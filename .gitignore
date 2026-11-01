@@ -1,0 +1,53 @@
+# Secrets & Config
+.env
+*.env
+secrets.*
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+ENV/
+
+# Frontend / Node
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+.npm/
+
+# Data, Database & State
+# Source database and local database instances are excluded from git
+ecommerce.sqlite
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Caches & Runtime Logs
+*.log
+logs/
+.cache/
+*.cache
+tmp/
+temp/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
