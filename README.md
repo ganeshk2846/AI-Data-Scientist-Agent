@@ -1,147 +1,131 @@
 # AI-Powered Data Scientist Agent for Business Intelligence (AI for BI)
 
-An enterprise-grade, conversational Data Scientist and Business Intelligence agent built on top of a multi-domain SQLite warehouse (`ecommerce.sqlite`). The system enables business users to ask natural-language business questions across six analytical levels (**What, Why, So What, What Next, What If, Now What**), retrieves the verified database schema, generates and validates safe read-only SQL, executes deterministic statistical and ML analysis, renders interactive visualizations, and composes business-oriented narratives with strict evidence traceability.
+An enterprise-grade, conversational Data Scientist and Business Intelligence agent built against a multi-domain SQLite data warehouse (`ecommerce.sqlite`). The system enables business stakeholders to ask natural-language questions across six analytical levels (**What, Why, So What, What Next, What If, Now What**), retrieves the verified database schema, generates and validates safe read-only SQL, executes deterministic statistical and ML calculations, renders interactive Plotly visualizations, and composes business narratives with strict evidence traceability.
 
 ---
 
-## 1. Architectural Pipeline & Design Principles
+## 1. System Architecture & Pipeline
 
-The runtime follows a strict pipeline:
-$$\text{Retrieve} \longrightarrow \text{Constrain} \longrightarrow \text{Plan} \longrightarrow \text{Generate} \longrightarrow \text{Validate} \longrightarrow \text{Execute} \longrightarrow \text{Verify} \longrightarrow \text{Analyze} \longrightarrow \text{Visualize} \longrightarrow \text{Explain}$$
+```
+User Question ──► ContextResolver ──► Router Agent ──► Answerability Gate ──► Clarification
+                        │
+                        ▼
+Planner DAG (7 Steps) ──► Hybrid Retriever (BM25 + TF-IDF RRF + FK Graph + Value Linker)
+                        │
+                        ▼
+SQL Generator ──► AST Security Guardrail ──► Bounded Repair (2x) ──► Read-Only Executor
+                        │
+                        ▼
+Deterministic Python Tools (Anomalies, Forecasts, Churn, Optimization)
+                        │
+                        ▼
+Visualization Agent (Plotly.js) ──► Executive Composer ──► Telemetry Tracer (p50/p95)
+```
 
-### Core Operating Principles
-1. **LLM for Language, Code for Numbers:** LLMs classify intents, ground queries, generate schema-constrained SQL, and narrate findings. All arithmetic, trend calculations, forecasting, and statistical modeling run in deterministic, tested Python tools.
-2. **Strictly Read-Only Business Warehouse:** `ecommerce.sqlite` is treated as immutable and opened with `mode=ro`. The agent never alters, writes to, migrates, or creates tables in the source database.
-3. **Agent-Owned Local Store:** Checkpoints, session state, audit traces, and precomputed insights reside exclusively in a separate, writable agent-owned SQLite database (`agent_app.sqlite`).
-4. **AST-Enforced SQL Guardrails:** SQL generation is restricted strictly to retrieved schema identifiers. Queries are parsed and validated via `sqlglot` to reject mutations, DDL, PRAGMA alterations, multi-statement injection, and unindexed full-table scans.
-5. **No Redis / No Complex Container Swarms:** Clean, in-process asynchronous task scheduling and LangGraph local SQLite checkpointers provide high performance and low operational complexity for development and testing.
+For detailed architectural specifications and design decisions, refer to [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
-## 2. Technology Stack
+## 2. Implementation Status & Phase Roadmap
+
+All 10 project phases have been completed, verified with actual executed code, merged into `main` via `--no-ff`, and tagged:
+
+| Phase | Milestone | Git Tag | Status | Documentation / Deliverables |
+|---|---|---|---|---|
+| **Phase 0** | Repository & Dataset Reconnaissance | `phase-0-complete` | **Complete** | [DATASET_PROFILE.md](docs/DATASET_PROFILE.md), `scripts/inspect_db.py`, `.gitignore` |
+| **Phase 1** | Project Foundation & Dev Experience | `phase-1-complete` | **Complete** | FastAPI, Next.js 14, Pydantic/Zod contracts, health harness |
+| **Phase 2** | Schema Preparation & Profiling | `phase-2-complete` | **Complete** | Schema catalogue, SHA-256 fingerprint caching, catalog browser UI |
+| **Phase 3** | NL Query API & Vertical Slice | `phase-3-complete` | **Complete** | Router, Grounder, `sqlglot` guardrail, vertical slice chat UI |
+| **Phase 4** | Multi-Agent Planning & Bounded Repair | `phase-4-complete` | **Complete** | Planner DAG, Answerability Gate, Clarification, Bounded 2-attempt Repair |
+| **Phase 5** | Hybrid Schema Retrieval & Semantics | `phase-5-complete` | **Complete** | BM25 + embedding RRF ($k=60$), FK graph expansion, value linker, metrics |
+| **Phase 6** | Reliable Analysis Tools | `phase-6-complete` | **Complete** | Deterministic stats, MAD anomalies, trend forecast, churn risk, SLSQP optimizer |
+| **Phase 7** | Visualization & Business Composition | `phase-7-complete` | **Complete** | Plotly.js chart renderer, table fallbacks, analytical follow-up suggestions |
+| **Phase 8** | Shared Memory & Reusable Knowledge | `phase-8-complete` | **Complete** | Central `MemoryService`, ContextResolver, `agent_app.sqlite`, session controls |
+| **Phase 9** | Security, Observability & Evaluation | `phase-9-complete` | **Complete** | AST injection defenses, 100% benchmark score, telemetry traces, [EVALUATION.md](docs/EVALUATION.md) |
+| **Phase 10** | End-to-End Validation & Final Sign-Off | `phase-10-complete` | **Complete** | 114 backend tests passing, Next.js production build, developer docs |
+
+For the chronological implementation log, refer to [DEVELOPMENT_HISTORY.md](DEVELOPMENT_HISTORY.md).
+
+---
+
+## 3. Technology Stack
 
 - **Backend API:** Python 3.14+, FastAPI, Uvicorn, Pydantic v2, Pydantic-Settings
-- **Workflow Orchestration:** LangGraph (stateful graph orchestration with local checkpoints)
-- **Database Access & Safety:** SQLite (`mode=ro`), SQLAlchemy 2.x (for agent-owned store), `sqlglot` (SQL AST parser/validator)
-- **Schema Grounding & Retrieval:** BM25 (`rank-bm25`) lexical search + local embedding retrieval with Reciprocal Rank Fusion (RRF)
-- **Analysis Engine:** `pandas`, `statsmodels`, `scikit-learn`, `scipy`, `xgboost`
-- **Frontend Application:** Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query
-- **Contract Validation:** Pydantic v2 (backend) and Zod (frontend)
-- **Visualizations:** Plotly.js (with full tabular and text fallback)
+- **Database Access & Safety:** SQLite (`mode=ro`), `sqlglot` (SQL AST parser/validator)
+- **Schema Grounding & Retrieval:** BM25 (`rank-bm25`) + local TF-IDF cosine similarity with Reciprocal Rank Fusion (RRF, $k=60$)
+- **Analysis Engine:** `pandas`, `statsmodels`, `scipy.optimize` (SLSQP), `scikit-learn`
+- **Application Store:** Local SQLite (`agent_app.sqlite` for sessions, active frames, preferences, and telemetry)
+- **Frontend Application:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons, TanStack Query
+- **Visualization:** `plotly.js-dist-min` (interactive charts with automatic table fallback)
 - **Streaming:** Server-Sent Events (SSE) via `sse-starlette`
-- **Testing:** `pytest` (backend)
+- **Testing:** `pytest` (114 passing backend unit and integration tests)
 
 ---
 
-## 3. Verified Dataset Overview (`ecommerce.sqlite`)
+## 4. Quickstart Guide
 
-The provided business warehouse has been fully profiled and validated in Phase 0:
-- **Total Tables:** 30 interconnected tables
-- **Total Views:** 0
-- **Total Rows:** 334,503 rows across all tables
-- **Total Indexes:** 61 indexes
-- **Foreign Key Declarations:** 44 foreign key relationships (0 violations verified via `PRAGMA foreign_key_check`)
-- **Temporal Span:** January 1, 2023 to December 31, 2025 (3 complete calendar years; 1,096 consecutive days)
-- **Financial Baseline:** 17,924 orders totaling \$21,761,969.17 gross (\$20,891,624.33 delivered across 17,274 orders; \$870,344.84 cancelled across 650 orders).
+### Prerequisites
+- Python 3.10+ (tested on Python 3.14.7)
+- Node.js 18+ (tested on Node v24.20.0) & npm 10+
+- The `ecommerce.sqlite` database file located in the project root
 
-For the complete schema inventory, column data types, null rates, and anomaly observations, refer to [DATASET_PROFILE.md](docs/DATASET_PROFILE.md).
-
----
-
-## 4. Repository Layout
-
-```text
-AI_FOR_BI_P/
-├── .env.example                      # Template configuration with safe placeholders
-├── .gitignore                         # Comprehensive ignore rules (secrets, venvs, caches, sqlite)
-├── README.md                          # Architecture, setup, run, test, and troubleshooting guide
-├── DEVELOPMENT_HISTORY.md             # Mandatory chronological audit trail
-├── PromptforAICodingTool.md           # Engineering guidelines and phase plan
-├── DataScientistAgentArchitecture_final.md # Architectural design reference specification
-├── ecommerce.sqlite                   # Source business dataset (strictly read-only)
-├── docs/
-│   ├── DATASET_PROFILE.md             # Verified inventory of all 30 tables, schemas, and metrics
-│   ├── ARCHITECTURE.md                # Implemented architecture & component boundaries
-│   └── EVALUATION.md                  # Metric definitions and gold test cases (Phase 9/10)
-├── scripts/
-│   ├── inspect_db.py                  # Read-only database inspection script
-│   ├── audit_quality.py               # Data quality, FK constraint, and PK uniqueness auditor
-│   └── generate_dataset_profile.py   # Dataset profile documentation generator
-├── backend/                           # FastAPI backend (Phase 1+)
-└── frontend/                          # Next.js App Router frontend (Phase 1+)
+### Environment Configuration
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Default configuration runs out-of-the-box in `MockLLMProvider` mode (no external API keys required). If using Google Gemini, set:
+```env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
----
-
-## 5. Getting Started & Verification
-
-### Local Development Commands
-
-#### 1. Start the FastAPI Backend
+### Running the Python Backend
 ```bash
-# From workspace root
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+# From repository root:
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 - API Documentation (Swagger): `http://localhost:8000/docs`
-- Health Probe: `http://localhost:8000/health`
-- Readiness Probe: `http://localhost:8000/ready`
-- System Status: `http://localhost:8000/api/v1/system/status`
+- Alternative API Documentation (ReDoc): `http://localhost:8000/redoc`
+- Readiness Health Check: `http://localhost:8000/api/v1/ready`
 
-#### 2. Run Backend Unit & Integration Tests
+### Running the Next.js Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:3000` in your web browser.
+
+---
+
+## 5. Verification & Testing
+
+### 1. Run Complete Backend Test Suite
 ```bash
 python -m pytest backend/tests -v
 ```
+*Current test status: 114 passed in ~3.5 seconds.*
 
-#### 3. Start the Next.js Frontend
+### 2. Run Reproducible Evaluation Harness
 ```bash
-cd frontend
-npm run dev
+python scripts/run_evaluation.py
 ```
-- Web Application UI: `http://localhost:3000`
+*Evaluates 25 gold benchmark test cases grounded in `ecommerce.sqlite`, verifying 100% security rejection, 100% refusal precision, and sub-15ms validation latencies.*
 
-#### 4. Build Frontend for Production
+### 3. Build Production Frontend Bundle
 ```bash
 cd frontend
 npm run build
 ```
-
-### Environment Configuration
-Copy the template environment file:
-```bash
-cp .env.example .env
-```
-*(Configure optional LLM provider keys in `.env` if natural-language synthesis is enabled; the application boots cleanly in mock/offline mode without API keys).*
-
-### Running Database Reconnaissance
-To verify read-only database connectivity and generate the dataset profile:
-```bash
-# Verify read-only access and generate raw inspection JSON
-python scripts/inspect_db.py
-
-# Audit foreign key integrity and data quality
-python scripts/audit_quality.py
-
-# Re-generate the markdown profile document
-python scripts/generate_dataset_profile.py
-```
+*Verifies TypeScript type safety, static page generation, and Plotly bundle compilation.*
 
 ---
 
-## 6. Implementation Roadmap & Phase Gate Status
+## 6. Key Documentation Reference
 
-| Phase | Description | Status | Completion Date | Reference |
-|---|---|---|---|---|
-| **Phase 0** | Repository & Dataset Reconnaissance | **Complete** | 2026-11-01 | [DATASET_PROFILE.md](docs/DATASET_PROFILE.md) |
-| **Phase 1** | Project Foundation & Developer Experience | Pending | - | - |
-| **Phase 2** | Read-Only DB Connection & Schema Preparation | Pending | - | - |
-| **Phase 3** | Natural-Language Question API & First Vertical Slice | Pending | - | - |
-| **Phase 4** | Multi-Agent Workflow, Planning & Bounded Repair | Pending | - | - |
-| **Phase 5** | Hybrid Schema Retrieval & Business Semantics | Pending | - | - |
-| **Phase 6** | Deterministic Analysis Tools (Descriptive, Predictive) | Pending | - | - |
-| **Phase 7** | Visualization & Business Answer Composition | Pending | - | - |
-| **Phase 8** | Shared Memory Service & Reusable Knowledge | Pending | - | - |
-| **Phase 9** | Security, Observability & Evaluation | Pending | - | - |
-| **Phase 10** | End-to-End Validation & Final Documentation | Pending | - | - |
-
-See [DEVELOPMENT_HISTORY.md](DEVELOPMENT_HISTORY.md) for detailed execution history, command outcomes, and design decisions.
-
+- **[DATASET_PROFILE.md](docs/DATASET_PROFILE.md):** Complete schema profile, foreign key inventory, null rates, and financial metrics across all 30 tables and 334,503 rows.
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md):** Multi-agent orchestration, hybrid retrieval, bounded repair, deterministic analysis tools, and telemetry design.
+- **[EVALUATION.md](docs/EVALUATION.md):** Benchmark results, naive baseline comparison, latency percentiles, and security verification.
+- **[DEVELOPMENT_HISTORY.md](DEVELOPMENT_HISTORY.md):** Complete chronological audit log of all 10 phases.
