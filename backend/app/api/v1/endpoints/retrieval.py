@@ -57,3 +57,4 @@ async def list_metrics(request: Request) -> APIResponse[List[BusinessMetric]]:
     request_id = getattr(request.state, "request_id", None)
     metrics = semantic_registry.list_metrics()
     return APIResponse(success=True, data=metrics, request_id=request_id)
+

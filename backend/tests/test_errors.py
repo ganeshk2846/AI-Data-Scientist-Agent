@@ -13,3 +13,4 @@ def test_custom_exception_serialization(client):
     assert body["success"] is False
     assert body["error"]["code"] == "RESOURCE_NOT_FOUND"
     assert "request_id" in body
+

@@ -114,3 +114,4 @@ class PreparationJobState(BaseModel):
     tables_processed: int = 0
     total_tables: int = 0
     source_fingerprint: Optional[str] = None
+

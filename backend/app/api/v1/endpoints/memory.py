@@ -117,3 +117,4 @@ async def list_exemplars(request: Request, domain: Optional[str] = None) -> APIR
     request_id = getattr(request.state, "request_id", None)
     exemplars = memory_service.store.list_exemplars(domain=domain)
     return APIResponse(success=True, data=exemplars, request_id=request_id)
+

@@ -121,3 +121,4 @@ def redact_sensitive_data(text: str) -> str:
     redacted = EMAIL_REGEX.sub("[REDACTED_EMAIL]", redacted)
     redacted = API_KEY_REGEX.sub("[REDACTED_SECRET]", redacted)
     return redacted
+

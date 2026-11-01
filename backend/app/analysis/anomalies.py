@@ -153,3 +153,4 @@ def detect_anomalies(
         ),
         anomaly_detection=result_payload,
     )
+

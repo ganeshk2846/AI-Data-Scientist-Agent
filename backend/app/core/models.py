@@ -60,3 +60,4 @@ class ReadinessStatus(BaseModel):
     app_store_ready: bool
     version: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+

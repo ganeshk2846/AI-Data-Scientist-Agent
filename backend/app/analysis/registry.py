@@ -129,3 +129,4 @@ class AnalysisToolRegistry:
 
 
 analysis_registry = AnalysisToolRegistry()
+

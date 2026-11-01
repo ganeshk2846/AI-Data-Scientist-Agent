@@ -96,7 +96,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:3000` in your web browser.
+Open `http://localhost:3001` in your web browser (defaulted to port 3001 to avoid conflicts on 3000; or pass any port with `npx next dev -p <port>`).
 
 ---
 

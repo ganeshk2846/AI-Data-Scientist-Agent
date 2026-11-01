@@ -184,3 +184,4 @@ def forecast_series(
         ),
         forecast=result_payload,
     )
+

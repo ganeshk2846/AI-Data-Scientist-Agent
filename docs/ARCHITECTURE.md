@@ -109,3 +109,4 @@ User Natural Language Question
 - **Agent Store (`agent_app.sqlite`):** Isolates session turns, active frames, preferences, and run traces from the read-only business database.
 - **ContextResolver:** Rewrites follow-up inquiries (e.g. "What about 2025?") into standalone queries without polluting downstream agents with raw transcripts.
 - **Telemetry:** Captures p50, p95, p99 latencies, success rates, and redacts PII/secrets.
+

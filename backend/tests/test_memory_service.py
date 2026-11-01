@@ -129,3 +129,4 @@ def test_memory_api_endpoints(client):
     s_res = client.get("/api/v1/memory/sessions")
     assert s_res.status_code == 200
     assert isinstance(s_res.json()["data"], list)
+

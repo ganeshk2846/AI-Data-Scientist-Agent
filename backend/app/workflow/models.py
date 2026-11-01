@@ -53,3 +53,4 @@ class QueryWorkflowResult(BaseModel):
     trace_steps: List[StepTrace] = Field(default_factory=list)
     total_duration_ms: float = 0.0
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+

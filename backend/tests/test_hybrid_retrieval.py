@@ -91,3 +91,4 @@ def test_api_retrieval_metrics_endpoint(client):
     metrics = body["data"]
     assert len(metrics) >= 5
     assert any(m["name"] == "gross_revenue" for m in metrics)
+

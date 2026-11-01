@@ -112,3 +112,4 @@ def test_redact_sensitive_pii_and_secrets():
     assert "[REDACTED_CC]" in redacted
     assert "sk-ant-api03-" not in redacted
     assert "[REDACTED_SECRET]" in redacted
+

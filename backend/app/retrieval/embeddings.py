@@ -41,3 +41,4 @@ class LocalTFIDFEmbeddingRetriever(BaseEmbeddingRetriever):
         scored_pairs = list(zip(self.table_names, similarities))
         scored_pairs.sort(key=lambda x: x[1], reverse=True)
         return [(t, float(score)) for t, score in scored_pairs[:top_k]]
+

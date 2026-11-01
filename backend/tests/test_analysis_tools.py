@@ -184,3 +184,4 @@ def test_analysis_registry_discovery_and_intent():
     assert analysis_registry.detect_intent("What is the churn risk for dormant customers?") == "analyze_customer_churn_risk"
     assert analysis_registry.detect_intent("What if price increases by 10%?") == "simulate_scenario"
     assert analysis_registry.detect_intent("Optimize budget across channels") == "optimize_budget_allocation"
+

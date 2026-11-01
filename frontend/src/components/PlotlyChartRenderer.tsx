@@ -219,3 +219,4 @@ export function PlotlyChartRenderer({ chartSpec, queryResult }: PlotlyChartRende
     </div>
   );
 }
+

@@ -40,3 +40,4 @@ def test_check_database_readiness():
     assert status.table_count == 30
     assert status.total_rows == 334503
     assert status.size_bytes > 40_000_000
+

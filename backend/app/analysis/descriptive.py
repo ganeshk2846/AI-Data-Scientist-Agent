@@ -132,3 +132,4 @@ def compare_periods(
         ),
         period_comparison=result_data,
     )
+

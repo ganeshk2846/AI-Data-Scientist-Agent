@@ -44,3 +44,4 @@ def test_system_status_endpoint(client):
     assert data["app"]["version"] == "0.1.0"
     assert data["database"]["connected"] is True
     assert data["limits"]["sql_query_timeout_seconds"] == 30
+

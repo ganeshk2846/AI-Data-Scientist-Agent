@@ -135,3 +135,4 @@ async def get_table(table_name: str, request: Request) -> APIResponse[TableModel
         )
 
     return APIResponse(success=True, data=tbl, request_id=request_id)
+

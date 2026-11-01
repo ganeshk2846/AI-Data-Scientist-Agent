@@ -88,3 +88,4 @@ class SQLRepairLoop:
 
 
 sql_repair_loop = SQLRepairLoop()
+

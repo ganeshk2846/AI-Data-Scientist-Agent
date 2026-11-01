@@ -123,3 +123,4 @@ def check_database_readiness() -> DatabaseReadiness:
             path=str(db_path),
             error=str(e),
         )
+

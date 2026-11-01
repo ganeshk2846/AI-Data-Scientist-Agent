@@ -126,3 +126,4 @@ def test_temporary_test_database(tmp_path):
     cur.execute("SELECT COUNT(*) FROM users;")
     assert cur.fetchone()[0] == 2
     conn_ro.close()
+

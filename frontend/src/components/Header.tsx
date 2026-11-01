@@ -44,3 +44,4 @@ export function Header({ isReady, version = "0.1.0" }: HeaderProps) {
     </header>
   );
 }
+

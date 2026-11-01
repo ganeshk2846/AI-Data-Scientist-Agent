@@ -25,3 +25,4 @@ class LLMResponse(BaseModel):
     tokens_used: Optional[int] = None
     finish_reason: Optional[str] = None
     raw_response: Optional[Dict[str, Any]] = None
+

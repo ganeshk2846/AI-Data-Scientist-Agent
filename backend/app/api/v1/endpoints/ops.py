@@ -34,3 +34,4 @@ async def list_traces(request: Request, limit: int = 25) -> APIResponse[List[Run
     request_id = getattr(request.state, "request_id", None)
     traces = observability_tracer.get_recent_traces(limit=limit)
     return APIResponse(success=True, data=traces, request_id=request_id)
+

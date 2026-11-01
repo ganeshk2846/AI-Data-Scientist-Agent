@@ -88,3 +88,4 @@ class SemanticRegistry:
 
 
 semantic_registry = SemanticRegistry()
+

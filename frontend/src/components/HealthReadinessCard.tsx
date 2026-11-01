@@ -43,7 +43,7 @@ export function HealthReadinessCard({
               {error?.message || "Could not connect to FastAPI backend at http://localhost:8000"}
             </p>
             <div className="mt-4 p-3 rounded-lg bg-background/50 border border-border font-mono text-xs text-muted-foreground">
-              Run backend: <code>uvicorn backend.app.main:app --port 8000 --reload</code>
+              Run backend: <code>python -m uvicorn backend.app.main:app --port 8000 --reload</code>
             </div>
             <button
               onClick={onRefresh}
@@ -198,3 +198,4 @@ export function HealthReadinessCard({
     </div>
   );
 }
+

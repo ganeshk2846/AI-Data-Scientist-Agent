@@ -31,3 +31,4 @@ class BM25Retriever:
         # Sort descending by score
         scored_pairs.sort(key=lambda x: x[1], reverse=True)
         return scored_pairs[:top_k]
+

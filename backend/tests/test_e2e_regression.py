@@ -162,3 +162,4 @@ def test_e2e_observability_and_traces(e2e_client):
     assert t_res.status_code == 200
     traces = t_res.json()["data"]
     assert len(traces) > 0
+

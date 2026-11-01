@@ -31,3 +31,4 @@ def test_secret_redaction():
     assert safe["OPENAI_API_KEY"] == "[REDACTED]"
     assert safe["ANTHROPIC_API_KEY"] == "[REDACTED]"
     assert safe["GEMINI_API_KEY"] is None
+

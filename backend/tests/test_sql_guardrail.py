@@ -67,3 +67,4 @@ def test_automatic_limit_appended():
     v, sanitized, _ = sql_validator.validate_and_format_sql(query, catalog)
     assert v is True
     assert "LIMIT 1000" in sanitized or "LIMIT" in sanitized
+

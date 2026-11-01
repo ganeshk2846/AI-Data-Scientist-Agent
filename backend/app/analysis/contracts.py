@@ -156,3 +156,4 @@ class AnalysisToolResult(BaseModel):
     scenario: Optional[ScenarioResult] = None
     churn_risk: Optional[ChurnAnalysisResult] = None
     optimization: Optional[OptimizationResult] = None
+

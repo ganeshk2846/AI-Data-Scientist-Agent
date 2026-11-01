@@ -131,3 +131,4 @@ def optimize_budget_allocation(
         ),
         optimization=result_payload,
     )
+

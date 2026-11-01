@@ -117,3 +117,4 @@ def simulate_scenario(
         ),
         scenario=result_payload,
     )
+

@@ -60,3 +60,4 @@ class ContextPack(BaseModel):
     user_preferences: Dict[str, str] = Field(default_factory=dict)
     exemplars: List[ReusableExemplar] = Field(default_factory=list)
     context_hash: str
+

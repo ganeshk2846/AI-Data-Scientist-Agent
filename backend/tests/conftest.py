@@ -22,3 +22,4 @@ def client():
     """Provides a synchronous FastAPI TestClient."""
     with TestClient(app) as test_client:
         yield test_client
+
