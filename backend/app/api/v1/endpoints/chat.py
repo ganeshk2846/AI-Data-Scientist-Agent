@@ -36,7 +36,12 @@ async def execute_chat_query(
     Router -> Answerability Gate -> Clarification -> Planner DAG -> Grounder -> Validator/Repair -> Executor -> Verifier -> Visualization -> Composer.
     """
     request_id = getattr(request.state, "request_id", None)
-    result = await multi_agent_orchestrator.run(body.query, request_id=request_id)
+    session_id = body.session_id or "default_session"
+    result = await multi_agent_orchestrator.run(
+        body.query,
+        session_id=session_id,
+        request_id=request_id,
+    )
     return APIResponse(success=True, data=result, request_id=request_id)
 
 
@@ -62,6 +67,7 @@ async def stream_chat_query(
         try:
             result = await multi_agent_orchestrator.run(
                 body.query,
+                session_id=body.session_id or "default_session",
                 request_id=request_id,
                 progress_callback=sync_progress_callback,
             )
