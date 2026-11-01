@@ -53,12 +53,13 @@ const WORKFLOW_STEPS = [
 ];
 
 export function ChatInterface() {
+  const [sessionId, setSessionId] = useState<string>("sess-" + Math.random().toString(36).substring(2, 9));
   const [queryInput, setQueryInput] = useState("");
   const [activeTab, setActiveTab] = useState<"narrative" | "chart" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
   const [copiedSql, setCopiedSql] = useState(false);
 
   const queryMutation = useMutation({
-    mutationFn: (text: string) => executeChatQuery(text),
+    mutationFn: (text: string) => executeChatQuery(text, sessionId),
   });
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -75,6 +76,12 @@ export function ChatInterface() {
   const handleClarificationOption = (inferredQuery: string) => {
     setQueryInput(inferredQuery);
     queryMutation.mutate(inferredQuery);
+  };
+
+  const handleNewSession = () => {
+    setSessionId("sess-" + Math.random().toString(36).substring(2, 9));
+    setQueryInput("");
+    queryMutation.reset();
   };
 
   const handleCopySql = (sql: string) => {
@@ -95,8 +102,20 @@ export function ChatInterface() {
             Multi-Agent Conversational BI Interface
           </h2>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-mono">
-            Phase 7 Visualization & Composer Active
+            Phase 8 Shared Memory Active
           </span>
+          <div className="ml-auto flex items-center space-x-2">
+            <span className="text-[11px] font-mono text-muted-foreground px-2 py-0.5 rounded bg-muted/60">
+              {sessionId}
+            </span>
+            <button
+              onClick={handleNewSession}
+              type="button"
+              className="text-xs px-2.5 py-1 rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors"
+            >
+              + New Session
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="relative">

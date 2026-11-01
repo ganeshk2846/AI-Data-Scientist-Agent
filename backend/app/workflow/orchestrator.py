@@ -24,6 +24,7 @@ from backend.app.analysis.contracts import AnalysisToolResult
 from backend.app.analysis.registry import analysis_registry
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
+from backend.app.memory.service import memory_service
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
 from backend.app.retrieval.hybrid import hybrid_retriever
@@ -73,7 +74,9 @@ Respond in concise markdown with:
 class MultiAgentWorkflowResult(BaseModel):
     """Complete result from the multi-agent planning and execution pipeline."""
     run_id: str
+    session_id: str = "default_session"
     query: str
+    standalone_query: Optional[str] = None
     route: RouteResult
     answerability: AnswerabilityAssessment
     clarification: Optional[ClarificationResponse] = None
@@ -100,6 +103,7 @@ class MultiAgentOrchestrator:
     async def run(
         self,
         query: str,
+        session_id: str = "default_session",
         request_id: Optional[str] = None,
         progress_callback: Optional[Callable[[WorkflowProgressState, str], None]] = None,
     ) -> MultiAgentWorkflowResult:
@@ -107,6 +111,17 @@ class MultiAgentOrchestrator:
         overall_start = time.perf_counter()
         traces: List[StepTrace] = []
         repair_attempts: List[RepairAttempt] = []
+
+        # Step 0: ContextResolver (Shared Memory)
+        standalone_q = memory_service.resolve_contextual_question(session_id, query)
+        if standalone_q != query:
+            traces.append(StepTrace(
+                step="understanding_question",
+                status="succeeded",
+                duration_ms=1.0,
+                message=f"ContextResolver resolved follow-up to: '{standalone_q}'",
+            ))
+        memory_service.record_user_turn(session_id, query, standalone_rewrite=standalone_q)
 
         catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
         llm = get_llm_provider()
@@ -478,9 +493,13 @@ class MultiAgentOrchestrator:
             ]
         total_duration_ms = (time.perf_counter() - overall_start) * 1000
 
+        memory_service.record_assistant_turn(session_id, composed_text, sql=sanitized_sql)
+
         return MultiAgentWorkflowResult(
             run_id=run_id,
+            session_id=session_id,
             query=query,
+            standalone_query=standalone_q,
             route=route,
             answerability=answerability,
             clarification=clarification,

@@ -74,12 +74,12 @@ export async function fetchTableDetail(tableName: string): Promise<TableModel> {
   return parsed.data.data;
 }
 
-export async function executeChatQuery(queryText: string): Promise<MultiAgentWorkflowResult> {
+export async function executeChatQuery(queryText: string, sessionId?: string): Promise<MultiAgentWorkflowResult> {
   const url = `${API_BASE_URL}/api/v1/chat/query`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ query: queryText }),
+    body: JSON.stringify({ query: queryText, session_id: sessionId }),
   });
   const json = await res.json();
   const parsed = MultiAgentWorkflowResponseSchema.safeParse(json);
@@ -114,4 +114,12 @@ export async function searchRetrieval(query: string, topK: number = 5): Promise<
     throw new Error(parsed.data?.error?.message || "Failed to execute hybrid retrieval search");
   }
   return parsed.data.data;
+}
+
+
+export async function clearSessionApi(sessionId: string): Promise<boolean> {
+  const url = `${API_BASE_URL}/api/v1/memory/sessions/${encodeURIComponent(sessionId)}/clear`;
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  const json = await res.json();
+  return Boolean(json.success);
 }

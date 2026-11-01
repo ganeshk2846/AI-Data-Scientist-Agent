@@ -12,7 +12,7 @@
 | **Phase 5** | Hybrid schema retrieval & business semantics | **Complete** | 2026-11-01 | BM25 + embedding RRF, FK graph expansion, value linking, semantic metrics |
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | **Complete** | 2026-11-01 | Deterministic stats, MAD anomalies, trend forecast, churn risk, SLSQP optimizer |
 | **Phase 7** | Visualization & business answer composition | **Complete** | 2026-11-01 | Plotly.js chart renderer, table fallbacks, follow-up suggestions |
-| **Phase 8** | Shared memory, sessions & reusable knowledge | Pending | - | Central MemoryService, session isolation, context pack |
+| **Phase 8** | Shared memory, sessions & reusable knowledge | **Complete** | 2026-11-01 | Central MemoryService, ContextResolver, agent_app.sqlite, session controls |
 | **Phase 9** | Security, observability, evaluation & performance | Pending | - | AST injection defenses, gold evaluation benchmark, traces |
 | **Phase 10** | End-to-end validation & final documentation | Pending | - | Full test suites, developer guide, final sign-off |
 
@@ -515,3 +515,55 @@
   - Provided instant Table toggle in the chart header so users can always inspect underlying exact numbers without changing main tabs.
 - **Next phase:**
   - Phase 8 — Shared memory, sessions, and reusable knowledge: Central `MemoryService` with session history, user preferences, pinned entities, and conversational context pack in `agent_app.sqlite`.
+
+
+---
+
+## Phase 8 — Shared memory, sessions, and reusable knowledge
+- **Date/time:** 2026-11-01T18:10:00+05:30
+- **Status:** Complete
+- **Objective:** Establish a unified, application-level `MemoryService` using a dedicated agent store (`agent_app.sqlite`), strictly separated from the read-only customer warehouse (`ecommerce.sqlite`). Maintain conversation turns, active frame slot state (metric, dimensions, filters, time range), user preferences, and verified reusable exemplars. Implement the "Rewrite, don't concatenate" ContextResolver so that downstream agents never receive raw, ambiguous transcript fragments, while ensuring that live database results remain the sole source of truth (memory assists context; it never overrides data).
+- **Implemented:**
+  - Implemented `backend/app/memory/models.py`: Pydantic models for `TurnModel`, `ActiveFrame`, `SessionModel`, `UserPreference`, `ReusableExemplar`, and `ContextPack`.
+  - Implemented `backend/app/memory/store.py`: Thread-safe SQLite repository managing tables `memory_sessions`, `memory_turns`, `memory_preferences`, and `memory_exemplars` in `agent_app.sqlite` with WAL mode and indexing.
+  - Implemented `backend/app/memory/service.py`: `MemoryService` providing session lifecycle, turn recording, preference precedence, and ContextResolver query rewriting:
+    - Resolves temporal shifts (e.g. "What about 2025?" -> "What is the revenue for 2025?")
+    - Resolves category substitutions (e.g. "And for Electronics?" -> "What are the total sales for Electronics?")
+    - Resolves diagnostic driver inquiries (e.g. "Why did that happen?" -> "What are the primary drivers and factors causing the change in revenue?")
+    - Detects explicit resets ("New question", "reset", "start over") to clear frames.
+  - Implemented `backend/app/api/v1/endpoints/memory.py`: REST endpoints for listing, inspecting, clearing, and deleting sessions, as well as managing user preferences and exemplars.
+  - Mounted memory router in `backend/app/api/v1/router.py`.
+  - Integrated `MemoryService` into `backend/app/workflow/orchestrator.py` and `backend/app/api/v1/endpoints/chat.py`.
+  - Created test suite `backend/tests/test_memory_service.py` (6 unit and integration tests).
+  - Enhanced frontend (`frontend/src/components/ChatInterface.tsx` and `frontend/src/lib/api.ts`) with active session tracking, a session ID indicator, and an interactive "+ New Session" button to clear conversational context.
+- **Files created/modified:**
+  - `backend/app/memory/models.py` (created) — Typed contracts for memory objects.
+  - `backend/app/memory/store.py` (created) — Relational SQLite persistence adapter for `agent_app.sqlite`.
+  - `backend/app/memory/service.py` (created) — Central MemoryService and ContextResolver.
+  - `backend/app/api/v1/endpoints/memory.py` (created) — REST endpoints for sessions and preferences.
+  - `backend/app/api/v1/router.py` (modified) — Mounted memory router.
+  - `backend/app/workflow/orchestrator.py` (modified) — Connected ContextResolver and turn logging.
+  - `backend/app/api/v1/endpoints/chat.py` (modified) — Accepted `session_id` parameter.
+  - `backend/tests/test_memory_service.py` (created) — 6 tests for memory isolation, rewriting, and reset.
+  - `frontend/src/lib/api.ts` (modified) — Added `sessionId` parameter to `executeChatQuery` and `clearSessionApi`.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Added session controls and badge.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 8 entry.
+- **Commands executed:**
+  - `git checkout -b phase-8-shared-memory` — Switched to dedicated Phase 8 branch.
+  - `python -m pytest backend/tests -v` — Ran full test suite (73 passed in 1.17s).
+  - `cd frontend; npm run build` — Compiled Next.js frontend production bundle (0 errors).
+- **Tests/checks:**
+  - Passed: Distinct sessions maintain completely isolated turn histories and active frames.
+  - Passed: ContextResolver cleanly rewrites elliptical temporal questions ("What about 2025?") into standalone queries.
+  - Passed: ContextResolver cleanly rewrites categorical questions ("And for Electronics?") using inherited metrics.
+  - Passed: Explicit reset instructions ("New question", "reset") clear active frames.
+  - Passed: Clearing a session purges turn records while preserving the session container.
+  - Passed: Deleting a session permanently cascades through associated turns.
+  - Passed: User preferences are stored and updated with explicit instruction precedence.
+- **Dataset/schema observations:**
+  - Separating application state into `agent_app.sqlite` strictly guarantees zero writes or schema pollution on the user's business warehouse `ecommerce.sqlite`.
+- **Decisions and rationale:**
+  - Implemented the "Rewrite, don't concatenate" pattern so that SQL generator, validator, and retrieval components receive clean, unambiguous sentences rather than conversational debris.
+  - Bound turn retrieval strictly to the last 3 turns to prevent token bloat and context window saturation.
+- **Next phase:**
+  - Phase 9 — Security, observability, evaluation, and performance: Hardening AST guardrails against SQL injection/bypasses, creating the evaluation gold benchmark dataset, tracking latency and cost metrics, and writing `docs/EVALUATION.md`.
