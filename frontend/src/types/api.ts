@@ -266,6 +266,60 @@ export const SchemaStatusResponseSchema = createAPIResponseSchema(SchemaStatusSc
 export const TableListResponseSchema = createAPIResponseSchema(z.array(TableSummarySchema));
 export const TableDetailResponseSchema = createAPIResponseSchema(TableModelSchema);
 export const PreparationJobResponseSchema = createAPIResponseSchema(PreparationJobStateSchema);
+export const BusinessMetricSchema = z.object({
+  name: z.string(),
+  display_name: z.string(),
+  formula_sql: z.string(),
+  plain_description: z.string(),
+  primary_tables: z.array(z.string()),
+  filters_applied: z.array(z.string()).default([]),
+  business_caveat: z.string().nullable().optional(),
+});
+
+export const LinkedValueSchema = z.object({
+  matched_text: z.string(),
+  table_name: z.string(),
+  column_name: z.string(),
+  target_value: z.string(),
+  confidence: z.number(),
+  filter_expression: z.string(),
+});
+
+export const RetrievedTableSchema = z.object({
+  table_name: z.string(),
+  domain: z.string(),
+  rrf_score: z.number(),
+  bm25_score: z.number(),
+  bm25_rank: z.number(),
+  embedding_score: z.number(),
+  embedding_rank: z.number(),
+  is_expanded_join: z.boolean().default(false),
+  expansion_reason: z.string().nullable().optional(),
+});
+
+export const HybridRetrievalResultSchema = z.object({
+  query: z.string(),
+  retrieved_tables: z.array(RetrievedTableSchema),
+  selected_table_names: z.array(z.string()),
+  minimal_schema_prompt: z.string(),
+});
+
+export const RetrievalDiagnosticPayloadSchema = z.object({
+  query: z.string(),
+  hybrid_result: HybridRetrievalResultSchema,
+  linked_values: z.array(LinkedValueSchema),
+  relevant_metrics: z.array(BusinessMetricSchema),
+});
+
+export const BusinessMetricsListResponseSchema = createAPIResponseSchema(z.array(BusinessMetricSchema));
+export const RetrievalDiagnosticResponseSchema = createAPIResponseSchema(RetrievalDiagnosticPayloadSchema);
+
+export type BusinessMetric = z.infer<typeof BusinessMetricSchema>;
+export type LinkedValue = z.infer<typeof LinkedValueSchema>;
+export type RetrievedTable = z.infer<typeof RetrievedTableSchema>;
+export type HybridRetrievalResult = z.infer<typeof HybridRetrievalResultSchema>;
+export type RetrievalDiagnosticPayload = z.infer<typeof RetrievalDiagnosticPayloadSchema>;
+
 export const MultiAgentWorkflowResponseSchema = createAPIResponseSchema(MultiAgentWorkflowResultSchema);
 
 export type ColumnModel = z.infer<typeof ColumnModelSchema>;

@@ -1,6 +1,7 @@
 """
-Multi-Agent Orchestrator with Planning, Clarification, and Bounded SQL Repair.
-Coordinates Router, Answerability Gate, Clarification, Planner, Grounder, Validator, Repair, Executor, Visualization, and Composer.
+Multi-Agent Orchestrator with Planning, Clarification, Bounded SQL Repair, and Hybrid Schema Retrieval.
+Coordinates Router, Answerability Gate, Clarification, Planner, Hybrid Retriever, Value Linker,
+Validator, Repair Loop, Executor, Visualization, and Composer.
 """
 
 import time
@@ -23,7 +24,9 @@ from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
-from backend.app.retrieval.retriever import schema_grounder
+from backend.app.retrieval.hybrid import hybrid_retriever
+from backend.app.retrieval.semantics import semantic_registry
+from backend.app.retrieval.value_linker import LinkedValue, value_linker
 from backend.app.schema.service import schema_service
 from backend.app.sql.executor import QueryExecutionResult, sql_executor
 from backend.app.sql.repair import sql_repair_loop
@@ -42,6 +45,10 @@ STRICT CONSTRAINTS:
 
 SCHEMA CONTEXT:
 {schema_context}
+
+{linked_values_context}
+
+{metrics_context}
 """
 
 COMPOSER_PROMPT = """You are an expert Chief Data Scientist composing a concise executive response.
@@ -70,6 +77,7 @@ class MultiAgentWorkflowResult(BaseModel):
     clarification: Optional[ClarificationResponse] = None
     plan: Optional[ExecutionPlan] = None
     selected_tables: List[str] = Field(default_factory=list)
+    linked_values: List[LinkedValue] = Field(default_factory=list)
     sanitized_sql: Optional[str] = None
     query_result: Optional[QueryExecutionResult] = None
     chart_spec: Optional[ChartSpecification] = None
@@ -83,7 +91,7 @@ class MultiAgentWorkflowResult(BaseModel):
 
 
 class MultiAgentOrchestrator:
-    """Orchestrates the multi-agent pipeline with planning, clarification, and bounded repair."""
+    """Orchestrates the multi-agent pipeline with planning, clarification, hybrid retrieval, and bounded repair."""
 
     async def run(
         self,
@@ -157,20 +165,45 @@ class MultiAgentOrchestrator:
                 total_duration_ms=round(total_duration_ms, 2),
             )
 
-        # Step 4: Grounding & Planning
+        # Step 4: Hybrid Schema Retrieval (BM25 + TF-IDF RRF + Value Linking)
         s2_start = time.perf_counter()
         if progress_callback:
-            progress_callback("retrieving_schema", "Grounding entities and building execution DAG...")
-        selected_tables = schema_grounder.retrieve_tables(query, catalog)
-        schema_prompt = catalog.to_minimal_prompt_schema(selected_tables)
+            progress_callback("retrieving_schema", "Running hybrid BM25 + embedding RRF retrieval and linking values...")
+
+        retrieval_res = hybrid_retriever.retrieve(query, top_k=5)
+        selected_tables = retrieval_res.selected_table_names
+        schema_prompt = retrieval_res.minimal_schema_prompt
+
+        linked_values = value_linker.link_values(query)
+        relevant_metrics = semantic_registry.find_relevant_metrics(query)
+
+        # Build prompt context additions
+        linked_str = ""
+        if linked_values:
+            linked_str = "LINKED DATABASE VALUES:\n" + "\n".join(
+                f"- Entity '{lv.user_mention}' matches column {lv.target_table}.{lv.target_column} = '{lv.exact_db_value}'"
+                for lv in linked_values
+            )
+
+        metrics_str = ""
+        if relevant_metrics:
+            metrics_str = "VERIFIED METRIC DEFINITIONS:\n" + "\n".join(
+                f"- {m.display_name}: Formula: {m.formula} ({m.description})"
+                for m in relevant_metrics
+            )
+
         plan = planner_agent.create_plan(query, route, selected_tables)
         s2_ms = (time.perf_counter() - s2_start) * 1000
         traces.append(StepTrace(
             step="retrieving_schema",
             status="succeeded",
             duration_ms=round(s2_ms, 2),
-            message=f"Planner DAG created ({len(plan.steps)} steps) with tables: {', '.join(selected_tables)}",
-            metadata={"plan_id": plan.plan_id, "selected_tables": selected_tables},
+            message=f"Hybrid RRF retrieved {len(selected_tables)} tables ({', '.join(selected_tables)}) and linked {len(linked_values)} exact values.",
+            metadata={
+                "plan_id": plan.plan_id,
+                "selected_tables": selected_tables,
+                "linked_values_count": len(linked_values),
+            },
         ))
 
         # Step 5: SQL Candidate Generation
@@ -179,7 +212,14 @@ class MultiAgentOrchestrator:
             progress_callback("generating_query", "Generating schema-grounded SQL query candidate...")
         gen_req = LLMRequest(
             messages=[
-                LLMMessage(role="system", content=SQL_GEN_PROMPT.format(schema_context=schema_prompt)),
+                LLMMessage(
+                    role="system",
+                    content=SQL_GEN_PROMPT.format(
+                        schema_context=schema_prompt,
+                        linked_values_context=linked_str,
+                        metrics_context=metrics_str,
+                    ),
+                ),
                 LLMMessage(role="user", content=query),
             ],
             temperature=0.0,
@@ -237,6 +277,7 @@ class MultiAgentOrchestrator:
                 answerability=answerability,
                 plan=plan,
                 selected_tables=selected_tables,
+                linked_values=linked_values,
                 sanitized_sql=None,
                 repair_attempts=repair_attempts,
                 composed_answer=f"### Query Blocked by Safety Guardrail\n\nThe query could not be safely validated after {len(repair_attempts)} repair attempts.\n\n**Reasons:** {'; '.join(val_errors)}",
@@ -260,7 +301,6 @@ class MultiAgentOrchestrator:
         try:
             query_result = sql_executor.execute_query(sanitized_sql)
         except Exception as exec_err:
-            # If execution error and we still have repair attempts remaining
             if len(repair_attempts) < 2:
                 logger.warning(f"Query execution error: {exec_err}. Attempting repair...")
                 exec_repair = await sql_repair_loop.attempt_repair(
@@ -366,6 +406,7 @@ class MultiAgentOrchestrator:
             clarification=clarification,
             plan=plan,
             selected_tables=selected_tables,
+            linked_values=linked_values,
             sanitized_sql=sanitized_sql,
             query_result=query_result,
             chart_spec=chart_spec,

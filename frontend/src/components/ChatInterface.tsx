@@ -92,7 +92,7 @@ export function ChatInterface() {
             Multi-Agent Conversational BI Interface
           </h2>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-mono">
-            Phase 4 Multi-Agent Active
+            Phase 5 Hybrid Retrieval Active
           </span>
         </div>
 
@@ -211,6 +211,19 @@ export function ChatInterface() {
               <p className="text-sm font-medium text-foreground mt-1.5 italic">
                 "{result.query}"
               </p>
+              {result.selected_tables.length > 0 && (
+                <div className="flex items-center space-x-1.5 mt-2 flex-wrap gap-1">
+                  <span className="text-[11px] text-muted-foreground font-mono">Grounded Tables (RRF):</span>
+                  {result.selected_tables.map((tbl) => (
+                    <span
+                      key={tbl}
+                      className="text-[10px] px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-mono"
+                    >
+                      {tbl}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* View Tabs */}
