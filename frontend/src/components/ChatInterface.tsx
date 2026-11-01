@@ -54,9 +54,11 @@ const WORKFLOW_STEPS = [
 
 export function ChatInterface() {
   const [sessionId, setSessionId] = useState<string>("sess-default");
+  const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
     setSessionId("sess-" + Math.random().toString(36).substring(2, 9));
+    setMounted(true);
   }, []);
   const [queryInput, setQueryInput] = useState("");
   const [activeTab, setActiveTab] = useState<"narrative" | "chart" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
@@ -110,7 +112,7 @@ export function ChatInterface() {
           </span>
           <div className="ml-auto flex items-center space-x-2">
             <span suppressHydrationWarning className="text-[11px] font-mono text-muted-foreground px-2 py-0.5 rounded bg-muted/60">
-              {sessionId}
+              {mounted ? sessionId : 'sess-default'}
             </span>
             <button
               onClick={handleNewSession}
