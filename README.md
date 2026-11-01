@@ -84,11 +84,11 @@ GEMINI_MODEL=gemini-2.0-flash
 ### Running the Python Backend
 ```bash
 # From repository root:
-python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
-- API Documentation (Swagger): `http://localhost:8000/docs`
-- Alternative API Documentation (ReDoc): `http://localhost:8000/redoc`
-- Readiness Health Check: `http://localhost:8000/api/v1/ready`
+- API Documentation (Swagger): `http://localhost:8001/docs`
+- Alternative API Documentation (ReDoc): `http://localhost:8001/redoc`
+- Readiness Health Check: `http://localhost:8001/ready`
 
 ### Running the Next.js Frontend
 ```bash

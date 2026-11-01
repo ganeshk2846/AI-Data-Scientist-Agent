@@ -17,7 +17,7 @@ import {
   RetrievalDiagnosticResponseSchema,
 } from "@/types/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
 
 export async function fetchReadiness(): Promise<ReadinessStatus> {
   const url = `${API_BASE_URL}/api/v1/ready`;

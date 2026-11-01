@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     APP_ENV: str = Field(default="development", description="development, testing, production")
     APP_DEBUG: bool = Field(default=False)
     APP_HOST: str = "0.0.0.0"
-    APP_PORT: int = 8000
+    APP_PORT: int = 8001
     LOG_LEVEL: str = "INFO"
 
     # CORS settings
@@ -42,6 +42,8 @@ class Settings(BaseSettings):
         "http://localhost:3002",
         "http://127.0.0.1:3002",
         "http://localhost:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
     ]
 
     # Database paths

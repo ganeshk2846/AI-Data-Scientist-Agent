@@ -40,10 +40,10 @@ export function HealthReadinessCard({
           <div className="flex-1">
             <h3 className="font-semibold text-base">Backend Connection Offline</h3>
             <p className="text-xs text-muted-foreground mt-1 text-foreground/80">
-              {error?.message || "Could not connect to FastAPI backend at http://localhost:8000"}
+              {error?.message || "Could not connect to FastAPI backend at http://localhost:8001"}
             </p>
             <div className="mt-4 p-3 rounded-lg bg-background/50 border border-border font-mono text-xs text-muted-foreground">
-              Run backend: <code>python -m uvicorn backend.app.main:app --port 8000 --reload</code>
+              Run backend: <code>python -m uvicorn backend.app.main:app --port 8001 --reload</code>
             </div>
             <button
               onClick={onRefresh}
