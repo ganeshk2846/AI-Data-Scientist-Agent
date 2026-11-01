@@ -10,7 +10,7 @@
 | **Phase 3** | NL question API & first reliable vertical slice | **Complete** | 2026-11-01 | Router, Grounder, sqlglot guardrail, vertical slice chat UI |
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | **Complete** | 2026-11-01 | Planner DAG, Clarification, Answerability Gate, Bounded Repair (2x) |
 | **Phase 5** | Hybrid schema retrieval & business semantics | **Complete** | 2026-11-01 | BM25 + embedding RRF, FK graph expansion, value linking, semantic metrics |
-| **Phase 6** | Reliable analysis tools (descriptive, predictive) | Pending | - | Deterministic stats, time-series forecasting, churn risk |
+| **Phase 6** | Reliable analysis tools (descriptive, predictive) | **Complete** | 2026-11-01 | Deterministic stats, MAD anomalies, trend forecast, churn risk, SLSQP optimizer |
 | **Phase 7** | Visualization & business answer composition | Pending | - | Plotly specs, table fallbacks, evidence-linked narrative |
 | **Phase 8** | Shared memory, sessions & reusable knowledge | Pending | - | Central MemoryService, session isolation, context pack |
 | **Phase 9** | Security, observability, evaluation & performance | Pending | - | AST injection defenses, gold evaluation benchmark, traces |
@@ -407,3 +407,65 @@
   - RRF constant $k=60$ prevents any single outlier ranking from skewing candidate selection.
 - **Next phase:**
   - Phase 6 — Reliable analysis tools: Descriptive, diagnostic, predictive, and prescriptive analysis tools in Python (period-over-period comparisons, trend decomposition, anomaly detection, churn risk, cohort retention, and what-if simulation).
+
+
+---
+
+## Phase 6 — Reliable analysis tools: descriptive, diagnostic, predictive, and prescriptive
+- **Date/time:** 2026-11-01T17:50:00+05:30
+- **Status:** Complete
+- **Objective:** Provide genuine data-scientist analytical capabilities in deterministic Python without relying on the LLM to invent arithmetic or statistical calculations. Implement pure functions with explicit units, provenance tracking, and typed confidence bounds for period-over-period comparisons, MAD-based anomaly detection with data-quality screening, diagnostic driver attribution (with explicit non-causal caveats), time-series trend forecasting with backtesting, what-if elasticity scenarios, customer segment churn risk prioritization against real SQLite history, and prescriptive budget optimization using `scipy.optimize`.
+- **Implemented:**
+  - Implemented `backend/app/analysis/contracts.py`: Pydantic models defining `AnalysisType`, `ProvenanceInfo`, `PeriodComparisonResult`, `AnomalyPoint`, `AnomalyDetectionResult`, `DriverContribution`, `DriverAnalysisResult`, `ForecastPoint`, `ForecastResult`, `ScenarioResult`, `SegmentChurnRisk`, `ChurnAnalysisResult`, `OptimizationResult`, and `AnalysisToolResult`.
+  - Implemented `backend/app/analysis/descriptive.py`: Pure function `compare_periods` calculating exact period deltas and categorical mix breakdowns with % contribution.
+  - Implemented `backend/app/analysis/anomalies.py`: Robust median/MAD z-score anomaly detector (`detect_anomalies`) with pre-flight data quality screening for duplicate batch loads and missing data gaps.
+  - Implemented `backend/app/analysis/diagnostic.py`: Variance mix decomposition tool (`analyze_drivers`) ranking candidate drivers with sample sizes and explicit non-causal disclaimer.
+  - Implemented `backend/app/analysis/forecasting.py`: Time-series forecasting tool (`forecast_series`) with holdout out-of-sample backtesting (MAE, RMSE, MAPE) and 80%/95% prediction intervals.
+  - Implemented `backend/app/analysis/scenarios.py`: What-if simulation tool (`simulate_scenario`) with log-log multiplicative elasticity and sensitivity spectrum.
+  - Implemented `backend/app/analysis/churn.py`: Customer churn risk tool (`analyze_customer_churn_risk`) querying real `customer_segments`, `customer_segment_history`, and `orders` in `ecommerce.sqlite`, calculating Wilson score 95% confidence intervals and actionability rankings.
+  - Implemented `backend/app/analysis/optimization.py`: Prescriptive SLSQP resource optimizer (`optimize_budget_allocation`) maximizing expected return with diminishing returns under linear budget bounds.
+  - Implemented `backend/app/analysis/registry.py`: Central analysis tool registry with intent detection and metadata discovery.
+  - Implemented `backend/app/api/v1/endpoints/analysis.py`: REST endpoints for listing tools and running churn, anomaly, forecast, scenario, and optimization tasks.
+  - Mounted analysis router in `backend/app/api/v1/router.py`.
+  - Integrated deterministic analysis tool dispatch into `backend/app/workflow/orchestrator.py`.
+  - Created test suite `backend/tests/test_analysis_tools.py` (13 tests verifying math, edge cases, small samples, and abstain rules).
+  - Updated frontend types (`frontend/src/types/api.ts`) and added interactive Analysis tab in `frontend/src/components/ChatInterface.tsx`.
+- **Files created/modified:**
+  - `backend/app/analysis/contracts.py` (created) — Typed contracts and Pydantic schemas.
+  - `backend/app/analysis/descriptive.py` (created) — Period comparison & distribution stats.
+  - `backend/app/analysis/anomalies.py` (created) — Robust MAD z-score anomaly detector & quality screen.
+  - `backend/app/analysis/diagnostic.py` (created) — Variance/mix decomposition & driver ranking.
+  - `backend/app/analysis/forecasting.py` (created) — Trend forecasting with intervals & backtest metrics.
+  - `backend/app/analysis/scenarios.py` (created) — What-if elasticity simulation.
+  - `backend/app/analysis/churn.py` (created) — Churn risk & revenue at risk on real SQLite data.
+  - `backend/app/analysis/optimization.py` (created) — SLSQP constrained budget optimizer.
+  - `backend/app/analysis/registry.py` (created) — Analysis tool registry & intent inference.
+  - `backend/app/api/v1/endpoints/analysis.py` (created) — REST endpoints for analysis tools.
+  - `backend/app/api/v1/router.py` (modified) — Mounted analysis router.
+  - `backend/app/workflow/orchestrator.py` (modified) — Dispatched analysis tool and embedded result.
+  - `backend/tests/test_analysis_tools.py` (created) — 13 tests for calculations, edge cases, and abstains.
+  - `frontend/src/types/api.ts` (modified) — Added Zod schemas for analysis results.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Added interactive Analysis tab.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 6 entry.
+- **Commands executed:**
+  - `git checkout -b phase-6-analysis-tools` — Switched to dedicated Phase 6 branch.
+  - `python -m pytest backend/tests -v` — Executed full test suite (62 tests passed in 2.60s).
+  - `cd frontend; npm run build` — Compiled Next.js frontend production build (0 errors).
+- **Tests/checks:**
+  - Passed: Exact mathematical reproducibility for period-over-period delta and mix contribution.
+  - Passed: Anomaly detector flags extreme outliers and flags duplicate batch jumps (`quality_flag="suspected_batch_spike_or_duplicate_load"`).
+  - Passed: Driver attribution reports exact variance shares and includes mandatory non-causal disclaimer.
+  - Passed: Time-series forecaster computes expanding 80%/95% prediction intervals and holdout backtest MAE/MAPE.
+  - Passed: Scenario simulation evaluates sensitivity across varied elasticity parameters.
+  - Passed: Churn risk analysis computes Wilson score 95% confidence intervals and ranks segments by revenue at risk against real SQLite tables.
+  - Passed: SLSQP budget allocation converges, conserves budget constraint, and respects channel bounds.
+  - Passed: Abstain checks trigger properly on empty records, small samples (< 5 for anomalies, < 10 for forecast), and non-positive baselines.
+- **Dataset/schema observations:**
+  - `customer_segments` and `customer_segment_history` accurately segment the 5,000 customers into VIP (322), Loyal (385), Occasional (704), New (2,134), At Risk (647), and Dormant (808).
+  - The At Risk and Dormant segments represent significant revenue at risk with high reactivation leverage.
+- **Decisions and rationale:**
+  - Used Median Absolute Deviation (MAD) over raw standard deviation to prevent extreme outliers from masking mild anomalies.
+  - Enforced out-of-sample backtesting on final 20% of series for honest uncertainty estimation.
+  - Kept statistical and numerical calculation strictly inside pure Python functions, separating computation completely from LLM generation.
+- **Next phase:**
+  - Phase 7 — Visualization and business-oriented answer composition: Adding interactive Plotly chart rendering (Line, Bar, Scatter, Pie, Table) in the Next.js UI, with automated fallback logic, evidence citations, and business-focused synthesis.
