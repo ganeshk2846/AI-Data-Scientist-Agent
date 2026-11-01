@@ -131,7 +131,7 @@ export const SchemaStatusSchema = z.object({
     .optional(),
 });
 
-// Phase 3 Chat & Workflow Models
+// Phase 4 Agent Contracts
 export const RouteResultSchema = z.object({
   intent: z.enum(["descriptive", "comparative", "trend", "diagnostic", "predictive", "prescriptive"]),
   confidence: z.number(),
@@ -139,6 +139,70 @@ export const RouteResultSchema = z.object({
   reasoning: z.string(),
   target_domains: z.array(z.string()).default([]),
   suggested_entities: z.array(z.string()).default([]),
+});
+
+export const AnswerabilityAssessmentSchema = z.object({
+  is_answerable: z.boolean(),
+  confidence: z.number(),
+  abstention_type: z.string().nullable().optional(),
+  refusal_reason: z.string().nullable().optional(),
+  available_alternatives: z.array(z.string()).default([]),
+});
+
+export const ClarificationOptionSchema = z.object({
+  option_id: z.string(),
+  label: z.string(),
+  description: z.string(),
+  inferred_query: z.string(),
+});
+
+export const ClarificationResponseSchema = z.object({
+  needs_clarification: z.boolean(),
+  question: z.string().nullable().optional(),
+  ambiguity_reason: z.string().nullable().optional(),
+  options: z.array(ClarificationOptionSchema).default([]),
+  default_interpretation: z.string().nullable().optional(),
+});
+
+export const PlanStepSchema = z.object({
+  step_id: z.string(),
+  tool_name: z.string(),
+  description: z.string(),
+  dependencies: z.array(z.string()).default([]),
+  arguments: z.record(z.any()).default({}),
+  status: z.enum(["pending", "running", "succeeded", "failed", "skipped"]),
+  output: z.any().nullable().optional(),
+  error: z.string().nullable().optional(),
+  duration_ms: z.number().default(0.0),
+});
+
+export const ExecutionPlanSchema = z.object({
+  plan_id: z.string(),
+  goal: z.string(),
+  steps: z.array(PlanStepSchema),
+  current_step_id: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+
+export const RepairAttemptSchema = z.object({
+  attempt_number: z.number(),
+  original_sql: z.string(),
+  error_message: z.string(),
+  repaired_sql: z.string(),
+  explanation: z.string(),
+  success: z.boolean(),
+  validation_passed: z.boolean(),
+});
+
+export const ChartSpecificationSchema = z.object({
+  chart_type: z.enum(["bar", "line", "scatter", "pie", "table"]),
+  title: z.string(),
+  x_axis_field: z.string().nullable().optional(),
+  y_axis_field: z.string().nullable().optional(),
+  category_field: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  data_points_count: z.number().default(0),
+  fallback_to_table: z.boolean().default(false),
 });
 
 export const StepTraceSchema = z.object({
@@ -167,21 +231,24 @@ export const VerificationResultSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
-export const QueryWorkflowResultSchema = z.object({
+export const MultiAgentWorkflowResultSchema = z.object({
   run_id: z.string(),
   query: z.string(),
   route: RouteResultSchema,
-  selected_tables: z.array(z.string()),
-  generated_sql: z.string().nullable().optional(),
+  answerability: AnswerabilityAssessmentSchema,
+  clarification: ClarificationResponseSchema.nullable().optional(),
+  plan: ExecutionPlanSchema.nullable().optional(),
+  selected_tables: z.array(z.string()).default([]),
   sanitized_sql: z.string().nullable().optional(),
   query_result: QueryExecutionResultSchema.nullable().optional(),
+  chart_spec: ChartSpecificationSchema.nullable().optional(),
   verification: VerificationResultSchema.nullable().optional(),
+  repair_attempts: z.array(RepairAttemptSchema).default([]),
   composed_answer: z.string(),
   key_findings: z.array(z.string()).default([]),
   limitations: z.array(z.string()).default([]),
   trace_steps: z.array(StepTraceSchema).default([]),
   total_duration_ms: z.number(),
-  timestamp: z.string(),
 });
 
 export function createAPIResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
@@ -199,7 +266,7 @@ export const SchemaStatusResponseSchema = createAPIResponseSchema(SchemaStatusSc
 export const TableListResponseSchema = createAPIResponseSchema(z.array(TableSummarySchema));
 export const TableDetailResponseSchema = createAPIResponseSchema(TableModelSchema);
 export const PreparationJobResponseSchema = createAPIResponseSchema(PreparationJobStateSchema);
-export const QueryWorkflowResponseSchema = createAPIResponseSchema(QueryWorkflowResultSchema);
+export const MultiAgentWorkflowResponseSchema = createAPIResponseSchema(MultiAgentWorkflowResultSchema);
 
 export type ColumnModel = z.infer<typeof ColumnModelSchema>;
 export type TableModel = z.infer<typeof TableModelSchema>;
@@ -208,7 +275,10 @@ export type DatabaseCatalog = z.infer<typeof DatabaseCatalogSchema>;
 export type PreparationJobState = z.infer<typeof PreparationJobStateSchema>;
 export type SchemaStatus = z.infer<typeof SchemaStatusSchema>;
 export type ReadinessStatus = z.infer<typeof ReadinessStatusSchema>;
-export type QueryWorkflowResult = z.infer<typeof QueryWorkflowResultSchema>;
-export type StepTrace = z.infer<typeof StepTraceSchema>;
-export type QueryExecutionResult = z.infer<typeof QueryExecutionResultSchema>;
-export type RouteResult = z.infer<typeof RouteResultSchema>;
+export type MultiAgentWorkflowResult = z.infer<typeof MultiAgentWorkflowResultSchema>;
+export type ExecutionPlan = z.infer<typeof ExecutionPlanSchema>;
+export type PlanStep = z.infer<typeof PlanStepSchema>;
+export type ChartSpecification = z.infer<typeof ChartSpecificationSchema>;
+export type RepairAttempt = z.infer<typeof RepairAttemptSchema>;
+export type ClarificationResponse = z.infer<typeof ClarificationResponseSchema>;
+export type ClarificationOption = z.infer<typeof ClarificationOptionSchema>;
