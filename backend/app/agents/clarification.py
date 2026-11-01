@@ -21,6 +21,7 @@ UNSUPPORTED_DOMAINS = [
     "employee salary", "ceo", "human resources", "hiring",
     "competitor", "amazon price", "walmart",
     "weather", "forecast temperature",
+    "antarctica", "international location",
     "password", "secret key", "credit card number",
 ]
 

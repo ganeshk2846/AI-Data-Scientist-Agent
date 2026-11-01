@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 """
 Multi-Agent Orchestrator with Planning, Clarification, Bounded SQL Repair, and Hybrid Schema Retrieval.
 Coordinates Router, Answerability Gate, Clarification, Planner, Hybrid Retriever, Value Linker,
@@ -25,6 +26,8 @@ from backend.app.analysis.registry import analysis_registry
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.memory.service import memory_service
+from backend.app.observability.tracer import RunTraceRecord, observability_tracer
+from backend.app.security.guardrails import detect_prompt_injection, validate_sql_security
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
 from backend.app.retrieval.hybrid import hybrid_retriever
@@ -112,6 +115,39 @@ class MultiAgentOrchestrator:
         traces: List[StepTrace] = []
         repair_attempts: List[RepairAttempt] = []
 
+        # Step -1: Security Prompt Injection Check
+        is_inj, inj_reason = detect_prompt_injection(query)
+        if is_inj:
+            duration_ms = (time.perf_counter() - overall_start) * 1000
+            refusal_ans = AnswerabilityAssessment(
+                is_answerable=False,
+                refusal_reason=f"Security violation: {inj_reason}",
+                available_alternatives=["Ask a direct question regarding ecommerce orders, customers, or metrics."],
+            )
+            res = MultiAgentWorkflowResult(
+                run_id=run_id,
+                session_id=session_id,
+                query=query,
+                standalone_query=query,
+                route=RouteResult(intent="descriptive", confidence=1.0, reasoning="Security prompt injection blocked"),
+                answerability=refusal_ans,
+                composed_answer=f"Request blocked by security guardrails: {inj_reason}",
+                total_duration_ms=round(duration_ms, 2),
+            )
+            observability_tracer.record_run_trace(
+                RunTraceRecord(
+                    run_id=run_id,
+                    session_id=session_id,
+                    query=query,
+                    intent="security_blocked",
+                    latency_ms=duration_ms,
+                    error_class="prompt_injection_block",
+                    verification_status="blocked",
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                )
+            )
+            return res
+
         # Step 0: ContextResolver (Shared Memory)
         standalone_q = memory_service.resolve_contextual_question(session_id, query)
         if standalone_q != query:
@@ -150,9 +186,26 @@ class MultiAgentOrchestrator:
                 duration_ms=round((time.perf_counter() - s1_start) * 1000, 2),
                 message=f"Answerability Gate Refusal: {answerability.refusal_reason}",
             ))
+            observability_tracer.record_run_trace(
+                RunTraceRecord(
+                    run_id=run_id,
+                    session_id=session_id,
+                    query=query,
+                    intent=route.intent,
+                    latency_ms=total_duration_ms,
+                    sql_executed=None,
+                    row_count=0,
+                    cost_estimate_usd=0.0001,
+                    error_class="answerability_refusal",
+                    verification_status="refused",
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                )
+            )
             return MultiAgentWorkflowResult(
                 run_id=run_id,
+                session_id=session_id,
                 query=query,
+                standalone_query=standalone_q,
                 route=route,
                 answerability=answerability,
                 composed_answer=f"### Question Not Answerable From Warehouse\n\n{answerability.refusal_reason}\n\n**Suggested Available Topics:**\n" + "\n".join(f"- {alt}" for alt in answerability.available_alternatives),
@@ -494,6 +547,22 @@ class MultiAgentOrchestrator:
         total_duration_ms = (time.perf_counter() - overall_start) * 1000
 
         memory_service.record_assistant_turn(session_id, composed_text, sql=sanitized_sql)
+
+        observability_tracer.record_run_trace(
+            RunTraceRecord(
+                run_id=run_id,
+                session_id=session_id,
+                query=query,
+                intent=route.intent,
+                latency_ms=total_duration_ms,
+                sql_executed=sanitized_sql,
+                row_count=query_result.row_count if query_result else 0,
+                cost_estimate_usd=0.0002,
+                error_class=None,
+                verification_status="verified" if (verification and verification.is_valid) else "unverified",
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
 
         return MultiAgentWorkflowResult(
             run_id=run_id,
