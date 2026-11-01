@@ -15,6 +15,7 @@
 | **Phase 8** | Shared memory, sessions & reusable knowledge | **Complete** | 2026-11-01 | Central MemoryService, ContextResolver, agent_app.sqlite, session controls |
 | **Phase 9** | Security, observability, evaluation & performance | **Complete** | 2026-11-01 | AST injection defenses, 100% gold benchmark, telemetry traces, EVALUATION.md |
 | **Phase 10** | End-to-end validation & final documentation | **Complete** | 2026-11-01 | Full test suites, developer guide, final sign-off |
+| **Post-Launch** | Live Gemini Integration & Grilling Validation | **Complete** | 2026-11-01 | Gemini SDK v2.26, 11-category grill suite, SSR hydration fix |
 
 ---
 
@@ -683,3 +684,58 @@
   - Preserved all phase branches so they can be pushed to remote GitHub repositories upon project completion.
 - **Next phase:**
   - Project complete. System is fully operational, verified, and ready for deployment.
+
+
+---
+
+## Operational Deployment, Live LLM Integration & Post-Launch Validation
+- **Date/time:** 2026-11-01T21:45:00+05:30
+- **Status:** Complete & Verified
+- **Objective:** Complete live operational deployment, port conflict mitigation, official Google Gemini LLM SDK integration, comprehensive end-to-end frontend grilling, and client-side hydration bug fixes.
+- **Implemented:**
+  - **Port Conflict Resolution & Network Hardening:**
+    - Reassigned default frontend development port from `3000` (occupied by external system process) to `3001` (`frontend/package.json`).
+    - Migrated backend port from `8000` to `8001` (`backend/app/core/config.py`).
+    - Configured dynamic Next.js rewrite proxy (`frontend/next.config.mjs`) mapping `/api/backend/:path*` to `http://localhost:8001/api/v1/:path*`.
+    - Hardened FastAPI CORS middleware with `allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$"` permitting flexible localhost port usage.
+  - **Live Google Gemini LLM Integration:**
+    - Integrated the official Google GenAI SDK (`google-genai` v2.26.0).
+    - Implemented `GeminiProvider` with asynchronous execution via `client.aio.models.generate_content`.
+    - Benchmarked model availability across the Google AI Studio tier:
+      - Identified deprecation of legacy preview `gemini-2.0-flash`.
+      - Mitigated high-demand `503 UNAVAILABLE` spikes on `gemini-3.8-flash`.
+      - Stabilized production default on `gemini-3.5-flash-lite`, delivering verified SQL generation and executive narratives in under ~0.95s.
+    - Disabled automatic function calling (`disable=True`) to suppress runtime SDK warnings.
+    - Added resilient fallback: external API timeouts or quota limits gracefully fall back to schema-grounded deterministic answers without server disruption.
+  - **End-to-End Application Grilling Harness (`scripts/grill_application.py`):**
+    - Built and executed comprehensive 11-category test suite exercising the application through the live frontend proxy (`http://localhost:3001/api/backend/chat/query`).
+    - Validated: YoY trends, top-N rankings, customer segment distribution, payment breakdown, comparative analysis, predictive churn risk with Wilson intervals, clarification handling, cryptocurrency out-of-scope refusal, temporal boundary refusal, and prompt injection defenses.
+    - Identified and fixed context rewriting bug in `backend/app/workflow/orchestrator.py` to route `effective_query = standalone_q or query` through the multi-agent pipeline.
+    - Added regex-based temporal entity substitution in `backend/app/memory/service.py` (`import re`) for seamless multi-turn conversational follow-ups ("What about 2025?").
+    - Achieved 11/11 (100.0%) pass rate across all grilling test categories.
+  - **Next.js SSR Hydration Fix:**
+    - Resolved React runtime mismatch on `sessionId` (`Text content does not match server-rendered HTML`) in `frontend/src/components/ChatInterface.tsx`.
+    - Moved dynamic session ID generation to client-side `useEffect` hook and added `suppressHydrationWarning`.
+- **Files created/modified:**
+  - `backend/app/llm/client.py` (modified) — Implemented `GeminiProvider` with async generation, fallback, and AFC config.
+  - `backend/app/core/config.py` (modified) — Added port `8001`, allowed origins, and `gemini-3.5-flash-lite` default.
+  - `backend/app/workflow/orchestrator.py` (modified) — Routed `effective_query` through planning, retrieval, and SQL generation.
+  - `backend/app/memory/service.py` (modified) — Added `import re` and regex temporal substitution for conversational follow-ups.
+  - `frontend/package.json` (modified) — Updated default port to `3001`.
+  - `frontend/next.config.mjs` (modified) — Configured proxy rewrite to port `8001`.
+  - `frontend/src/lib/api.ts` (modified) — Updated API base URL to port `8001`.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Fixed SSR hydration mismatch on `sessionId`.
+  - `frontend/src/components/HealthReadinessCard.tsx` (modified) — Updated copy to port `8001`.
+  - `scripts/grill_application.py` (created) — Automated live 11-category grilling harness.
+  - `.env.example` (modified) — Updated with Gemini provider configuration and port defaults.
+- **Commands executed:**
+  - `python scripts/grill_application.py` — 11/11 test categories passed (100.0%).
+  - `python -m pytest backend/tests -v` — 116/116 backend tests passed in 1.97s.
+  - `cd frontend; npm run build` — Clean production build with 0 TypeScript/lint errors.
+- **Tests/checks:**
+  - Passed: Port 8001 backend and port 3001 frontend communicate through proxy without CORS errors.
+  - Passed: Live Gemini API synthesizes grounded queries and executive narratives in ~0.95–2.5s.
+  - Passed: Multi-turn conversational memory resolves elliptical questions ("What about 2025?") to standalone queries.
+  - Passed: Zero SSR hydration errors in the browser.
+- **Next phase:**
+  - System fully deployed, verified, hardened, and operational.
