@@ -715,7 +715,7 @@
     - Achieved 11/11 (100.0%) pass rate across all grilling test categories.
   - **Next.js SSR Hydration Fix:**
     - Resolved React runtime mismatch on `sessionId` (`Text content does not match server-rendered HTML`) in `frontend/src/components/ChatInterface.tsx`.
-    - Moved dynamic session ID generation to client-side `useEffect` hook and added `suppressHydrationWarning`.
+    - Moved dynamic session ID generation to client-side `useEffect` hook with a `mounted` state guard and added `suppressHydrationWarning`.
 - **Files created/modified:**
   - `backend/app/llm/client.py` (modified) — Implemented `GeminiProvider` with async generation, fallback, and AFC config.
   - `backend/app/core/config.py` (modified) — Added port `8001`, allowed origins, and `gemini-3.5-flash-lite` default.
