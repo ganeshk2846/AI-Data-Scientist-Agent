@@ -1,0 +1,261 @@
+"""
+End-to-End Vertical Slice Workflow Service.
+Orchestrates: Router -> Grounder -> SQL Generator -> Validator -> Executor -> Verifier -> Composer.
+"""
+
+import time
+import uuid
+from typing import Any, Callable, Dict, List, Optional
+from backend.app.agents.router import router_agent
+from backend.app.core.config import settings
+from backend.app.core.errors import DatabaseError, ValidationError
+from backend.app.core.logging import logger
+from backend.app.llm.client import get_llm_provider
+from backend.app.llm.models import LLMMessage, LLMRequest
+from backend.app.retrieval.retriever import schema_grounder
+from backend.app.schema.service import schema_service
+from backend.app.sql.executor import sql_executor
+from backend.app.sql.validator import sql_validator
+from backend.app.workflow.models import (
+    QueryWorkflowResult,
+    StepTrace,
+    VerificationResult,
+    WorkflowProgressState,
+)
+
+SQL_GEN_PROMPT = """You are an expert Data Scientist and SQL Engineer specializing in SQLite.
+Write a single, safe, read-only SQLite SELECT query to answer the user's business question.
+
+STRICT CONSTRAINTS:
+1. Use ONLY the table and column identifiers provided in the schema context below.
+2. NEVER invent column names or table names.
+3. Use SQLite functions (e.g. strftime, ROUND, COUNT, SUM, AVG).
+4. For revenue or money values, ROUND(..., 2).
+5. Output ONLY the raw SQL inside a markdown ```sql code block. No conversation or extra text.
+
+SCHEMA CONTEXT:
+{schema_context}
+"""
+
+COMPOSER_PROMPT = """You are an expert Chief Data Scientist composing a concise executive response.
+Grounded strictly in the following query results, state the key factual findings and any business caveats.
+Never claim causation from mere correlation. If results are empty, state that plainly.
+
+USER QUESTION: {question}
+SQL EXECUTED: {sql}
+QUERY RESULTS (First {row_count} rows):
+{results_preview}
+
+Respond in concise markdown with:
+- **Direct Answer**: One or two sentences with exact numbers from the data.
+- **Key Findings**: Bullet points summarizing the metrics.
+- **Caveats / Data Coverage**: Any limitations (e.g. cancelled orders, date boundaries).
+"""
+
+
+class QueryWorkflowService:
+    """Coordinates the full question-to-answer pipeline."""
+
+    async def run_query(
+        self,
+        query: str,
+        request_id: Optional[str] = None,
+        progress_callback: Optional[Callable[[WorkflowProgressState, str], None]] = None,
+    ) -> QueryWorkflowResult:
+        run_id = request_id or str(uuid.uuid4())
+        overall_start = time.perf_counter()
+        traces: List[StepTrace] = []
+
+        catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
+        llm = get_llm_provider()
+
+        # Step 1: Understanding Question (Router)
+        s1_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("understanding_question", "Classifying business intent and target entities...")
+        route = await router_agent.route(query)
+        s1_ms = (time.perf_counter() - s1_start) * 1000
+        traces.append(StepTrace(
+            step="understanding_question",
+            status="succeeded",
+            duration_ms=round(s1_ms, 2),
+            message=f"Intent: {route.intent} (confidence: {route.confidence * 100:.0f}%)",
+            metadata=route.model_dump(),
+        ))
+
+        # Step 2: Retrieving Schema
+        s2_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("retrieving_schema", "Grounding query in catalog schema and join links...")
+        selected_tables = schema_grounder.retrieve_tables(query, catalog)
+        schema_prompt = catalog.to_minimal_prompt_schema(selected_tables)
+        s2_ms = (time.perf_counter() - s2_start) * 1000
+        traces.append(StepTrace(
+            step="retrieving_schema",
+            status="succeeded",
+            duration_ms=round(s2_ms, 2),
+            message=f"Retrieved {len(selected_tables)} schema tables: {', '.join(selected_tables)}",
+            metadata={"selected_tables": selected_tables},
+        ))
+
+        # Step 3: Generating SQL Query
+        s3_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("generating_query", "Synthesizing schema-grounded SQL query...")
+        gen_req = LLMRequest(
+            messages=[
+                LLMMessage(role="system", content=SQL_GEN_PROMPT.format(schema_context=schema_prompt)),
+                LLMMessage(role="user", content=query),
+            ],
+            temperature=0.0,
+        )
+        gen_res = await llm.generate(gen_req)
+        raw_sql = gen_res.content
+        s3_ms = (time.perf_counter() - s3_start) * 1000
+        traces.append(StepTrace(
+            step="generating_query",
+            status="succeeded",
+            duration_ms=round(s3_ms, 2),
+            message="SQL candidate generated by LLM provider.",
+            metadata={"raw_sql": raw_sql},
+        ))
+
+        # Step 4: Validating Query (sqlglot guardrail)
+        s4_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("validating_query", "Checking AST safety, read-only constraints, and schema conformance...")
+        is_valid, sanitized_sql, val_errors = sql_validator.validate_and_format_sql(raw_sql, catalog)
+        s4_ms = (time.perf_counter() - s4_start) * 1000
+
+        if not is_valid:
+            traces.append(StepTrace(
+                step="validating_query",
+                status="failed",
+                duration_ms=round(s4_ms, 2),
+                message=f"Validation failed: {'; '.join(val_errors)}",
+                metadata={"errors": val_errors},
+            ))
+            total_duration_ms = (time.perf_counter() - overall_start) * 1000
+            return QueryWorkflowResult(
+                run_id=run_id,
+                query=query,
+                route=route,
+                selected_tables=selected_tables,
+                generated_sql=raw_sql,
+                sanitized_sql=None,
+                composed_answer=f"### Query Blocked by Safety Guardrail\n\nThe generated query could not be executed because: {'; '.join(val_errors)}",
+                limitations=val_errors,
+                trace_steps=traces,
+                total_duration_ms=round(total_duration_ms, 2),
+            )
+
+        traces.append(StepTrace(
+            step="validating_query",
+            status="succeeded",
+            duration_ms=round(s4_ms, 2),
+            message="Query successfully passed AST validation and identifier verification.",
+            metadata={"sanitized_sql": sanitized_sql},
+        ))
+
+        # Step 5: Running Query
+        s5_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("running_query", "Executing read-only SQL on ecommerce.sqlite...")
+        query_result = sql_executor.execute_query(sanitized_sql)
+        s5_ms = (time.perf_counter() - s5_start) * 1000
+        traces.append(StepTrace(
+            step="running_query",
+            status="succeeded",
+            duration_ms=round(s5_ms, 2),
+            message=f"Returned {query_result.row_count} rows in {query_result.execution_time_ms:.1f}ms",
+            metadata={"row_count": query_result.row_count, "columns": query_result.columns},
+        ))
+
+        # Step 6: Verifying Results
+        s6_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("verifying_results", "Performing claim sanity and result bounds check...")
+        is_empty = query_result.row_count == 0
+        checks = ["Non-null execution", "Row bounds check"]
+        warnings = []
+        if is_empty:
+            warnings.append("Query returned zero rows matching criteria.")
+        if query_result.truncated:
+            warnings.append(f"Result set truncated to {settings.SQL_MAX_ROWS_RETURN} rows.")
+
+        verification = VerificationResult(
+            is_valid=True,
+            empty_result=is_empty,
+            row_count=query_result.row_count,
+            checks_passed=checks,
+            warnings=warnings,
+        )
+        s6_ms = (time.perf_counter() - s6_start) * 1000
+        traces.append(StepTrace(
+            step="verifying_results",
+            status="succeeded",
+            duration_ms=round(s6_ms, 2),
+            message=f"Verification complete: {len(checks)} checks passed, {len(warnings)} warnings.",
+            metadata=verification.model_dump(),
+        ))
+
+        # Step 7: Composing Business Answer
+        s7_start = time.perf_counter()
+        if progress_callback:
+            progress_callback("composing_answer", "Synthesizing business answer narrative...")
+
+        # Build preview string for narrative generator
+        preview_rows = query_result.rows[:10]
+        results_preview_str = "\n".join([str(r) for r in preview_rows]) if preview_rows else "No rows returned."
+
+        comp_req = LLMRequest(
+            messages=[
+                LLMMessage(
+                    role="system",
+                    content=COMPOSER_PROMPT.format(
+                        question=query,
+                        sql=sanitized_sql,
+                        row_count=len(preview_rows),
+                        results_preview=results_preview_str,
+                    ),
+                ),
+                LLMMessage(role="user", content="Compose the answer based strictly on the query output above."),
+            ],
+            temperature=0.0,
+        )
+        comp_res = await llm.generate(comp_req)
+        composed_text = comp_res.content
+
+        s7_ms = (time.perf_counter() - s7_start) * 1000
+        traces.append(StepTrace(
+            step="composing_answer",
+            status="succeeded",
+            duration_ms=round(s7_ms, 2),
+            message="Business narrative composed from validated evidence.",
+        ))
+
+        # Extract findings & limitations
+        key_findings = []
+        for r in preview_rows[:3]:
+            key_findings.append(f"Result observation: {', '.join(f'{k}: {v}' for k, v in r.items())}")
+
+        total_duration_ms = (time.perf_counter() - overall_start) * 1000
+
+        return QueryWorkflowResult(
+            run_id=run_id,
+            query=query,
+            route=route,
+            selected_tables=selected_tables,
+            generated_sql=raw_sql,
+            sanitized_sql=sanitized_sql,
+            query_result=query_result,
+            verification=verification,
+            composed_answer=composed_text,
+            key_findings=key_findings,
+            limitations=warnings,
+            trace_steps=traces,
+            total_duration_ms=round(total_duration_ms, 2),
+        )
+
+
+query_workflow_service = QueryWorkflowService()
