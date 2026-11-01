@@ -103,7 +103,7 @@ class MockLLMProvider(BaseLLMProvider):
 class GeminiProvider(BaseLLMProvider):
     """Google Gemini API Provider using the official google-genai SDK."""
 
-    def __init__(self, api_key: str, model: str = "gemini-3.8-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-3.5-flash-lite"):
         from google import genai
         self.client = genai.Client(api_key=api_key)
         self.model = model

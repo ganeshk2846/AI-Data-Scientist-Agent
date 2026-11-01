@@ -84,8 +84,8 @@ def test_chat_query_endpoint(client):
 
 def test_gemini_provider_instantiation():
     from backend.app.llm.client import GeminiProvider
-    provider = GeminiProvider(api_key="AIzaSyTestMockKey", model="gemini-2.0-flash")
-    assert provider.model == "gemini-2.0-flash"
+    provider = GeminiProvider(api_key="AIzaSyTestMockKey", model="gemini-3.5-flash-lite")
+    assert provider.model == "gemini-3.5-flash-lite"
     assert provider.client is not None
 
 

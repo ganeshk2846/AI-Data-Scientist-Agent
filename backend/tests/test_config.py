@@ -37,10 +37,10 @@ def test_gemini_configuration_and_redaction():
     s = Settings(
         LLM_PROVIDER="gemini",
         GEMINI_API_KEY="AIzaSyTestGeminiKey123",
-        GEMINI_MODEL="gemini-2.0-flash",
+        GEMINI_MODEL="gemini-3.5-flash-lite",
     )
     assert s.is_llm_configured() is True
-    assert s.GEMINI_MODEL == "gemini-2.0-flash"
+    assert s.GEMINI_MODEL == "gemini-3.5-flash-lite"
     safe = s.get_safe_dict()
     assert safe["GEMINI_API_KEY"] == "[REDACTED]"
     assert safe["llm_configured"] is True
