@@ -8,7 +8,7 @@
 | **Phase 1** | Project foundation and developer experience | **Complete** | 2026-11-01 | FastAPI & Next.js skeletons, health endpoints, test harness |
 | **Phase 2** | Read-only database connection & schema preparation | **Complete** | 2026-11-01 | Schema catalogue, profiling service, async preparation job, table inspector UI |
 | **Phase 3** | NL question API & first reliable vertical slice | **Complete** | 2026-11-01 | Router, Grounder, sqlglot guardrail, vertical slice chat UI |
-| **Phase 4** | Multi-agent workflow, planning & bounded repair | Pending | - | LangGraph orchestration, Router, Planner, Clarification, Verifier |
+| **Phase 4** | Multi-agent workflow, planning & bounded repair | **Complete** | 2026-11-01 | Planner DAG, Clarification, Answerability Gate, Bounded Repair (2x) |
 | **Phase 5** | Hybrid schema retrieval & business semantics | Pending | - | BM25 + embedding RRF, value linking, semantic metrics |
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | Pending | - | Deterministic stats, time-series forecasting, churn risk |
 | **Phase 7** | Visualization & business answer composition | Pending | - | Plotly specs, table fallbacks, evidence-linked narrative |
@@ -294,3 +294,64 @@
   - All SQL queries are strictly validated via AST before hitting the database.
 - **Next phase:**
   - Phase 4 — Multi-agent workflow, planning, clarification, and bounded repair: LangGraph workflow orchestration, explicit Router/Planner/Clarification/Visualization agent contracts, DAG execution plans, clarification when ambiguity exists, and bounded 2-attempt SQL repair.
+
+
+---
+
+## Phase 4 — Multi-agent workflow, planning, clarification, and bounded repair
+- **Date/time:** 2026-11-01T17:20:00+05:30
+- **Status:** Complete
+- **Objective:** Make the workflow explicit, inspectable, and robust. Implement clear contracts for the four first-class agents (Router, Planner, Clarification, Visualization), add Answerability Gate, typed DAG execution plan, clarification policy for ambiguous queries, bounded 2-attempt SQL repair with re-validation from scratch, and observable execution UI.
+- **Implemented:**
+  - Implemented typed agent contracts (`backend/app/agents/contracts.py`): `AnswerabilityAssessment`, `ClarificationResponse`, `ExecutionPlan`, `PlanStep`, `RepairAttempt`, `ChartSpecification`, and `ChartType`.
+  - Built `AnswerabilityGate` (`backend/app/agents/clarification.py`) refusing questions on unsupported domains (e.g. crypto, external stock prices, HR salaries) or outside the database temporal boundaries (2023-2025).
+  - Built `ClarificationAgent` (`backend/app/agents/clarification.py`) identifying underspecified queries and presenting structured, selectable clarification options.
+  - Built `PlannerAgent` (`backend/app/agents/planner.py`) generating a 7-step typed execution DAG with step IDs, tool names, descriptions, arguments, and dependencies.
+  - Built `SQLRepairLoop` (`backend/app/sql/repair.py`) enforcing a maximum of 2 automatic query repair retries. Each repair sends the specific execution/validation error and retrieved schema context, and re-validates the candidate query from scratch via `sqlglot`.
+  - Built `VisualizationAgent` (`backend/app/agents/visualization.py`) deriving typed chart specifications: line charts for temporal trends, bar charts for category/segment comparisons, and table fallbacks.
+  - Built `MultiAgentOrchestrator` (`backend/app/workflow/orchestrator.py`) executing the complete multi-agent pipeline with non-leaking step traces, timing, and error boundaries.
+  - Enhanced frontend `ChatInterface.tsx`:
+    - Clarification card with clickable options that re-trigger execution
+    - Answerability refusal alert with suggested warehouse domains
+    - Execution DAG tab displaying step-by-step pipeline status
+    - Repair attempts badge and trail
+    - Chart specification preview badge
+  - Added 8 unit and integration tests (`backend/tests/test_multi_agent_orchestrator.py`) verifying answerability refusals, clarification detection, planner DAG creation, bounded repair execution, chart derivation, and end-to-end orchestration.
+- **Files created/modified:**
+  - `backend/app/agents/contracts.py` (created) — Typed contracts for agents, DAG steps, repair, and charts.
+  - `backend/app/agents/clarification.py` (created) — Answerability Gate and Clarification policy.
+  - `backend/app/agents/planner.py` (created) — Planner DAG decomposition agent.
+  - `backend/app/agents/visualization.py` (created) — Visualization chart specification agent.
+  - `backend/app/sql/repair.py` (created) — Bounded 2-attempt SQL repair loop.
+  - `backend/app/workflow/orchestrator.py` (created) — Multi-agent execution coordinator.
+  - `backend/app/api/v1/endpoints/chat.py` (modified) — Connected multi-agent orchestrator.
+  - `backend/tests/test_multi_agent_orchestrator.py` (created) — 8 tests for Phase 4 multi-agent capabilities.
+  - `frontend/src/types/api.ts` (modified) — Added Zod schemas for DAG plans, clarification, repair, and charts.
+  - `frontend/src/lib/api.ts` (modified) — Updated chat client to return MultiAgentWorkflowResult.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Integrated clarification options, refusal alerts, DAG plan tab, and repair badges.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 4 record.
+- **Commands executed:**
+  - `git checkout -b phase-4-multi-agent-planning` — Created dedicated Phase 4 branch.
+  - `python -m pytest backend/tests -v` — Ran 41 backend tests (all 41 passed in 0.92s).
+  - `cd frontend; npm run build` — Built frontend production bundle with Phase 4 multi-agent interface (100% success).
+- **Tests/checks:**
+  - Passed: Answerability Gate cleanly refuses unsupported domains and temporal boundaries (e.g. bitcoin, year 2018).
+  - Passed: Clarification Agent detects ambiguous comparisons and provides structured selectable alternatives.
+  - Passed: Planner Agent creates valid 7-step DAG with explicit dependencies.
+  - Passed: Bounded repair loop repairs failing SQL and re-validates via sqlglot; caps retries at 2.
+  - Passed: Visualization Agent emits line charts for time-series and bar charts for categorical breakdowns.
+  - Passed: End-to-end multi-agent orchestration and REST API endpoints.
+  - Passed: Frontend production build (`next build`) compiles without errors.
+- **Dataset/schema observations:**
+  - Answerability Gate effectively shields the warehouse from hallucinated domains (e.g. crypto, external stock prices) and respects the verified 2023-2025 temporal boundary discovered in Phase 0.
+- **Decisions and rationale:**
+  - Encapsulated agents as explicit typed modules with Pydantic contracts rather than an uncontrolled swarm.
+  - Bounded recovery strictly at 2 attempts to prevent runaway latency, API costs, or infinite retry loops.
+  - Kept DAG plan inspectable in the frontend UI to ensure user trust and transparency.
+- **Known issues / limitations:**
+  - Schema retrieval currently uses keyword/synonym mapping; Phase 5 will add BM25 lexical retrieval and embedding-based Reciprocal Rank Fusion (RRF).
+- **Security/data-safety notes:**
+  - All repaired queries undergo complete AST re-validation from scratch before execution.
+  - No private internal chain-of-thought is exposed; only concise step statuses and action summaries are streamed.
+- **Next phase:**
+  - Phase 5 — Hybrid schema retrieval and business semantics: Building BM25 lexical search + local embedding retrieval with Reciprocal Rank Fusion (RRF), foreign key graph expansion, low-cardinality value linking, and semantic business metric definitions.

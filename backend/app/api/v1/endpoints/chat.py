@@ -1,6 +1,7 @@
 """
 Chat and Natural Language Query API endpoints.
 Provides standard REST and Server-Sent Events (SSE) streaming for real-time progress updates.
+Powered by Multi-Agent Planning, Clarification, and Bounded Repair Orchestrator.
 """
 
 import asyncio
@@ -10,10 +11,10 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from backend.app.core.models import APIResponse
-from backend.app.workflow.models import QueryWorkflowResult, WorkflowProgressState
-from backend.app.workflow.service import query_workflow_service
+from backend.app.workflow.models import WorkflowProgressState
+from backend.app.workflow.orchestrator import MultiAgentWorkflowResult, multi_agent_orchestrator
 
-router = APIRouter(prefix="/chat", tags=["Conversational BI & Chat"])
+router = APIRouter(prefix="/chat", tags=["Conversational BI & Multi-Agent Chat"])
 
 
 class ChatQueryRequest(BaseModel):
@@ -23,19 +24,19 @@ class ChatQueryRequest(BaseModel):
 
 @router.post(
     "/query",
-    response_model=APIResponse[QueryWorkflowResult],
-    summary="Execute natural language business question",
+    response_model=APIResponse[MultiAgentWorkflowResult],
+    summary="Execute multi-agent business question workflow",
 )
 async def execute_chat_query(
     body: ChatQueryRequest,
     request: Request,
-) -> APIResponse[QueryWorkflowResult]:
+) -> APIResponse[MultiAgentWorkflowResult]:
     """
-    Executes an end-to-end question-to-answer query:
-    Router -> Grounder -> SQL Generator -> AST Validator -> Executor -> Verifier -> Composer.
+    Executes the multi-agent pipeline:
+    Router -> Answerability Gate -> Clarification -> Planner DAG -> Grounder -> Validator/Repair -> Executor -> Verifier -> Visualization -> Composer.
     """
     request_id = getattr(request.state, "request_id", None)
-    result = await query_workflow_service.run_query(body.query, request_id=request_id)
+    result = await multi_agent_orchestrator.run(body.query, request_id=request_id)
     return APIResponse(success=True, data=result, request_id=request_id)
 
 
@@ -59,7 +60,7 @@ async def stream_chat_query(
 
     async def workflow_task():
         try:
-            result = await query_workflow_service.run_query(
+            result = await multi_agent_orchestrator.run(
                 body.query,
                 request_id=request_id,
                 progress_callback=sync_progress_callback,
@@ -74,7 +75,6 @@ async def stream_chat_query(
 
     async def event_generator() -> AsyncGenerator[dict, None]:
         while True:
-            # Check for client disconnect
             if await request.is_disconnected():
                 break
 

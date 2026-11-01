@@ -1,8 +1,8 @@
 import {
+  MultiAgentWorkflowResponseSchema,
+  MultiAgentWorkflowResult,
   PreparationJobResponseSchema,
   PreparationJobState,
-  QueryWorkflowResponseSchema,
-  QueryWorkflowResult,
   ReadinessResponseSchema,
   ReadinessStatus,
   SchemaStatus,
@@ -70,21 +70,17 @@ export async function fetchTableDetail(tableName: string): Promise<TableModel> {
   return parsed.data.data;
 }
 
-export async function executeChatQuery(queryText: string): Promise<QueryWorkflowResult> {
+export async function executeChatQuery(queryText: string): Promise<MultiAgentWorkflowResult> {
   const url = `${API_BASE_URL}/api/v1/chat/query`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: jsonStringify({ query: queryText }),
+    body: JSON.stringify({ query: queryText }),
   });
   const json = await res.json();
-  const parsed = QueryWorkflowResponseSchema.safeParse(json);
+  const parsed = MultiAgentWorkflowResponseSchema.safeParse(json);
   if (!parsed.success || !parsed.data.data) {
-    throw new Error(parsed.data?.error?.message || "Failed to execute business query");
+    throw new Error(parsed.data?.error?.message || "Failed to execute multi-agent business query");
   }
   return parsed.data.data;
-}
-
-function jsonStringify(obj: any): string {
-  return JSON.stringify(obj);
 }
