@@ -20,6 +20,8 @@ from backend.app.agents.contracts import (
 from backend.app.agents.planner import planner_agent
 from backend.app.agents.router import RouteResult, router_agent
 from backend.app.agents.visualization import visualization_agent
+from backend.app.analysis.contracts import AnalysisToolResult
+from backend.app.analysis.registry import analysis_registry
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.llm.client import get_llm_provider
@@ -81,6 +83,7 @@ class MultiAgentWorkflowResult(BaseModel):
     sanitized_sql: Optional[str] = None
     query_result: Optional[QueryExecutionResult] = None
     chart_spec: Optional[ChartSpecification] = None
+    analysis_result: Optional[AnalysisToolResult] = None
     verification: Optional[VerificationResult] = None
     repair_attempts: List[RepairAttempt] = Field(default_factory=list)
     composed_answer: str
@@ -361,6 +364,54 @@ class MultiAgentOrchestrator:
             message=f"Visualization Agent derived {chart_spec.chart_type.value.upper()} chart specification.",
         ))
 
+        # Step 9.5: Deterministic Analysis Tool Execution
+        detected_tool = analysis_registry.detect_intent(query)
+        analysis_res: Optional[AnalysisToolResult] = None
+        if detected_tool == "analyze_customer_churn_risk":
+            analysis_res = analysis_registry.execute_tool("analyze_customer_churn_risk")
+        elif detected_tool == "detect_anomalies" and query_result and query_result.row_count >= 5:
+            date_col = next((c for c in query_result.columns if any(k in c.lower() for k in ["date", "day", "month", "year", "time"])), None)
+            metric_col = next((c for c in query_result.columns if c != date_col), None)
+            if date_col and metric_col:
+                analysis_res = analysis_registry.execute_tool(
+                    "detect_anomalies",
+                    records=query_result.rows,
+                    date_col=date_col,
+                    metric_col=metric_col,
+                )
+        elif detected_tool == "forecast_series" and query_result and query_result.row_count >= 10:
+            date_col = next((c for c in query_result.columns if any(k in c.lower() for k in ["date", "day", "month", "year", "time"])), None)
+            metric_col = next((c for c in query_result.columns if c != date_col), None)
+            if date_col and metric_col:
+                analysis_res = analysis_registry.execute_tool(
+                    "forecast_series",
+                    records=query_result.rows,
+                    date_col=date_col,
+                    value_col=metric_col,
+                )
+        elif detected_tool == "simulate_scenario":
+            analysis_res = analysis_registry.execute_tool(
+                "simulate_scenario",
+                baseline_value=1000000.0,
+                parameter_name="price",
+                shock_pct=5.0,
+            )
+        elif detected_tool == "optimize_budget_allocation":
+            analysis_res = analysis_registry.execute_tool(
+                "optimize_budget_allocation",
+                total_budget=50000.0,
+                channels=["Search", "Social", "Email", "Affiliate"],
+                historical_roas={"Search": 3.2, "Social": 2.4, "Email": 4.5, "Affiliate": 2.1},
+            )
+
+        if analysis_res and analysis_res.success:
+            traces.append(StepTrace(
+                step="verifying_results",
+                status="succeeded",
+                duration_ms=1.0,
+                message=f"Deterministic Analysis Tool '{analysis_res.tool_name}' executed successfully.",
+            ))
+
         # Step 10: Answer Composition
         s7_start = time.perf_counter()
         if progress_callback:
@@ -410,6 +461,7 @@ class MultiAgentOrchestrator:
             sanitized_sql=sanitized_sql,
             query_result=query_result,
             chart_spec=chart_spec,
+            analysis_result=analysis_res,
             verification=verification,
             repair_attempts=repair_attempts,
             composed_answer=composed_text,

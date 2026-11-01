@@ -231,6 +231,144 @@ export const VerificationResultSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+
+export const ProvenanceInfoSchema = z.object({
+  source_dataset: z.string().default("ecommerce.sqlite"),
+  time_window: z.string().default("2023-01-01 to 2025-12-31"),
+  record_count: z.number().default(0),
+  computed_at: z.string(),
+  method_name: z.string(),
+  assumptions: z.array(z.string()).default([]),
+});
+
+export const PeriodComparisonResultSchema = z.object({
+  metric_name: z.string(),
+  period_a_label: z.string(),
+  period_a_value: z.number(),
+  period_b_label: z.string(),
+  period_b_value: z.number(),
+  delta_absolute: z.number(),
+  delta_percentage: z.number(),
+  dimension_breakdown: z.array(z.record(z.any())).default([]),
+});
+
+export const AnomalyPointSchema = z.object({
+  date: z.string(),
+  actual_value: z.number(),
+  expected_value: z.number(),
+  z_score: z.number(),
+  is_anomaly: z.boolean(),
+  severity: z.string(),
+  quality_flag: z.string().nullable().optional(),
+});
+
+export const AnomalyDetectionResultSchema = z.object({
+  metric_name: z.string(),
+  threshold: z.number(),
+  total_data_points: z.number(),
+  anomaly_count: z.number(),
+  anomalies: z.array(AnomalyPointSchema),
+  method: z.string(),
+  quality_warning: z.string().nullable().optional(),
+});
+
+export const DriverContributionSchema = z.object({
+  dimension_value: z.string(),
+  period_a_value: z.number(),
+  period_b_value: z.number(),
+  delta: z.number(),
+  pct_of_total_delta: z.number(),
+  direction: z.string(),
+});
+
+export const DriverAnalysisResultSchema = z.object({
+  metric_name: z.string(),
+  dimension: z.string(),
+  total_delta: z.number(),
+  sample_size: z.number(),
+  drivers: z.array(DriverContributionSchema),
+  causal_claim_disclaimer: z.string(),
+});
+
+export const ForecastPointSchema = z.object({
+  date: z.string(),
+  point_forecast: z.number(),
+  lower_bound_80: z.number(),
+  upper_bound_80: z.number(),
+  lower_bound_95: z.number(),
+  upper_bound_95: z.number(),
+});
+
+export const ForecastResultSchema = z.object({
+  metric_name: z.string(),
+  horizon_periods: z.number(),
+  frequency: z.string(),
+  points: z.array(ForecastPointSchema),
+  model_used: z.string(),
+  backtest_mae: z.number().nullable().optional(),
+  backtest_rmse: z.number().nullable().optional(),
+  backtest_mape_pct: z.number().nullable().optional(),
+  is_sufficient_data: z.boolean().default(true),
+  limitations: z.array(z.string()).default([]),
+});
+
+export const ScenarioResultSchema = z.object({
+  target_metric: z.string(),
+  baseline_value: z.number(),
+  simulated_value: z.number(),
+  delta_absolute: z.number(),
+  delta_percentage: z.number(),
+  assumptions_applied: z.record(z.any()),
+  sensitivities: z.array(z.record(z.any())).default([]),
+});
+
+export const SegmentChurnRiskSchema = z.object({
+  segment_name: z.string(),
+  customer_count: z.number(),
+  active_count: z.number(),
+  churned_count: z.number(),
+  churn_rate_pct: z.number(),
+  total_historical_spend: z.number(),
+  revenue_at_risk: z.number(),
+  confidence_interval_low: z.number(),
+  confidence_interval_high: z.number(),
+  actionability_rank: z.number(),
+});
+
+export const ChurnAnalysisResultSchema = z.object({
+  cutoff_date: z.string(),
+  inactivity_threshold_days: z.number(),
+  total_customers_analyzed: z.number(),
+  total_revenue_at_risk: z.number(),
+  segments: z.array(SegmentChurnRiskSchema),
+  observations: z.array(z.string()).default([]),
+});
+
+export const OptimizationResultSchema = z.object({
+  objective: z.string(),
+  total_budget: z.number(),
+  allocations: z.record(z.number()),
+  expected_total_revenue: z.number(),
+  constraints_satisfied: z.boolean(),
+  status: z.string(),
+  notes: z.array(z.string()).default([]),
+});
+
+export const AnalysisToolResultSchema = z.object({
+  tool_name: z.string(),
+  analysis_type: z.string(),
+  success: z.boolean(),
+  provenance: ProvenanceInfoSchema,
+  abstain_reason: z.string().nullable().optional(),
+  period_comparison: PeriodComparisonResultSchema.nullable().optional(),
+  anomaly_detection: AnomalyDetectionResultSchema.nullable().optional(),
+  driver_analysis: DriverAnalysisResultSchema.nullable().optional(),
+  forecast: ForecastResultSchema.nullable().optional(),
+  scenario: ScenarioResultSchema.nullable().optional(),
+  churn_risk: ChurnAnalysisResultSchema.nullable().optional(),
+  optimization: OptimizationResultSchema.nullable().optional(),
+});
+
 export const MultiAgentWorkflowResultSchema = z.object({
   run_id: z.string(),
   query: z.string(),
@@ -242,6 +380,7 @@ export const MultiAgentWorkflowResultSchema = z.object({
   sanitized_sql: z.string().nullable().optional(),
   query_result: QueryExecutionResultSchema.nullable().optional(),
   chart_spec: ChartSpecificationSchema.nullable().optional(),
+  analysis_result: AnalysisToolResultSchema.nullable().optional(),
   verification: VerificationResultSchema.nullable().optional(),
   repair_attempts: z.array(RepairAttemptSchema).default([]),
   composed_answer: z.string(),
@@ -336,3 +475,8 @@ export type ChartSpecification = z.infer<typeof ChartSpecificationSchema>;
 export type RepairAttempt = z.infer<typeof RepairAttemptSchema>;
 export type ClarificationResponse = z.infer<typeof ClarificationResponseSchema>;
 export type ClarificationOption = z.infer<typeof ClarificationOptionSchema>;
+
+export type AnalysisToolResult = z.infer<typeof AnalysisToolResultSchema>;
+export type AnomalyPoint = z.infer<typeof AnomalyPointSchema>;
+export type ForecastPoint = z.infer<typeof ForecastPointSchema>;
+export type SegmentChurnRisk = z.infer<typeof SegmentChurnRiskSchema>;

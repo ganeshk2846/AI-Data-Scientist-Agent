@@ -35,6 +35,7 @@ const SUGGESTED_QUERIES = [
   "What are our total sales and order counts by year?",
   "What are the top 5 product categories by revenue?",
   "How many customers belong to each customer segment?",
+  "What is the churn risk and revenue at risk across customer segments?",
   "compare revenue", // Triggers clarification
   "What is the current bitcoin price?", // Triggers answerability refusal
 ];
@@ -51,7 +52,7 @@ const WORKFLOW_STEPS = [
 
 export function ChatInterface() {
   const [queryInput, setQueryInput] = useState("");
-  const [activeTab, setActiveTab] = useState<"narrative" | "sql" | "data" | "plan" | "trace">("narrative");
+  const [activeTab, setActiveTab] = useState<"narrative" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
   const [copiedSql, setCopiedSql] = useState(false);
 
   const queryMutation = useMutation({
@@ -92,7 +93,7 @@ export function ChatInterface() {
             Multi-Agent Conversational BI Interface
           </h2>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-mono">
-            Phase 5 Hybrid Retrieval Active
+            Phase 6 Analysis Tools Active
           </span>
         </div>
 
@@ -230,6 +231,15 @@ export function ChatInterface() {
             <div className="flex items-center space-x-1 p-1 bg-background rounded-lg border border-border text-xs flex-wrap">
               {[
                 { key: "narrative", label: "Executive Answer", icon: FileText },
+                ...(result.analysis_result
+                  ? [
+                      {
+                        key: "analysis",
+                        label: `Analysis: ${result.analysis_result.tool_name}`,
+                        icon: Sparkles,
+                      },
+                    ]
+                  : []),
                 {
                   key: "plan",
                   label: `Execution DAG (${result.plan?.steps.length ?? 0})`,
@@ -363,6 +373,230 @@ export function ChatInterface() {
                   <ul className="list-disc list-inside space-y-0.5 text-foreground/80 pl-1">
                     {result.limitations.map((lim, i) => (
                       <li key={i}>{lim}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+
+          {/* Tab: Deterministic Analysis Tool Artefact */}
+          {activeTab === "analysis" && result.analysis_result && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-semibold text-foreground capitalize">
+                    {result.analysis_result.tool_name.replace(/_/g, " ")}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-primary/20 text-primary font-mono">
+                    Method: {result.analysis_result.provenance.method_name}
+                  </span>
+                </div>
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  Window: {result.analysis_result.provenance.time_window}
+                </span>
+              </div>
+
+              {/* Churn Risk Artefact */}
+              {result.analysis_result.churn_risk && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-lg border border-border bg-background/50">
+                      <span className="text-[11px] text-muted-foreground">Total Customers</span>
+                      <p className="text-lg font-bold text-foreground">
+                        {result.analysis_result.churn_risk.total_customers_analyzed.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10">
+                      <span className="text-[11px] text-destructive font-medium">Revenue at Risk</span>
+                      <p className="text-lg font-bold text-destructive">
+                        ${result.analysis_result.churn_risk.total_revenue_at_risk.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg border border-border bg-background/50">
+                      <span className="text-[11px] text-muted-foreground">Threshold</span>
+                      <p className="text-lg font-bold text-foreground">
+                        {result.analysis_result.churn_risk.inactivity_threshold_days} Days Inactivity
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-border bg-background/30">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted text-muted-foreground font-semibold">
+                        <tr>
+                          <th className="p-2.5">Rank</th>
+                          <th className="p-2.5">Segment</th>
+                          <th className="p-2.5">Customers</th>
+                          <th className="p-2.5">Churn Rate (95% CI)</th>
+                          <th className="p-2.5">Historical Spend</th>
+                          <th className="p-2.5">Revenue at Risk</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {result.analysis_result.churn_risk.segments.map((seg) => (
+                          <tr key={seg.segment_name} className="hover:bg-muted/20">
+                            <td className="p-2.5 font-bold font-mono">#{seg.actionability_rank}</td>
+                            <td className="p-2.5 font-semibold text-foreground">{seg.segment_name}</td>
+                            <td className="p-2.5 font-mono">{seg.customer_count.toLocaleString()}</td>
+                            <td className="p-2.5 font-mono">
+                              <span className="font-semibold text-warning">{seg.churn_rate_pct}%</span>
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                ({seg.confidence_interval_low}% - {seg.confidence_interval_high}%)
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-mono">${seg.total_historical_spend.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2.5 font-mono font-semibold text-destructive">
+                              ${seg.revenue_at_risk.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Anomaly Detection Artefact */}
+              {result.analysis_result.anomaly_detection && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3 text-xs">
+                    <span className="text-muted-foreground">
+                      Anomalies detected: <strong className="text-foreground">{result.analysis_result.anomaly_detection.anomaly_count}</strong> of {result.analysis_result.anomaly_detection.total_data_points} points
+                    </span>
+                    <span className="text-muted-foreground">
+                      Threshold: |z| &ge; {result.analysis_result.anomaly_detection.threshold}
+                    </span>
+                  </div>
+
+                  {result.analysis_result.anomaly_detection.anomalies.filter(a => a.is_anomaly).length > 0 && (
+                    <div className="overflow-x-auto rounded-lg border border-border bg-background/30">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-muted text-muted-foreground font-semibold">
+                          <tr>
+                            <th className="p-2.5">Date</th>
+                            <th className="p-2.5">Actual Value</th>
+                            <th className="p-2.5">Expected Baseline</th>
+                            <th className="p-2.5">Z-Score</th>
+                            <th className="p-2.5">Severity</th>
+                            <th className="p-2.5">Data Quality Screen</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {result.analysis_result.anomaly_detection.anomalies.filter(a => a.is_anomaly).map((anom, idx) => (
+                            <tr key={idx} className="hover:bg-muted/20">
+                              <td className="p-2.5 font-mono">{anom.date}</td>
+                              <td className="p-2.5 font-mono font-bold text-foreground">{anom.actual_value}</td>
+                              <td className="p-2.5 font-mono text-muted-foreground">{anom.expected_value}</td>
+                              <td className="p-2.5 font-mono text-warning">{anom.z_score}</td>
+                              <td className="p-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                  anom.severity === "severe" ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                                }`}>
+                                  {anom.severity.toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-[11px] text-muted-foreground">
+                                {anom.quality_flag ? (
+                                  <span className="text-destructive font-mono">{anom.quality_flag}</span>
+                                ) : (
+                                  "Pass"
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Forecast Artefact */}
+              {result.analysis_result.forecast && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded border border-border bg-background/40">
+                      <span className="text-muted-foreground">Model</span>
+                      <p className="font-semibold text-foreground">{result.analysis_result.forecast.model_used}</p>
+                    </div>
+                    <div className="p-2.5 rounded border border-border bg-background/40">
+                      <span className="text-muted-foreground">Backtest MAE</span>
+                      <p className="font-semibold text-foreground">{result.analysis_result.forecast.backtest_mae}</p>
+                    </div>
+                    <div className="p-2.5 rounded border border-border bg-background/40">
+                      <span className="text-muted-foreground">Backtest MAPE</span>
+                      <p className="font-semibold text-foreground">{result.analysis_result.forecast.backtest_mape_pct}%</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-border bg-background/30">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted text-muted-foreground font-semibold">
+                        <tr>
+                          <th className="p-2.5">Forecast Date</th>
+                          <th className="p-2.5">Point Forecast</th>
+                          <th className="p-2.5">80% Interval</th>
+                          <th className="p-2.5">95% Interval</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {result.analysis_result.forecast.points.map((pt) => (
+                          <tr key={pt.date} className="hover:bg-muted/20">
+                            <td className="p-2.5 font-mono">{pt.date}</td>
+                            <td className="p-2.5 font-mono font-bold text-primary">{pt.point_forecast}</td>
+                            <td className="p-2.5 font-mono text-muted-foreground">
+                              [{pt.lower_bound_80} - {pt.upper_bound_80}]
+                            </td>
+                            <td className="p-2.5 font-mono text-muted-foreground">
+                              [{pt.lower_bound_95} - {pt.upper_bound_95}]
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Optimization Artefact */}
+              {result.analysis_result.optimization && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg border border-border bg-background/40 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Total Budget Allocated</span>
+                      <p className="text-base font-bold text-foreground">
+                        ${result.analysis_result.optimization.total_budget.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Expected Return</span>
+                      <p className="text-base font-bold text-success">
+                        ${result.analysis_result.optimization.expected_total_revenue.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {Object.entries(result.analysis_result.optimization.allocations).map(([ch, alloc]) => (
+                      <div key={ch} className="p-2 rounded border border-border bg-background/30 flex items-center justify-between">
+                        <span className="font-semibold text-foreground">{ch}</span>
+                        <span className="text-primary font-bold">${alloc.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Provenance Assumptions */}
+              {result.analysis_result.provenance.assumptions.length > 0 && (
+                <div className="p-3 rounded-lg bg-background/40 border border-border text-xs space-y-1">
+                  <span className="font-semibold text-muted-foreground">Method Assumptions & Provenance:</span>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground/80 pl-1">
+                    {result.analysis_result.provenance.assumptions.map((assump, i) => (
+                      <li key={i}>{assump}</li>
                     ))}
                   </ul>
                 </div>
