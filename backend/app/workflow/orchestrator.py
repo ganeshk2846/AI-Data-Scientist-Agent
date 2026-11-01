@@ -89,6 +89,7 @@ class MultiAgentWorkflowResult(BaseModel):
     composed_answer: str
     key_findings: List[str] = Field(default_factory=list)
     limitations: List[str] = Field(default_factory=list)
+    suggested_followups: List[str] = Field(default_factory=list)
     trace_steps: List[StepTrace] = Field(default_factory=list)
     total_duration_ms: float = 0.0
 
@@ -447,6 +448,34 @@ class MultiAgentOrchestrator:
         ))
 
         key_findings = [f"Data observation: {', '.join(f'{k}: {v}' for k, v in r.items())}" for r in preview_rows[:3]]
+
+        # Contextual analytical follow-up suggestions
+        followups = []
+        q_lower = query.lower()
+        if any(w in q_lower for w in ["order", "sales", "revenue", "spend"]):
+            followups = [
+                "What are the top 5 product categories contributing to these sales?",
+                "How does this revenue break down across customer segments?",
+                "Are there any anomalous daily spikes in this period?",
+            ]
+        elif any(w in q_lower for w in ["churn", "segment", "customer"]):
+            followups = [
+                "What is the average order frequency for VIP customers?",
+                "Which marketing channels have the lowest churn rates?",
+                "What is the revenue impact if we reduce At Risk churn by 10%?",
+            ]
+        elif any(w in q_lower for w in ["product", "category", "inventory"]):
+            followups = [
+                "Which products have the highest return rates?",
+                "What are the best-selling products by volume?",
+                "How do product ratings correlate with sales?",
+            ]
+        else:
+            followups = [
+                "What is the month-over-month growth rate?",
+                "What are the primary drivers of this trend?",
+                "Show detailed customer segment breakdown for these results.",
+            ]
         total_duration_ms = (time.perf_counter() - overall_start) * 1000
 
         return MultiAgentWorkflowResult(
@@ -467,6 +496,7 @@ class MultiAgentOrchestrator:
             composed_answer=composed_text,
             key_findings=key_findings,
             limitations=warnings,
+            suggested_followups=followups,
             trace_steps=traces,
             total_duration_ms=round(total_duration_ms, 2),
         )

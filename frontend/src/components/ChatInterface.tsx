@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { executeChatQuery } from "@/lib/api";
 import { MultiAgentWorkflowResult } from "@/types/api";
+import { PlotlyChartRenderer } from "./PlotlyChartRenderer";
 import {
   AlertCircle,
   ArrowRight,
@@ -26,6 +27,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Table,
   Wrench,
 } from "lucide-react";
@@ -52,7 +54,7 @@ const WORKFLOW_STEPS = [
 
 export function ChatInterface() {
   const [queryInput, setQueryInput] = useState("");
-  const [activeTab, setActiveTab] = useState<"narrative" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
+  const [activeTab, setActiveTab] = useState<"narrative" | "chart" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
   const [copiedSql, setCopiedSql] = useState(false);
 
   const queryMutation = useMutation({
@@ -93,7 +95,7 @@ export function ChatInterface() {
             Multi-Agent Conversational BI Interface
           </h2>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-mono">
-            Phase 6 Analysis Tools Active
+            Phase 7 Visualization & Composer Active
           </span>
         </div>
 
@@ -231,12 +233,16 @@ export function ChatInterface() {
             <div className="flex items-center space-x-1 p-1 bg-background rounded-lg border border-border text-xs flex-wrap">
               {[
                 { key: "narrative", label: "Executive Answer", icon: FileText },
+                ...(result.chart_spec && !result.chart_spec.fallback_to_table
+                  ? [{ key: "chart", label: `Chart (${result.chart_spec.chart_type})`, icon: BarChart2 }]
+                  : []),
                 ...(result.analysis_result
                   ? [
                       {
                         key: "analysis",
                         label: `Analysis: ${result.analysis_result.tool_name}`,
                         icon: Sparkles,
+  TrendingUp,
                       },
                     ]
                   : []),
@@ -333,6 +339,29 @@ export function ChatInterface() {
                   </ul>
                 </div>
               )}
+
+              {/* Contextual Analytical Follow-up Questions */}
+              {result.suggested_followups && result.suggested_followups.length > 0 && (
+                <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                  <div className="flex items-center space-x-2 text-xs font-semibold text-primary">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Suggested Next Questions (Click to Investigate):</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {result.suggested_followups.map((qText, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSelectSuggested(qText)}
+                        className="px-3 py-1.5 rounded-lg border border-border bg-card hover:border-primary text-left text-xs text-foreground/90 hover:text-primary transition-all flex items-center space-x-1.5 group"
+                      >
+                        <span>{qText}</span>
+                        <ArrowRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
@@ -380,6 +409,14 @@ export function ChatInterface() {
             </div>
           )}
 
+
+          
+          {/* Tab: Interactive Plotly Visual Chart */}
+          {activeTab === "chart" && result.chart_spec && (
+            <div className="space-y-4">
+              <PlotlyChartRenderer chartSpec={result.chart_spec} queryResult={result.query_result} />
+            </div>
+          )}
 
           {/* Tab: Deterministic Analysis Tool Artefact */}
           {activeTab === "analysis" && result.analysis_result && (

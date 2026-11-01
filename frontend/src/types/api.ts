@@ -203,6 +203,12 @@ export const ChartSpecificationSchema = z.object({
   description: z.string().nullable().optional(),
   data_points_count: z.number().default(0),
   fallback_to_table: z.boolean().default(false),
+  subtitle: z.string().nullable().optional(),
+  color_field: z.string().nullable().optional(),
+  units: z.string().nullable().optional(),
+  alt_text: z.string().nullable().optional(),
+  plotly_data: z.array(z.record(z.any())).default([]),
+  plotly_layout: z.record(z.any()).default({}),
 });
 
 export const StepTraceSchema = z.object({
@@ -310,6 +316,7 @@ export const ForecastResultSchema = z.object({
   backtest_mape_pct: z.number().nullable().optional(),
   is_sufficient_data: z.boolean().default(true),
   limitations: z.array(z.string()).default([]),
+  suggested_followups: z.array(z.string()).default([]),
 });
 
 export const ScenarioResultSchema = z.object({
@@ -386,6 +393,7 @@ export const MultiAgentWorkflowResultSchema = z.object({
   composed_answer: z.string(),
   key_findings: z.array(z.string()).default([]),
   limitations: z.array(z.string()).default([]),
+  suggested_followups: z.array(z.string()).default([]),
   trace_steps: z.array(StepTraceSchema).default([]),
   total_duration_ms: z.number(),
 });
@@ -480,3 +488,5 @@ export type AnalysisToolResult = z.infer<typeof AnalysisToolResultSchema>;
 export type AnomalyPoint = z.infer<typeof AnomalyPointSchema>;
 export type ForecastPoint = z.infer<typeof ForecastPointSchema>;
 export type SegmentChurnRisk = z.infer<typeof SegmentChurnRiskSchema>;
+
+export type QueryExecutionResult = z.infer<typeof QueryExecutionResultSchema>;
