@@ -7,7 +7,7 @@
 | **Phase 0** | Repository and dataset reconnaissance | **Complete** | 2026-11-01 | [DATASET_PROFILE.md](docs/DATASET_PROFILE.md), `scripts/inspect_db.py`, `.gitignore`, `README.md` |
 | **Phase 1** | Project foundation and developer experience | **Complete** | 2026-11-01 | FastAPI & Next.js skeletons, health endpoints, test harness |
 | **Phase 2** | Read-only database connection & schema preparation | **Complete** | 2026-11-01 | Schema catalogue, profiling service, async preparation job, table inspector UI |
-| **Phase 3** | NL question API & first reliable vertical slice | Pending | - | Chat endpoint, schema retriever, SQL validator, runner |
+| **Phase 3** | NL question API & first reliable vertical slice | **Complete** | 2026-11-01 | Router, Grounder, sqlglot guardrail, vertical slice chat UI |
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | Pending | - | LangGraph orchestration, Router, Planner, Clarification, Verifier |
 | **Phase 5** | Hybrid schema retrieval & business semantics | Pending | - | BM25 + embedding RRF, value linking, semantic metrics |
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | Pending | - | Deterministic stats, time-series forecasting, churn risk |
@@ -221,3 +221,76 @@
   - `ecommerce.sqlite` remains strictly read-only (`mode=ro`).
 - **Next phase:**
   - Phase 3 — Natural-language question API and first reliable vertical slice: Chat/session APIs, provider-agnostic LLM interface, simple Router, schema-grounded single SQL generation, validation, safe execution, progress states, and results display.
+
+
+---
+
+## Phase 3 — Natural-language question API and first reliable vertical slice
+- **Date/time:** 2026-11-01T17:15:00+05:30
+- **Status:** Complete
+- **Objective:** Support a complete, trustworthy question-to-answer workflow grounded in real data before adding multi-agent complexity. Implement chat/session APIs, provider-agnostic LLM interface with fallback, simple intent Router, schema Grounder, sqlglot AST validator, read-only SQL execution, result verification, answer composition, observable progress states, and chat UI.
+- **Implemented:**
+  - Implemented provider-agnostic LLM interface (`backend/app/llm/client.py`, `models.py`) supporting OpenAI, Anthropic, Gemini, and a schema-grounded Mock provider for local/offline testing without external API keys.
+  - Implemented `RouterAgent` (`backend/app/agents/router.py`) classifying queries into descriptive, comparative, trend, diagnostic, predictive, or prescriptive intents with recorded confidence score and entity suggestions.
+  - Implemented `SchemaGrounder` (`backend/app/retrieval/retriever.py`) mapping business synonyms to real tables and automatically expanding join links via foreign keys.
+  - Implemented `SQLValidator` (`backend/app/sql/validator.py`) using `sqlglot` AST parsing to strictly enforce read-only `SELECT` queries, disallow DDL/DML/PRAGMA/multiple statements, verify all table identifiers exist in the schema, and automatically inject row limits.
+  - Implemented `SQLExecutor` (`backend/app/sql/executor.py`) executing queries in read-only mode (`mode=ro`) with timeouts and latency measurement.
+  - Implemented `QueryWorkflowService` (`backend/app/workflow/service.py`) orchestrating the complete pipeline: Router -> Grounder -> SQL Generator -> AST Validator -> Executor -> Verifier -> Composer, recording step traces and latencies.
+  - Built chat REST and SSE streaming endpoints (`backend/app/api/v1/endpoints/chat.py`):
+    - `POST /api/v1/chat/query`: Standard synchronous request/response.
+    - `POST /api/v1/chat/stream`: Real-time Server-Sent Events (SSE) streaming progress states.
+  - Built frontend conversational interface (`frontend/src/components/ChatInterface.tsx`):
+    - Input form with quick suggested prompts
+    - 7-step pipeline progress stepper
+    - Executive business answer card
+    - SQL inspector with copy button and timing badge
+    - Interactive data results table with formatted values
+    - Full step trace timing inspector
+  - Added 11 automated unit and integration tests (`backend/tests/test_sql_guardrail.py` and `backend/tests/test_chat_workflow.py`) covering SQL security AST guardrails, router classification, schema retrieval, executor runs, and end-to-end question workflows.
+- **Files created/modified:**
+  - `backend/app/llm/__init__.py` (created) — LLM package init.
+  - `backend/app/llm/models.py` (created) — LLM request/response typed models.
+  - `backend/app/llm/client.py` (created) — Provider-agnostic LLM client with Mock provider.
+  - `backend/app/agents/__init__.py` (created) — Agents package init.
+  - `backend/app/agents/router.py` (created) — Intent and domain router agent.
+  - `backend/app/retrieval/__init__.py` (created) — Retrieval package init.
+  - `backend/app/retrieval/retriever.py` (created) — Schema grounder and synonym mapper.
+  - `backend/app/sql/__init__.py` (created) — SQL safety package init.
+  - `backend/app/sql/validator.py` (created) — sqlglot AST validation guardrail.
+  - `backend/app/sql/executor.py` (created) — Read-only SQL query runner.
+  - `backend/app/workflow/__init__.py` (created) — Workflow package init.
+  - `backend/app/workflow/models.py` (created) — Progress state and result models.
+  - `backend/app/workflow/service.py` (created) — Vertical slice execution coordinator.
+  - `backend/app/api/v1/endpoints/chat.py` (created) — Chat and streaming endpoints.
+  - `backend/app/api/v1/router.py` (modified) — Mounted chat router.
+  - `backend/tests/test_sql_guardrail.py` (created) — Tests for SQL AST validation rules.
+  - `backend/tests/test_chat_workflow.py` (created) — End-to-end question workflow tests.
+  - `frontend/src/types/api.ts` (modified) — Added Zod schemas and TypeScript types for chat and workflow results.
+  - `frontend/src/lib/api.ts` (modified) — Added `executeChatQuery` API client.
+  - `frontend/src/components/ChatInterface.tsx` (created) — Interactive conversational BI component.
+  - `frontend/src/app/page.tsx` (modified) — Integrated `ChatInterface` into dashboard.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 3 record.
+- **Commands executed:**
+  - `git checkout -b phase-3-vertical-slice` — Created dedicated Phase 3 branch.
+  - `python -m pytest backend/tests -v` — Ran 33 backend tests (all 33 passed in 0.93s).
+  - `cd frontend; npm run build` — Built frontend production bundle with ChatInterface (100% success).
+- **Tests/checks:**
+  - Passed: SQL AST security validation blocks INSERT, UPDATE, DELETE, DROP, PRAGMA, and multiple statements.
+  - Passed: Table identifier hallucination defense (unrecognized table names immediately blocked).
+  - Passed: Router classification across descriptive, comparative, trend, and diagnostic questions.
+  - Passed: End-to-end question-to-answer execution on live SQLite data (orders by status and revenue).
+  - Passed: API endpoint `/api/v1/chat/query` returns correlated `run_id`, sanitized SQL, results table, and composed answer.
+  - Passed: Frontend production build (`next build`) compiles without errors.
+- **Dataset/schema observations:**
+  - Live query verified: `SELECT order_status, COUNT(*), SUM(total_amount) FROM orders GROUP BY order_status;` returns delivered: 17,274 ($20,891,624.33) and cancelled: 650 ($870,344.84) in 1.8ms.
+- **Decisions and rationale:**
+  - Chose `sqlglot` for AST parsing as it provides deterministic, dialect-aware validation and automated LIMIT enforcement.
+  - Implemented MockLLMProvider with schema-grounded SQL generation so that developers without OpenAI/Gemini/Anthropic keys can test the full vertical slice reliably.
+  - Progress states are tracked explicitly across 7 discrete stages (`understanding_question`, `retrieving_schema`, `generating_query`, `validating_query`, `running_query`, `verifying_results`, `composing_answer`).
+- **Known issues / limitations:**
+  - Single-query execution only at this stage; multi-step DAG planning and automatic repair loops will be introduced in Phase 4.
+- **Security/data-safety notes:**
+  - `ecommerce.sqlite` remains 100% read-only.
+  - All SQL queries are strictly validated via AST before hitting the database.
+- **Next phase:**
+  - Phase 4 — Multi-agent workflow, planning, clarification, and bounded repair: LangGraph workflow orchestration, explicit Router/Planner/Clarification/Visualization agent contracts, DAG execution plans, clarification when ambiguity exists, and bounded 2-attempt SQL repair.

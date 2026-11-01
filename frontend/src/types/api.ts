@@ -131,6 +131,59 @@ export const SchemaStatusSchema = z.object({
     .optional(),
 });
 
+// Phase 3 Chat & Workflow Models
+export const RouteResultSchema = z.object({
+  intent: z.enum(["descriptive", "comparative", "trend", "diagnostic", "predictive", "prescriptive"]),
+  confidence: z.number(),
+  complexity: z.enum(["simple", "medium", "complex"]),
+  reasoning: z.string(),
+  target_domains: z.array(z.string()).default([]),
+  suggested_entities: z.array(z.string()).default([]),
+});
+
+export const StepTraceSchema = z.object({
+  step: z.string(),
+  status: z.enum(["running", "succeeded", "failed", "skipped"]),
+  duration_ms: z.number(),
+  message: z.string(),
+  metadata: z.record(z.any()).nullable().optional(),
+});
+
+export const QueryExecutionResultSchema = z.object({
+  sql: z.string(),
+  columns: z.array(z.string()),
+  rows: z.array(z.record(z.any())),
+  row_count: z.number(),
+  execution_time_ms: z.number(),
+  truncated: z.boolean().default(false),
+  error: z.string().nullable().optional(),
+});
+
+export const VerificationResultSchema = z.object({
+  is_valid: z.boolean(),
+  empty_result: z.boolean().default(false),
+  row_count: z.number(),
+  checks_passed: z.array(z.string()).default([]),
+  warnings: z.array(z.string()).default([]),
+});
+
+export const QueryWorkflowResultSchema = z.object({
+  run_id: z.string(),
+  query: z.string(),
+  route: RouteResultSchema,
+  selected_tables: z.array(z.string()),
+  generated_sql: z.string().nullable().optional(),
+  sanitized_sql: z.string().nullable().optional(),
+  query_result: QueryExecutionResultSchema.nullable().optional(),
+  verification: VerificationResultSchema.nullable().optional(),
+  composed_answer: z.string(),
+  key_findings: z.array(z.string()).default([]),
+  limitations: z.array(z.string()).default([]),
+  trace_steps: z.array(StepTraceSchema).default([]),
+  total_duration_ms: z.number(),
+  timestamp: z.string(),
+});
+
 export function createAPIResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
   return z.object({
     success: z.boolean(),
@@ -146,6 +199,7 @@ export const SchemaStatusResponseSchema = createAPIResponseSchema(SchemaStatusSc
 export const TableListResponseSchema = createAPIResponseSchema(z.array(TableSummarySchema));
 export const TableDetailResponseSchema = createAPIResponseSchema(TableModelSchema);
 export const PreparationJobResponseSchema = createAPIResponseSchema(PreparationJobStateSchema);
+export const QueryWorkflowResponseSchema = createAPIResponseSchema(QueryWorkflowResultSchema);
 
 export type ColumnModel = z.infer<typeof ColumnModelSchema>;
 export type TableModel = z.infer<typeof TableModelSchema>;
@@ -154,3 +208,7 @@ export type DatabaseCatalog = z.infer<typeof DatabaseCatalogSchema>;
 export type PreparationJobState = z.infer<typeof PreparationJobStateSchema>;
 export type SchemaStatus = z.infer<typeof SchemaStatusSchema>;
 export type ReadinessStatus = z.infer<typeof ReadinessStatusSchema>;
+export type QueryWorkflowResult = z.infer<typeof QueryWorkflowResultSchema>;
+export type StepTrace = z.infer<typeof StepTraceSchema>;
+export type QueryExecutionResult = z.infer<typeof QueryExecutionResultSchema>;
+export type RouteResult = z.infer<typeof RouteResultSchema>;

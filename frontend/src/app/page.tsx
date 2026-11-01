@@ -5,7 +5,8 @@ import { fetchReadiness } from "@/lib/api";
 import { Header } from "@/components/Header";
 import { HealthReadinessCard } from "@/components/HealthReadinessCard";
 import { SchemaReadinessSection } from "@/components/SchemaReadinessSection";
-import { Layers, Database } from "lucide-react";
+import { ChatInterface } from "@/components/ChatInterface";
+import { Layers } from "lucide-react";
 
 export default function HomePage() {
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -27,6 +28,9 @@ export default function HomePage() {
           error={error as Error}
           onRefresh={() => refetch()}
         />
+
+        {/* Phase 3: Conversational BI Question Interface */}
+        <ChatInterface />
 
         {/* Phase 2: Schema Preparation & Catalog Explorer */}
         <SchemaReadinessSection />

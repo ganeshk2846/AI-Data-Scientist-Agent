@@ -1,6 +1,8 @@
 import {
   PreparationJobResponseSchema,
   PreparationJobState,
+  QueryWorkflowResponseSchema,
+  QueryWorkflowResult,
   ReadinessResponseSchema,
   ReadinessStatus,
   SchemaStatus,
@@ -66,4 +68,23 @@ export async function fetchTableDetail(tableName: string): Promise<TableModel> {
     throw new Error(parsed.data?.error?.message || `Failed to fetch table profile for ${tableName}`);
   }
   return parsed.data.data;
+}
+
+export async function executeChatQuery(queryText: string): Promise<QueryWorkflowResult> {
+  const url = `${API_BASE_URL}/api/v1/chat/query`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: jsonStringify({ query: queryText }),
+  });
+  const json = await res.json();
+  const parsed = QueryWorkflowResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to execute business query");
+  }
+  return parsed.data.data;
+}
+
+function jsonStringify(obj: any): string {
+  return JSON.stringify(obj);
 }
