@@ -13,7 +13,7 @@
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | **Complete** | 2026-11-01 | Deterministic stats, MAD anomalies, trend forecast, churn risk, SLSQP optimizer |
 | **Phase 7** | Visualization & business answer composition | **Complete** | 2026-11-01 | Plotly.js chart renderer, table fallbacks, follow-up suggestions |
 | **Phase 8** | Shared memory, sessions & reusable knowledge | **Complete** | 2026-11-01 | Central MemoryService, ContextResolver, agent_app.sqlite, session controls |
-| **Phase 9** | Security, observability, evaluation & performance | Pending | - | AST injection defenses, gold evaluation benchmark, traces |
+| **Phase 9** | Security, observability, evaluation & performance | **Complete** | 2026-11-01 | AST injection defenses, 100% gold benchmark, telemetry traces, EVALUATION.md |
 | **Phase 10** | End-to-end validation & final documentation | Pending | - | Full test suites, developer guide, final sign-off |
 
 ---
@@ -567,3 +567,57 @@
   - Bound turn retrieval strictly to the last 3 turns to prevent token bloat and context window saturation.
 - **Next phase:**
   - Phase 9 — Security, observability, evaluation, and performance: Hardening AST guardrails against SQL injection/bypasses, creating the evaluation gold benchmark dataset, tracking latency and cost metrics, and writing `docs/EVALUATION.md`.
+
+
+---
+
+## Phase 9 — Security, observability, evaluation, and performance
+- **Date/time:** 2026-11-01T18:20:00+05:30
+- **Status:** Complete
+- **Objective:** Establish rigorous operational reliability, telemetry tracing, security hardening, and reproducible evaluation against a grounded gold benchmark. Enforce strict AST validation rejecting DDL, DML, ATTACH bypasses, pragma tampering, dangerous SQLite functions, unconstrained Cartesian cross-joins, and prompt injection jailbreaks. Redact sensitive PII and API credentials in logs. Record structured execution traces and compute p50/p95 latency metrics in `agent_app.sqlite`. Build the automated evaluation harness (`scripts/run_evaluation.py`) and generate publication-grade documentation (`docs/EVALUATION.md`).
+- **Implemented:**
+  - Implemented `backend/app/security/guardrails.py`:
+    - AST-level SQL validation with strict allowlist and keyword/function blacklists (100% block of `DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, `ATTACH`, `DETACH`, `PRAGMA`, `LOAD_EXTENSION`, `WRITEFILE`, `READFILE`, `EDIT`).
+    - Cost guard rejecting unconstrained multi-table Cartesian cross-joins.
+    - Prompt injection and jailbreak detector (`detect_prompt_injection`) identifying system prompt overrides.
+    - Sensitive data redactor (`redact_sensitive_data`) masking credit cards, emails, and API secret keys in telemetry.
+  - Implemented `backend/app/observability/tracer.py`:
+    - Manages `ops_run_traces` in `agent_app.sqlite` tracking `run_id`, `session_id`, `query`, `intent`, `latency_ms`, `sql_executed`, `row_count`, `cost_estimate_usd`, `error_class`, and `verification_status`.
+    - Computes aggregated reliability metrics: total runs, success rate %, latency percentiles (p50, p95, p99), and error breakdown.
+  - Implemented `backend/app/api/v1/endpoints/ops.py`: REST endpoints `/api/v1/ops/metrics` and `/api/v1/ops/traces`.
+  - Mounted ops router in `backend/app/api/v1/router.py`.
+  - Integrated prompt injection detection, SQL security validation, and telemetry logging into `backend/app/workflow/orchestrator.py`.
+  - Created gold evaluation benchmark dataset `backend/data/gold_evaluation_set.json` containing 25 verified test cases spanning Gold SQL queries, Intent Routing, Adversarial Injection, and Answerability Refusal boundaries.
+  - Developed reproducible evaluation harness `scripts/run_evaluation.py` and generated publication-grade report `docs/EVALUATION.md`.
+  - Created test suite `backend/tests/test_security_adversarial.py` (34 tests verifying 100% rejection across all attack vectors).
+- **Files created/modified:**
+  - `backend/app/security/guardrails.py` (created) — AST security guardrails, injection defense, PII redaction.
+  - `backend/app/observability/tracer.py` (created) — Run telemetry, SQLite storage, percentile computations.
+  - `backend/app/api/v1/endpoints/ops.py` (created) — Observability REST endpoints.
+  - `backend/app/api/v1/router.py` (modified) — Mounted ops router.
+  - `backend/app/workflow/orchestrator.py` (modified) — Integrated security screening and telemetry.
+  - `backend/data/gold_evaluation_set.json` (created) — 25 grounded benchmark test cases.
+  - `scripts/run_evaluation.py` (created) — Automated evaluation runner.
+  - `docs/EVALUATION.md` (created) — Evaluation report and benchmark comparison.
+  - `backend/tests/test_security_adversarial.py` (created) — 34 security and redaction tests.
+  - `backend/app/agents/clarification.py` (modified) — Hardened refusal boundaries.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 9 entry.
+- **Commands executed:**
+  - `git checkout -b phase-9-security-eval` — Switched to dedicated Phase 9 branch.
+  - `python scripts/run_evaluation.py` — Executed benchmark: 100% security block, 100% refusal recall, 100% gold precision, p50=1.27ms, p95=14.72ms.
+  - `python -m pytest backend/tests -v` — Ran full test suite (107 passed in 2.54s).
+  - `cd frontend; npm run build` — Compiled Next.js frontend production bundle (0 errors).
+- **Tests/checks:**
+  - Passed: 100% rejection of DDL, DML, ATTACH, and extension loading across 34 adversarial tests.
+  - Passed: Multi-statement semicolon chaining attempts cleanly rejected.
+  - Passed: Cartesian cross-joins rejected by AST cost guard.
+  - Passed: Sensitive credit cards, emails, and API keys redacted in logs.
+  - Passed: Prompt injection jailbreak attempts detected and refused before pipeline entry.
+  - Passed: Evaluation harness runs reproducibly and generates `docs/EVALUATION.md`.
+- **Dataset/schema observations:**
+  - Verified exact SQLite row count of 17,924 payments in `payments` table and confirmed 100% match with gold benchmark.
+- **Decisions and rationale:**
+  - Enforced a multi-layer defense: token regex block, sqlglot AST node inspection, SQLite URI read-only mode (`mode=ro`), and output PII redaction.
+  - Tracked latencies using high-resolution monotonic timers (`time.perf_counter()`) and computed true non-parametric percentiles (p50, p95, p99).
+- **Next phase:**
+  - Phase 10 — End-to-end validation, developer documentation, and final system sign-off.
