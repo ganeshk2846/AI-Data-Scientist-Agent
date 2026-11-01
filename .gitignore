@@ -52,3 +52,6 @@ Thumbs.db
 .vscode/
 .idea/
 
+
+# Application generated cache & data
+data/
