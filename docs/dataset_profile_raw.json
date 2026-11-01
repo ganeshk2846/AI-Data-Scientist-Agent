@@ -1,0 +1,4749 @@
+{
+  "tables_count": 30,
+  "views_count": 0,
+  "indexes_count": 61,
+  "tables": {
+    "brands": {
+      "row_count": 30,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "brand_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "1",
+          "max_sample": "30"
+        },
+        {
+          "cid": 1,
+          "name": "brand_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "Alvorada",
+          "max_sample": "Zircon"
+        },
+        {
+          "cid": 2,
+          "name": "country_of_origin",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5,
+          "min_sample": "Argentina",
+          "max_sample": "United States"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_brands_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "brand_name"
+          ]
+        }
+      ]
+    },
+    "categories": {
+      "row_count": 30,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "category_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "1",
+          "max_sample": "30"
+        },
+        {
+          "cid": 1,
+          "name": "parent_category_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 6,
+          "null_percentage": 20.0,
+          "distinct_count": 6,
+          "min_sample": "1",
+          "max_sample": "26"
+        },
+        {
+          "cid": 2,
+          "name": "category_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "Accessories",
+          "max_sample": "Wearables"
+        },
+        {
+          "cid": 3,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "Accessories products within Fashion.",
+          "max_sample": "Wearables products within Electronics."
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "categories",
+          "from_col": "parent_category_id",
+          "to_col": "category_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_categories_parent",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "parent_category_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_categories_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "category_name"
+          ]
+        }
+      ]
+    },
+    "customer_addresses": {
+      "row_count": 6915,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "address_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6915,
+          "min_sample": "1",
+          "max_sample": "6915"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5000,
+          "min_sample": "1",
+          "max_sample": "5000"
+        },
+        {
+          "cid": 2,
+          "name": "address_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "billing",
+          "max_sample": "shipping"
+        },
+        {
+          "cid": 3,
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "Aracaju",
+          "max_sample": "Vitoria"
+        },
+        {
+          "cid": 4,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 23,
+          "min_sample": "AL",
+          "max_sample": "TO"
+        },
+        {
+          "cid": 5,
+          "name": "postal_code",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6915,
+          "min_sample": "01028-375",
+          "max_sample": "99971-124"
+        },
+        {
+          "cid": 6,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "Brazil",
+          "max_sample": "Brazil"
+        },
+        {
+          "cid": 7,
+          "name": "is_default",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "0",
+          "max_sample": "1"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_customer_default_address",
+          "unique": true,
+          "origin": "c",
+          "partial": true,
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "idx_addresses_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id"
+          ]
+        }
+      ]
+    },
+    "customer_segment_history": {
+      "row_count": 10199,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "history_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 10199,
+          "min_sample": "1",
+          "max_sample": "10199"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5000,
+          "min_sample": "1",
+          "max_sample": "5000"
+        },
+        {
+          "cid": 2,
+          "name": "segment_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "1",
+          "max_sample": "6"
+        },
+        {
+          "cid": 3,
+          "name": "valid_from",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1422,
+          "min_sample": "2022-01-04",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 4,
+          "name": "valid_to",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 5000,
+          "null_percentage": 49.02,
+          "distinct_count": 1078,
+          "min_sample": "2023-01-05",
+          "max_sample": "2025-12-31"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "customer_segments",
+          "from_col": "segment_id",
+          "to_col": "segment_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "uq_open_segment_per_customer",
+          "unique": true,
+          "origin": "c",
+          "partial": true,
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "idx_segment_history_segment",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "segment_id"
+          ]
+        },
+        {
+          "name": "idx_segment_history_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id",
+            "valid_from"
+          ]
+        }
+      ]
+    },
+    "customer_segments": {
+      "row_count": 6,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "segment_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "1",
+          "max_sample": "6"
+        },
+        {
+          "cid": 1,
+          "name": "segment_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "At Risk",
+          "max_sample": "VIP"
+        },
+        {
+          "cid": 2,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "Customers with 0-1 orders who signed up in the las",
+          "max_sample": "Repeat customers with 6-11 lifetime orders."
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_customer_segments_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "segment_name"
+          ]
+        }
+      ]
+    },
+    "customers": {
+      "row_count": 5000,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5000,
+          "min_sample": "1",
+          "max_sample": "5000"
+        },
+        {
+          "cid": 1,
+          "name": "customer_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4715,
+          "min_sample": "Agatha Andrade",
+          "max_sample": "\u00cdsis da Rocha"
+        },
+        {
+          "cid": 2,
+          "name": "email",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5000,
+          "min_sample": "agatha.almeida.4413@example.com.br",
+          "max_sample": "zoe.viana.3445@gmail.com"
+        },
+        {
+          "cid": 3,
+          "name": "signup_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1389,
+          "min_sample": "2022-01-04",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 4,
+          "name": "gender",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "female",
+          "max_sample": "unknown"
+        },
+        {
+          "cid": 5,
+          "name": "birth_date",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4426,
+          "min_sample": "1949-05-13",
+          "max_sample": "2007-10-11"
+        },
+        {
+          "cid": 6,
+          "name": "acquisition_channel_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "1",
+          "max_sample": "8"
+        },
+        {
+          "cid": 7,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "active",
+          "max_sample": "active"
+        },
+        {
+          "cid": 8,
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "Aracaju",
+          "max_sample": "Vitoria"
+        },
+        {
+          "cid": 9,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 23,
+          "min_sample": "AL",
+          "max_sample": "TO"
+        },
+        {
+          "cid": 10,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "Brazil",
+          "max_sample": "Brazil"
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4996,
+          "min_sample": "2022-01-04T21:14:07",
+          "max_sample": "2025-12-31T21:55:44"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "marketing_channels",
+          "from_col": "acquisition_channel_id",
+          "to_col": "channel_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_customers_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "status"
+          ]
+        },
+        {
+          "name": "idx_customers_acquisition",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "acquisition_channel_id"
+          ]
+        },
+        {
+          "name": "idx_customers_signup",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "signup_date"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_customers_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    },
+    "daily_targets": {
+      "row_count": 1096,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "target_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "1",
+          "max_sample": "1096"
+        },
+        {
+          "cid": 1,
+          "name": "target_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 2,
+          "name": "channel_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 1096,
+          "null_percentage": 100.0,
+          "distinct_count": 0,
+          "min_sample": null,
+          "max_sample": null
+        },
+        {
+          "cid": 3,
+          "name": "target_revenue",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 16,
+          "min_sample": "3840.0",
+          "max_sample": "8960.0"
+        },
+        {
+          "cid": 4,
+          "name": "target_orders",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 16,
+          "min_sample": "12",
+          "max_sample": "28"
+        },
+        {
+          "cid": 5,
+          "name": "target_margin",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "0.42",
+          "max_sample": "0.42"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "marketing_channels",
+          "from_col": "channel_id",
+          "to_col": "channel_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_daily_targets_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "target_date"
+          ]
+        }
+      ]
+    },
+    "expenses": {
+      "row_count": 6576,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "expense_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6576,
+          "min_sample": "1",
+          "max_sample": "6576"
+        },
+        {
+          "cid": 1,
+          "name": "expense_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 2,
+          "name": "expense_category",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "logistics",
+          "max_sample": "software"
+        },
+        {
+          "cid": 3,
+          "name": "warehouse_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 6576,
+          "null_percentage": 100.0,
+          "distinct_count": 0,
+          "min_sample": null,
+          "max_sample": null
+        },
+        {
+          "cid": 4,
+          "name": "amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4373,
+          "min_sample": "47.0",
+          "max_sample": "515.1"
+        },
+        {
+          "cid": 5,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "Daily logistics expense.",
+          "max_sample": "Daily software expense."
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "warehouses",
+          "from_col": "warehouse_id",
+          "to_col": "warehouse_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_expenses_category",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "expense_category"
+          ]
+        },
+        {
+          "name": "idx_expenses_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "expense_date"
+          ]
+        }
+      ]
+    },
+    "inventory": {
+      "row_count": 12960,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "inventory_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 12960,
+          "min_sample": "1",
+          "max_sample": "12960"
+        },
+        {
+          "cid": 1,
+          "name": "warehouse_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "1",
+          "max_sample": "20"
+        },
+        {
+          "cid": 2,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 355,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 3,
+          "name": "snapshot_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 36,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-01"
+        },
+        {
+          "cid": 4,
+          "name": "stock_on_hand",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 349,
+          "min_sample": "0",
+          "max_sample": "373"
+        },
+        {
+          "cid": 5,
+          "name": "reserved_quantity",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 7,
+          "min_sample": "0",
+          "max_sample": "6"
+        },
+        {
+          "cid": 6,
+          "name": "reorder_level",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 58,
+          "min_sample": "9",
+          "max_sample": "66"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "warehouses",
+          "from_col": "warehouse_id",
+          "to_col": "warehouse_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_inventory_warehouse_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "warehouse_id",
+            "snapshot_date"
+          ]
+        },
+        {
+          "name": "idx_inventory_product_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "product_id",
+            "snapshot_date"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_inventory_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "warehouse_id",
+            "product_id",
+            "snapshot_date"
+          ]
+        }
+      ]
+    },
+    "marketing_channels": {
+      "row_count": 8,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "channel_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "1",
+          "max_sample": "8"
+        },
+        {
+          "cid": 1,
+          "name": "channel_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "Affiliates",
+          "max_sample": "Referral"
+        },
+        {
+          "cid": 2,
+          "name": "channel_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "organic",
+          "max_sample": "referral"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_marketing_channels_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "channel_name"
+          ]
+        }
+      ]
+    },
+    "marketing_spend": {
+      "row_count": 8768,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "spend_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8768,
+          "min_sample": "1",
+          "max_sample": "8768"
+        },
+        {
+          "cid": 1,
+          "name": "channel_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "1",
+          "max_sample": "8"
+        },
+        {
+          "cid": 2,
+          "name": "spend_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 3,
+          "name": "campaign_id",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 8723,
+          "null_percentage": 99.49,
+          "distinct_count": 1,
+          "min_sample": "BF2024",
+          "max_sample": "BF2024"
+        },
+        {
+          "cid": 4,
+          "name": "spend_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5131,
+          "min_sample": "0.0",
+          "max_sample": "1729.53"
+        },
+        {
+          "cid": 5,
+          "name": "impressions",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5166,
+          "min_sample": "0",
+          "max_sample": "120868"
+        },
+        {
+          "cid": 6,
+          "name": "clicks",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2342,
+          "min_sample": "0",
+          "max_sample": "5959"
+        },
+        {
+          "cid": 7,
+          "name": "conversions",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "0",
+          "max_sample": "5"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "marketing_channels",
+          "from_col": "channel_id",
+          "to_col": "channel_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_marketing_spend_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "spend_date"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_marketing_spend_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "channel_id",
+            "spend_date"
+          ]
+        }
+      ]
+    },
+    "order_items": {
+      "row_count": 30707,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "order_item_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30707,
+          "min_sample": "1",
+          "max_sample": "30707"
+        },
+        {
+          "cid": 1,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17924,
+          "min_sample": "1",
+          "max_sample": "17924"
+        },
+        {
+          "cid": 2,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 971,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 3,
+          "name": "seller_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 100,
+          "min_sample": "1",
+          "max_sample": "100"
+        },
+        {
+          "cid": 4,
+          "name": "seller_product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1899,
+          "min_sample": "1",
+          "max_sample": "2000"
+        },
+        {
+          "cid": 5,
+          "name": "quantity",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "1",
+          "max_sample": "3"
+        },
+        {
+          "cid": 6,
+          "name": "unit_price",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1873,
+          "min_sample": "15.61",
+          "max_sample": "2244.76"
+        },
+        {
+          "cid": 7,
+          "name": "unit_cost",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1632,
+          "min_sample": "10.09",
+          "max_sample": "892.82"
+        },
+        {
+          "cid": 8,
+          "name": "discount_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3156,
+          "min_sample": "0.0",
+          "max_sample": "1346.86"
+        },
+        {
+          "cid": 9,
+          "name": "line_total",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 7231,
+          "min_sample": "14.26",
+          "max_sample": "6734.28"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "seller_products",
+          "from_col": "seller_product_id",
+          "to_col": "seller_product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "sellers",
+          "from_col": "seller_id",
+          "to_col": "seller_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 3,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_order_items_seller",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "seller_id"
+          ]
+        },
+        {
+          "name": "idx_order_items_product",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "product_id"
+          ]
+        },
+        {
+          "name": "idx_order_items_order",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_order_items_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "order_id",
+            "product_id"
+          ]
+        }
+      ]
+    },
+    "orders": {
+      "row_count": 17924,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17924,
+          "min_sample": "1",
+          "max_sample": "17924"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3308,
+          "min_sample": "1",
+          "max_sample": "5000"
+        },
+        {
+          "cid": 2,
+          "name": "order_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 3,
+          "name": "order_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "cancelled",
+          "max_sample": "delivered"
+        },
+        {
+          "cid": 4,
+          "name": "currency",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": "'BRL'",
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "BRL",
+          "max_sample": "BRL"
+        },
+        {
+          "cid": 5,
+          "name": "subtotal",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 10490,
+          "min_sample": "15.61",
+          "max_sample": "11977.32"
+        },
+        {
+          "cid": 6,
+          "name": "discount_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3125,
+          "min_sample": "0.0",
+          "max_sample": "1799.69"
+        },
+        {
+          "cid": 7,
+          "name": "shipping_fee",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "0.0",
+          "max_sample": "39.9"
+        },
+        {
+          "cid": 8,
+          "name": "tax_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 9157,
+          "min_sample": "1.25",
+          "max_sample": "958.19"
+        },
+        {
+          "cid": 9,
+          "name": "total_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 12188,
+          "min_sample": "26.76",
+          "max_sample": "12935.51"
+        },
+        {
+          "cid": 10,
+          "name": "sales_channel",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "marketplace",
+          "max_sample": "web"
+        },
+        {
+          "cid": 11,
+          "name": "channel_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 7981,
+          "null_percentage": 44.53,
+          "distinct_count": 8,
+          "min_sample": "1",
+          "max_sample": "8"
+        },
+        {
+          "cid": 12,
+          "name": "promotion_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 17557,
+          "null_percentage": 97.95,
+          "distinct_count": 4,
+          "min_sample": "1",
+          "max_sample": "4"
+        },
+        {
+          "cid": 13,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17891,
+          "min_sample": "2023-01-01T22:03:07",
+          "max_sample": "2025-12-31T23:27:12"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "promotions",
+          "from_col": "promotion_id",
+          "to_col": "promotion_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "marketing_channels",
+          "from_col": "channel_id",
+          "to_col": "channel_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_orders_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_status"
+          ]
+        },
+        {
+          "name": "idx_orders_promotion",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "promotion_id"
+          ]
+        },
+        {
+          "name": "idx_orders_channel",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "channel_id"
+          ]
+        },
+        {
+          "name": "idx_orders_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id",
+            "order_date"
+          ]
+        },
+        {
+          "name": "idx_orders_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_date"
+          ]
+        }
+      ]
+    },
+    "payments": {
+      "row_count": 17924,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "payment_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17924,
+          "min_sample": "1",
+          "max_sample": "17924"
+        },
+        {
+          "cid": 1,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17924,
+          "min_sample": "1",
+          "max_sample": "17924"
+        },
+        {
+          "cid": 2,
+          "name": "payment_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1096,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 3,
+          "name": "payment_method",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5,
+          "min_sample": "boleto",
+          "max_sample": "voucher"
+        },
+        {
+          "cid": 4,
+          "name": "payment_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "paid",
+          "max_sample": "voided"
+        },
+        {
+          "cid": 5,
+          "name": "amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 12188,
+          "min_sample": "26.76",
+          "max_sample": "12935.51"
+        },
+        {
+          "cid": 6,
+          "name": "transaction_reference",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17924,
+          "min_sample": "PAY-00000001-440675",
+          "max_sample": "PAY-00017924-706721"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_payments_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "payment_status"
+          ]
+        },
+        {
+          "name": "idx_payments_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "payment_date"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_payments_2",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "transaction_reference"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_payments_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        }
+      ]
+    },
+    "product_categories": {
+      "row_count": 414,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 414,
+          "min_sample": "4",
+          "max_sample": "997"
+        },
+        {
+          "cid": 1,
+          "name": "category_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "2",
+          "max_sample": "30"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "categories",
+          "from_col": "category_id",
+          "to_col": "category_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_product_categories_category",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "category_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_product_categories_1",
+          "unique": true,
+          "origin": "pk",
+          "partial": false,
+          "columns": [
+            "product_id",
+            "category_id"
+          ]
+        }
+      ]
+    },
+    "products": {
+      "row_count": 1000,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1000,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 1,
+          "name": "sku",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1000,
+          "min_sample": "SKU-000001",
+          "max_sample": "SKU-001000"
+        },
+        {
+          "cid": 2,
+          "name": "product_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1000,
+          "min_sample": "Alvorada Classic Fragrances Kit 0184",
+          "max_sample": "Zircon Signature Team Sports Collection 0667"
+        },
+        {
+          "cid": 3,
+          "name": "brand_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 30,
+          "min_sample": "1",
+          "max_sample": "30"
+        },
+        {
+          "cid": 4,
+          "name": "category_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "2",
+          "max_sample": "30"
+        },
+        {
+          "cid": 5,
+          "name": "cost_price",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 981,
+          "min_sample": "10.09",
+          "max_sample": "797.16"
+        },
+        {
+          "cid": 6,
+          "name": "list_price",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 995,
+          "min_sample": "15.0",
+          "max_sample": "2003.23"
+        },
+        {
+          "cid": 7,
+          "name": "weight_kg",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 517,
+          "min_sample": "0.1",
+          "max_sample": "14.82"
+        },
+        {
+          "cid": 8,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "active",
+          "max_sample": "launched"
+        },
+        {
+          "cid": 9,
+          "name": "launch_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 711,
+          "min_sample": "2020-07-16",
+          "max_sample": "2025-12-22"
+        },
+        {
+          "cid": 10,
+          "name": "discontinue_date",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 948,
+          "null_percentage": 94.8,
+          "distinct_count": 52,
+          "min_sample": "2021-05-05",
+          "max_sample": "2025-12-23"
+        },
+        {
+          "cid": 11,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 711,
+          "min_sample": "2020-07-16T08:00:00",
+          "max_sample": "2025-12-22T08:00:00"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "categories",
+          "from_col": "category_id",
+          "to_col": "category_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "brands",
+          "from_col": "brand_id",
+          "to_col": "brand_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_products_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "status"
+          ]
+        },
+        {
+          "name": "idx_products_brand",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "brand_id"
+          ]
+        },
+        {
+          "name": "idx_products_category",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "category_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_products_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "sku"
+          ]
+        }
+      ]
+    },
+    "promotions": {
+      "row_count": 4,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "promotion_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "1",
+          "max_sample": "4"
+        },
+        {
+          "cid": 1,
+          "name": "promotion_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "Black Friday 2024",
+          "max_sample": "Sports Week 2024"
+        },
+        {
+          "cid": 2,
+          "name": "promotion_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "percentage",
+          "max_sample": "percentage"
+        },
+        {
+          "cid": 3,
+          "name": "start_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "2023-09-01",
+          "max_sample": "2025-03-10"
+        },
+        {
+          "cid": 4,
+          "name": "end_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "2023-09-10",
+          "max_sample": "2025-03-20"
+        },
+        {
+          "cid": 5,
+          "name": "discount_rate",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "0.07",
+          "max_sample": "0.2"
+        },
+        {
+          "cid": 6,
+          "name": "campaign_id",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "BF2024",
+          "max_sample": "SPORT2024"
+        },
+        {
+          "cid": 7,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "10% off Fashion during Fashion Week.",
+          "max_sample": "8% off Home & Living assortment."
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_promotions_window",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "start_date",
+            "end_date"
+          ]
+        }
+      ]
+    },
+    "purchase_orders": {
+      "row_count": 3000,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "purchase_order_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3000,
+          "min_sample": "1",
+          "max_sample": "3000"
+        },
+        {
+          "cid": 1,
+          "name": "supplier_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "1",
+          "max_sample": "24"
+        },
+        {
+          "cid": 2,
+          "name": "warehouse_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "1",
+          "max_sample": "20"
+        },
+        {
+          "cid": 3,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 946,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 4,
+          "name": "order_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 998,
+          "min_sample": "2023-01-01",
+          "max_sample": "2025-11-30"
+        },
+        {
+          "cid": 5,
+          "name": "expected_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1008,
+          "min_sample": "2023-01-08",
+          "max_sample": "2025-12-21"
+        },
+        {
+          "cid": 6,
+          "name": "received_date",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1011,
+          "min_sample": "2023-01-08",
+          "max_sample": "2025-12-21"
+        },
+        {
+          "cid": 7,
+          "name": "quantity_ordered",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 556,
+          "min_sample": "40",
+          "max_sample": "599"
+        },
+        {
+          "cid": 8,
+          "name": "quantity_received",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 554,
+          "min_sample": "32",
+          "max_sample": "598"
+        },
+        {
+          "cid": 9,
+          "name": "unit_cost",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2828,
+          "min_sample": "9.29",
+          "max_sample": "824.44"
+        },
+        {
+          "cid": 10,
+          "name": "purchase_order_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "late",
+          "max_sample": "received"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "warehouses",
+          "from_col": "warehouse_id",
+          "to_col": "warehouse_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "suppliers",
+          "from_col": "supplier_id",
+          "to_col": "supplier_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_purchase_orders_warehouse",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "warehouse_id"
+          ]
+        },
+        {
+          "name": "idx_purchase_orders_product",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "product_id"
+          ]
+        },
+        {
+          "name": "idx_purchase_orders_supplier",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "supplier_id",
+            "order_date"
+          ]
+        }
+      ]
+    },
+    "refunds": {
+      "row_count": 1853,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "refund_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1853,
+          "min_sample": "1",
+          "max_sample": "1853"
+        },
+        {
+          "cid": 1,
+          "name": "payment_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1782,
+          "min_sample": "8",
+          "max_sample": "17575"
+        },
+        {
+          "cid": 2,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1782,
+          "min_sample": "8",
+          "max_sample": "17575"
+        },
+        {
+          "cid": 3,
+          "name": "return_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1853,
+          "min_sample": "2",
+          "max_sample": "2275"
+        },
+        {
+          "cid": 4,
+          "name": "refund_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 867,
+          "min_sample": "2023-01-14",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 5,
+          "name": "refund_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1149,
+          "min_sample": "14.29",
+          "max_sample": "6093.09"
+        },
+        {
+          "cid": 6,
+          "name": "refund_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 7,
+          "min_sample": "changed_mind",
+          "max_sample": "wrong_item"
+        },
+        {
+          "cid": 7,
+          "name": "refund_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "pending",
+          "max_sample": "processed"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "returns",
+          "from_col": "return_id",
+          "to_col": "return_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "payments",
+          "from_col": "payment_id",
+          "to_col": "payment_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_refunds_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "refund_date"
+          ]
+        },
+        {
+          "name": "idx_refunds_return",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "return_id"
+          ]
+        },
+        {
+          "name": "idx_refunds_order",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        }
+      ]
+    },
+    "returns": {
+      "row_count": 2277,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "return_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2277,
+          "min_sample": "1",
+          "max_sample": "2277"
+        },
+        {
+          "cid": 1,
+          "name": "order_item_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2277,
+          "min_sample": "9",
+          "max_sample": "30375"
+        },
+        {
+          "cid": 2,
+          "name": "return_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 935,
+          "min_sample": "2023-01-12",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 3,
+          "name": "return_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 7,
+          "min_sample": "changed_mind",
+          "max_sample": "wrong_item"
+        },
+        {
+          "cid": 4,
+          "name": "return_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5,
+          "min_sample": "approved",
+          "max_sample": "requested"
+        },
+        {
+          "cid": 5,
+          "name": "quantity_returned",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "1",
+          "max_sample": "3"
+        },
+        {
+          "cid": 6,
+          "name": "refund_amount",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1356,
+          "min_sample": "14.29",
+          "max_sample": "6734.28"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "order_items",
+          "from_col": "order_item_id",
+          "to_col": "order_item_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_returns_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "return_status"
+          ]
+        },
+        {
+          "name": "idx_returns_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "return_date"
+          ]
+        },
+        {
+          "name": "idx_returns_item",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_item_id"
+          ]
+        }
+      ]
+    },
+    "reviews": {
+      "row_count": 9224,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "review_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 9224,
+          "min_sample": "1",
+          "max_sample": "9224"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2434,
+          "min_sample": "1",
+          "max_sample": "4999"
+        },
+        {
+          "cid": 2,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 912,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 3,
+          "name": "order_item_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 9224,
+          "min_sample": "1",
+          "max_sample": "30328"
+        },
+        {
+          "cid": 4,
+          "name": "rating",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5,
+          "min_sample": "1",
+          "max_sample": "5"
+        },
+        {
+          "cid": 5,
+          "name": "review_text",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 15,
+          "min_sample": "Arrived damaged or unusable.",
+          "max_sample": "Would not buy again."
+        },
+        {
+          "cid": 6,
+          "name": "review_date",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1084,
+          "min_sample": "2023-01-12",
+          "max_sample": "2025-12-31"
+        },
+        {
+          "cid": 7,
+          "name": "verified_purchase",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "1",
+          "max_sample": "1"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "order_items",
+          "from_col": "order_item_id",
+          "to_col": "order_item_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_reviews_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "review_date"
+          ]
+        },
+        {
+          "name": "idx_reviews_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "idx_reviews_product_date",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "product_id",
+            "review_date"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_reviews_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "order_item_id"
+          ]
+        }
+      ]
+    },
+    "seller_products": {
+      "row_count": 2000,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "seller_product_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2000,
+          "min_sample": "1",
+          "max_sample": "2000"
+        },
+        {
+          "cid": 1,
+          "name": "seller_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 100,
+          "min_sample": "1",
+          "max_sample": "100"
+        },
+        {
+          "cid": 2,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1000,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 3,
+          "name": "seller_sku",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2000,
+          "min_sample": "001-000016-2",
+          "max_sample": "100-000943-1"
+        },
+        {
+          "cid": 4,
+          "name": "selling_price",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1970,
+          "min_sample": "15.61",
+          "max_sample": "2244.76"
+        },
+        {
+          "cid": 5,
+          "name": "active_from",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 711,
+          "min_sample": "2020-07-16",
+          "max_sample": "2025-12-22"
+        },
+        {
+          "cid": 6,
+          "name": "active_to",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 2000,
+          "null_percentage": 100.0,
+          "distinct_count": 0,
+          "min_sample": null,
+          "max_sample": null
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "sellers",
+          "from_col": "seller_id",
+          "to_col": "seller_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_seller_products_seller",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "seller_id"
+          ]
+        },
+        {
+          "name": "idx_seller_products_product",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "product_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_seller_products_2",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "seller_id",
+            "seller_sku"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_seller_products_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "seller_id",
+            "product_id"
+          ]
+        }
+      ]
+    },
+    "sellers": {
+      "row_count": 100,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "seller_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 100,
+          "min_sample": "1",
+          "max_sample": "100"
+        },
+        {
+          "cid": 1,
+          "name": "seller_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 100,
+          "min_sample": "Seller 001 - Alves e Filhos",
+          "max_sample": "Seller 100 - Sampaio"
+        },
+        {
+          "cid": 2,
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "Aracaju",
+          "max_sample": "Teresina"
+        },
+        {
+          "cid": 3,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "BA",
+          "max_sample": "SP"
+        },
+        {
+          "cid": 4,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "Brazil",
+          "max_sample": "Brazil"
+        },
+        {
+          "cid": 5,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 100,
+          "min_sample": "2020-07-19T22:15:00",
+          "max_sample": "2022-09-02T22:31:35"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "session_events": {
+      "row_count": 34640,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "event_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 34640,
+          "min_sample": "1",
+          "max_sample": "105880"
+        },
+        {
+          "cid": 1,
+          "name": "session_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 10434,
+          "min_sample": "2",
+          "max_sample": "71043"
+        },
+        {
+          "cid": 2,
+          "name": "event_timestamp",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 34509,
+          "min_sample": "2023-01-01T22:03:34",
+          "max_sample": "2025-12-31T23:27:12"
+        },
+        {
+          "cid": 3,
+          "name": "event_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "add_to_cart",
+          "max_sample": "search"
+        },
+        {
+          "cid": 4,
+          "name": "product_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 17682,
+          "null_percentage": 51.05,
+          "distinct_count": 944,
+          "min_sample": "1",
+          "max_sample": "1000"
+        },
+        {
+          "cid": 5,
+          "name": "page_path",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 955,
+          "min_sample": "/",
+          "max_sample": "/search"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "products",
+          "from_col": "product_id",
+          "to_col": "product_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "website_sessions",
+          "from_col": "session_id",
+          "to_col": "session_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_session_events_time",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "event_timestamp"
+          ]
+        },
+        {
+          "name": "idx_session_events_session",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "session_id",
+            "event_timestamp"
+          ]
+        }
+      ]
+    },
+    "shipment_events": {
+      "row_count": 71310,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "event_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 71310,
+          "min_sample": "18",
+          "max_sample": "105950"
+        },
+        {
+          "cid": 1,
+          "name": "shipment_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17274,
+          "min_sample": "1",
+          "max_sample": "17274"
+        },
+        {
+          "cid": 2,
+          "name": "event_timestamp",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 67181,
+          "min_sample": "2023-01-02T08:28:00",
+          "max_sample": "2026-01-16T10:42:00"
+        },
+        {
+          "cid": 3,
+          "name": "event_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 5,
+          "min_sample": "delay_reported",
+          "max_sample": "picked_up"
+        },
+        {
+          "cid": 4,
+          "name": "location",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "Aracaju, SE",
+          "max_sample": "Vitoria, ES"
+        },
+        {
+          "cid": 5,
+          "name": "description",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "CarrierA reported a transit delay.",
+          "max_sample": "Parcel in transit."
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "shipments",
+          "from_col": "shipment_id",
+          "to_col": "shipment_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_shipment_events_time",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "event_timestamp"
+          ]
+        },
+        {
+          "name": "idx_shipment_events_shipment",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "shipment_id",
+            "event_timestamp"
+          ]
+        }
+      ]
+    },
+    "shipments": {
+      "row_count": 17274,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "shipment_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17274,
+          "min_sample": "1",
+          "max_sample": "17274"
+        },
+        {
+          "cid": 1,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17274,
+          "min_sample": "1",
+          "max_sample": "17924"
+        },
+        {
+          "cid": 2,
+          "name": "warehouse_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "1",
+          "max_sample": "20"
+        },
+        {
+          "cid": 3,
+          "name": "carrier",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "CarrierA",
+          "max_sample": "CarrierD"
+        },
+        {
+          "cid": 4,
+          "name": "shipping_method",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "economy",
+          "max_sample": "standard"
+        },
+        {
+          "cid": 5,
+          "name": "shipped_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 17050,
+          "min_sample": "2023-01-02T08:28:00",
+          "max_sample": "2026-01-02T18:39:00"
+        },
+        {
+          "cid": 6,
+          "name": "estimated_delivery_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1106,
+          "min_sample": "2023-01-06T18:00:00",
+          "max_sample": "2026-01-16T18:00:00"
+        },
+        {
+          "cid": 7,
+          "name": "delivered_at",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 16992,
+          "min_sample": "2023-01-04T13:51:00",
+          "max_sample": "2026-01-16T10:42:00"
+        },
+        {
+          "cid": 8,
+          "name": "shipping_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "delivered",
+          "max_sample": "delivered"
+        },
+        {
+          "cid": 9,
+          "name": "shipping_cost",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3233,
+          "min_sample": "9.21",
+          "max_sample": "62.54"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "warehouses",
+          "from_col": "warehouse_id",
+          "to_col": "warehouse_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_shipments_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "shipping_status"
+          ]
+        },
+        {
+          "name": "idx_shipments_warehouse",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "warehouse_id"
+          ]
+        },
+        {
+          "name": "idx_shipments_carrier",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "carrier"
+          ]
+        },
+        {
+          "name": "idx_shipments_shipped",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "shipped_at"
+          ]
+        },
+        {
+          "name": "idx_shipments_order",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_shipments_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        }
+      ]
+    },
+    "suppliers": {
+      "row_count": 24,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "supplier_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "1",
+          "max_sample": "24"
+        },
+        {
+          "cid": 1,
+          "name": "supplier_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "Supplier 01",
+          "max_sample": "Supplier 24"
+        },
+        {
+          "cid": 2,
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 24,
+          "min_sample": "Aracaju",
+          "max_sample": "Vitoria"
+        },
+        {
+          "cid": 3,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 23,
+          "min_sample": "AL",
+          "max_sample": "TO"
+        },
+        {
+          "cid": 4,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "Brazil",
+          "max_sample": "Brazil"
+        },
+        {
+          "cid": 5,
+          "name": "lead_time_days",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 12,
+          "min_sample": "3",
+          "max_sample": "25"
+        },
+        {
+          "cid": 6,
+          "name": "reliability_score",
+          "type": "REAL",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 23,
+          "min_sample": "0.583",
+          "max_sample": "0.965"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "support_tickets": {
+      "row_count": 2174,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "ticket_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2174,
+          "min_sample": "1",
+          "max_sample": "2174"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1227,
+          "min_sample": "2",
+          "max_sample": "4999"
+        },
+        {
+          "cid": 2,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2084,
+          "min_sample": "32",
+          "max_sample": "17666"
+        },
+        {
+          "cid": 3,
+          "name": "created_at",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2174,
+          "min_sample": "2023-01-14T21:33:22",
+          "max_sample": "2025-12-30T21:54:52"
+        },
+        {
+          "cid": 4,
+          "name": "resolved_at",
+          "type": "TEXT",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 304,
+          "null_percentage": 13.98,
+          "distinct_count": 1870,
+          "min_sample": "2023-01-17T20:09:55",
+          "max_sample": "2025-12-31T20:33:24"
+        },
+        {
+          "cid": 5,
+          "name": "issue_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 6,
+          "min_sample": "account",
+          "max_sample": "return_refund"
+        },
+        {
+          "cid": 6,
+          "name": "priority",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "high",
+          "max_sample": "urgent"
+        },
+        {
+          "cid": 7,
+          "name": "ticket_status",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 4,
+          "min_sample": "closed",
+          "max_sample": "resolved"
+        },
+        {
+          "cid": 8,
+          "name": "satisfaction_score",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 304,
+          "null_percentage": 13.98,
+          "distinct_count": 5,
+          "min_sample": "1",
+          "max_sample": "5"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_tickets_status",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "ticket_status"
+          ]
+        },
+        {
+          "name": "idx_tickets_order",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        },
+        {
+          "name": "idx_tickets_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "idx_tickets_created",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "created_at"
+          ]
+        }
+      ]
+    },
+    "warehouses": {
+      "row_count": 20,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "warehouse_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "1",
+          "max_sample": "20"
+        },
+        {
+          "cid": 1,
+          "name": "warehouse_name",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "Warehouse AL-18",
+          "max_sample": "Warehouse SP-02"
+        },
+        {
+          "cid": 2,
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 20,
+          "min_sample": "Aracaju",
+          "max_sample": "Vitoria"
+        },
+        {
+          "cid": 3,
+          "name": "state",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 19,
+          "min_sample": "AL",
+          "max_sample": "SP"
+        },
+        {
+          "cid": 4,
+          "name": "country",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 1,
+          "min_sample": "Brazil",
+          "max_sample": "Brazil"
+        },
+        {
+          "cid": 5,
+          "name": "capacity",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 19,
+          "min_sample": "29000",
+          "max_sample": "79500"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "website_sessions": {
+      "row_count": 71046,
+      "columns": [
+        {
+          "cid": 0,
+          "name": "session_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": true,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 71046,
+          "min_sample": "1",
+          "max_sample": "71046"
+        },
+        {
+          "cid": 1,
+          "name": "customer_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 45837,
+          "null_percentage": 64.52,
+          "distinct_count": 3673,
+          "min_sample": "1",
+          "max_sample": "5000"
+        },
+        {
+          "cid": 2,
+          "name": "channel_id",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 8,
+          "min_sample": "1",
+          "max_sample": "8"
+        },
+        {
+          "cid": 3,
+          "name": "session_start",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 70440,
+          "min_sample": "2023-01-01T22:00:22",
+          "max_sample": "2025-12-31T22:59:21"
+        },
+        {
+          "cid": 4,
+          "name": "session_end",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 70543,
+          "min_sample": "2023-01-01T22:14:13",
+          "max_sample": "2025-12-31T23:31:06"
+        },
+        {
+          "cid": 5,
+          "name": "device_type",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 3,
+          "min_sample": "desktop",
+          "max_sample": "tablet"
+        },
+        {
+          "cid": 6,
+          "name": "landing_page",
+          "type": "TEXT",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 9,
+          "min_sample": "/",
+          "max_sample": "/search"
+        },
+        {
+          "cid": 7,
+          "name": "converted",
+          "type": "INTEGER",
+          "notnull": true,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 0,
+          "null_percentage": 0.0,
+          "distinct_count": 2,
+          "min_sample": "0",
+          "max_sample": "1"
+        },
+        {
+          "cid": 8,
+          "name": "order_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "dflt_value": null,
+          "pk": false,
+          "null_count": 67553,
+          "null_percentage": 95.08,
+          "distinct_count": 3493,
+          "min_sample": "1",
+          "max_sample": "17907"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "target_table": "orders",
+          "from_col": "order_id",
+          "to_col": "order_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "target_table": "marketing_channels",
+          "from_col": "channel_id",
+          "to_col": "channel_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "target_table": "customers",
+          "from_col": "customer_id",
+          "to_col": "customer_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_sessions_converted",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "converted"
+          ]
+        },
+        {
+          "name": "idx_sessions_customer",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "idx_sessions_channel_start",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "channel_id",
+            "session_start"
+          ]
+        },
+        {
+          "name": "idx_sessions_start",
+          "unique": false,
+          "origin": "c",
+          "partial": false,
+          "columns": [
+            "session_start"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_website_sessions_1",
+          "unique": true,
+          "origin": "u",
+          "partial": false,
+          "columns": [
+            "order_id"
+          ]
+        }
+      ]
+    }
+  },
+  "foreign_keys_graph": [
+    {
+      "source_table": "categories",
+      "source_col": "parent_category_id",
+      "target_table": "categories",
+      "target_col": "category_id"
+    },
+    {
+      "source_table": "customer_addresses",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    },
+    {
+      "source_table": "customer_segment_history",
+      "source_col": "segment_id",
+      "target_table": "customer_segments",
+      "target_col": "segment_id"
+    },
+    {
+      "source_table": "customer_segment_history",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    },
+    {
+      "source_table": "customers",
+      "source_col": "acquisition_channel_id",
+      "target_table": "marketing_channels",
+      "target_col": "channel_id"
+    },
+    {
+      "source_table": "daily_targets",
+      "source_col": "channel_id",
+      "target_table": "marketing_channels",
+      "target_col": "channel_id"
+    },
+    {
+      "source_table": "expenses",
+      "source_col": "warehouse_id",
+      "target_table": "warehouses",
+      "target_col": "warehouse_id"
+    },
+    {
+      "source_table": "inventory",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "inventory",
+      "source_col": "warehouse_id",
+      "target_table": "warehouses",
+      "target_col": "warehouse_id"
+    },
+    {
+      "source_table": "marketing_spend",
+      "source_col": "channel_id",
+      "target_table": "marketing_channels",
+      "target_col": "channel_id"
+    },
+    {
+      "source_table": "order_items",
+      "source_col": "seller_product_id",
+      "target_table": "seller_products",
+      "target_col": "seller_product_id"
+    },
+    {
+      "source_table": "order_items",
+      "source_col": "seller_id",
+      "target_table": "sellers",
+      "target_col": "seller_id"
+    },
+    {
+      "source_table": "order_items",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "order_items",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "orders",
+      "source_col": "promotion_id",
+      "target_table": "promotions",
+      "target_col": "promotion_id"
+    },
+    {
+      "source_table": "orders",
+      "source_col": "channel_id",
+      "target_table": "marketing_channels",
+      "target_col": "channel_id"
+    },
+    {
+      "source_table": "orders",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    },
+    {
+      "source_table": "payments",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "product_categories",
+      "source_col": "category_id",
+      "target_table": "categories",
+      "target_col": "category_id"
+    },
+    {
+      "source_table": "product_categories",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "products",
+      "source_col": "category_id",
+      "target_table": "categories",
+      "target_col": "category_id"
+    },
+    {
+      "source_table": "products",
+      "source_col": "brand_id",
+      "target_table": "brands",
+      "target_col": "brand_id"
+    },
+    {
+      "source_table": "purchase_orders",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "purchase_orders",
+      "source_col": "warehouse_id",
+      "target_table": "warehouses",
+      "target_col": "warehouse_id"
+    },
+    {
+      "source_table": "purchase_orders",
+      "source_col": "supplier_id",
+      "target_table": "suppliers",
+      "target_col": "supplier_id"
+    },
+    {
+      "source_table": "refunds",
+      "source_col": "return_id",
+      "target_table": "returns",
+      "target_col": "return_id"
+    },
+    {
+      "source_table": "refunds",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "refunds",
+      "source_col": "payment_id",
+      "target_table": "payments",
+      "target_col": "payment_id"
+    },
+    {
+      "source_table": "returns",
+      "source_col": "order_item_id",
+      "target_table": "order_items",
+      "target_col": "order_item_id"
+    },
+    {
+      "source_table": "reviews",
+      "source_col": "order_item_id",
+      "target_table": "order_items",
+      "target_col": "order_item_id"
+    },
+    {
+      "source_table": "reviews",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "reviews",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    },
+    {
+      "source_table": "seller_products",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "seller_products",
+      "source_col": "seller_id",
+      "target_table": "sellers",
+      "target_col": "seller_id"
+    },
+    {
+      "source_table": "session_events",
+      "source_col": "product_id",
+      "target_table": "products",
+      "target_col": "product_id"
+    },
+    {
+      "source_table": "session_events",
+      "source_col": "session_id",
+      "target_table": "website_sessions",
+      "target_col": "session_id"
+    },
+    {
+      "source_table": "shipment_events",
+      "source_col": "shipment_id",
+      "target_table": "shipments",
+      "target_col": "shipment_id"
+    },
+    {
+      "source_table": "shipments",
+      "source_col": "warehouse_id",
+      "target_table": "warehouses",
+      "target_col": "warehouse_id"
+    },
+    {
+      "source_table": "shipments",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "support_tickets",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "support_tickets",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    },
+    {
+      "source_table": "website_sessions",
+      "source_col": "order_id",
+      "target_table": "orders",
+      "target_col": "order_id"
+    },
+    {
+      "source_table": "website_sessions",
+      "source_col": "channel_id",
+      "target_table": "marketing_channels",
+      "target_col": "channel_id"
+    },
+    {
+      "source_table": "website_sessions",
+      "source_col": "customer_id",
+      "target_table": "customers",
+      "target_col": "customer_id"
+    }
+  ],
+  "total_rows": 334503,
+  "date_ranges": {
+    "categories.category_id": {
+      "min": "1",
+      "max": "30"
+    },
+    "categories.parent_category_id": {
+      "min": "1",
+      "max": "26"
+    },
+    "categories.category_name": {
+      "min": "Accessories",
+      "max": "Wearables"
+    },
+    "customer_addresses.state": {
+      "min": "AL",
+      "max": "TO"
+    },
+    "customers.signup_date": {
+      "min": "2022-01-04",
+      "max": "2025-12-31"
+    },
+    "customers.birth_date": {
+      "min": "1949-05-13",
+      "max": "2007-10-11"
+    },
+    "customers.status": {
+      "min": "active",
+      "max": "active"
+    },
+    "customers.state": {
+      "min": "AL",
+      "max": "TO"
+    },
+    "customers.created_at": {
+      "min": "2022-01-04T21:14:07",
+      "max": "2025-12-31T21:55:44"
+    },
+    "daily_targets.target_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-31"
+    },
+    "expenses.expense_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-31"
+    },
+    "expenses.expense_category": {
+      "min": "logistics",
+      "max": "software"
+    },
+    "inventory.snapshot_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-01"
+    },
+    "marketing_spend.spend_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-31"
+    },
+    "orders.order_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-31"
+    },
+    "orders.order_status": {
+      "min": "cancelled",
+      "max": "delivered"
+    },
+    "orders.created_at": {
+      "min": "2023-01-01T22:03:07",
+      "max": "2025-12-31T23:27:12"
+    },
+    "payments.payment_date": {
+      "min": "2023-01-01",
+      "max": "2025-12-31"
+    },
+    "payments.payment_status": {
+      "min": "paid",
+      "max": "voided"
+    },
+    "product_categories.category_id": {
+      "min": "2",
+      "max": "30"
+    },
+    "products.category_id": {
+      "min": "2",
+      "max": "30"
+    },
+    "products.status": {
+      "min": "active",
+      "max": "launched"
+    },
+    "products.launch_date": {
+      "min": "2020-07-16",
+      "max": "2025-12-22"
+    },
+    "products.discontinue_date": {
+      "min": "2021-05-05",
+      "max": "2025-12-23"
+    },
+    "products.created_at": {
+      "min": "2020-07-16T08:00:00",
+      "max": "2025-12-22T08:00:00"
+    },
+    "promotions.start_date": {
+      "min": "2023-09-01",
+      "max": "2025-03-10"
+    },
+    "promotions.end_date": {
+      "min": "2023-09-10",
+      "max": "2025-03-20"
+    },
+    "promotions.discount_rate": {
+      "min": "0.07",
+      "max": "0.2"
+    },
+    "purchase_orders.order_date": {
+      "min": "2023-01-01",
+      "max": "2025-11-30"
+    },
+    "purchase_orders.expected_date": {
+      "min": "2023-01-08",
+      "max": "2025-12-21"
+    },
+    "purchase_orders.received_date": {
+      "min": "2023-01-08",
+      "max": "2025-12-21"
+    },
+    "purchase_orders.purchase_order_status": {
+      "min": "late",
+      "max": "received"
+    },
+    "refunds.refund_date": {
+      "min": "2023-01-14",
+      "max": "2025-12-31"
+    },
+    "refunds.refund_status": {
+      "min": "pending",
+      "max": "processed"
+    },
+    "returns.return_date": {
+      "min": "2023-01-12",
+      "max": "2025-12-31"
+    },
+    "returns.return_status": {
+      "min": "approved",
+      "max": "requested"
+    },
+    "reviews.rating": {
+      "min": "1",
+      "max": "5"
+    },
+    "reviews.review_date": {
+      "min": "2023-01-12",
+      "max": "2025-12-31"
+    },
+    "sellers.state": {
+      "min": "BA",
+      "max": "SP"
+    },
+    "sellers.created_at": {
+      "min": "2020-07-19T22:15:00",
+      "max": "2022-09-02T22:31:35"
+    },
+    "session_events.event_timestamp": {
+      "min": "2023-01-01T22:03:34",
+      "max": "2025-12-31T23:27:12"
+    },
+    "session_events.page_path": {
+      "min": "/",
+      "max": "/search"
+    },
+    "shipment_events.event_timestamp": {
+      "min": "2023-01-02T08:28:00",
+      "max": "2026-01-16T10:42:00"
+    },
+    "shipment_events.location": {
+      "min": "Aracaju, SE",
+      "max": "Vitoria, ES"
+    },
+    "shipments.shipped_at": {
+      "min": "2023-01-02T08:28:00",
+      "max": "2026-01-02T18:39:00"
+    },
+    "shipments.estimated_delivery_at": {
+      "min": "2023-01-06T18:00:00",
+      "max": "2026-01-16T18:00:00"
+    },
+    "shipments.delivered_at": {
+      "min": "2023-01-04T13:51:00",
+      "max": "2026-01-16T10:42:00"
+    },
+    "shipments.shipping_status": {
+      "min": "delivered",
+      "max": "delivered"
+    },
+    "suppliers.state": {
+      "min": "AL",
+      "max": "TO"
+    },
+    "suppliers.lead_time_days": {
+      "min": "3",
+      "max": "25"
+    },
+    "support_tickets.created_at": {
+      "min": "2023-01-14T21:33:22",
+      "max": "2025-12-30T21:54:52"
+    },
+    "support_tickets.resolved_at": {
+      "min": "2023-01-17T20:09:55",
+      "max": "2025-12-31T20:33:24"
+    },
+    "support_tickets.ticket_status": {
+      "min": "closed",
+      "max": "resolved"
+    },
+    "support_tickets.satisfaction_score": {
+      "min": "1",
+      "max": "5"
+    },
+    "warehouses.state": {
+      "min": "AL",
+      "max": "SP"
+    }
+  }
+}
