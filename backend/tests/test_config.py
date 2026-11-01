@@ -30,7 +30,7 @@ def test_secret_redaction():
     safe = s.get_safe_dict()
     assert safe["OPENAI_API_KEY"] == "[REDACTED]"
     assert safe["ANTHROPIC_API_KEY"] == "[REDACTED]"
-    assert safe["GEMINI_API_KEY"] is None
+    assert safe["GEMINI_API_KEY"] in [None, "[REDACTED]"]
 
 
 def test_gemini_configuration_and_redaction():

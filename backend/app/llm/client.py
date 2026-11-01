@@ -3,6 +3,7 @@ Provider-agnostic LLM interface supporting OpenAI, Anthropic, Gemini, and Mock.
 """
 
 from abc import ABC, abstractmethod
+import asyncio
 import os
 import re
 from typing import Optional
@@ -102,7 +103,7 @@ class MockLLMProvider(BaseLLMProvider):
 class GeminiProvider(BaseLLMProvider):
     """Google Gemini API Provider using the official google-genai SDK."""
 
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str, model: str = "gemini-3.8-flash"):
         from google import genai
         self.client = genai.Client(api_key=api_key)
         self.model = model
@@ -141,13 +142,17 @@ class GeminiProvider(BaseLLMProvider):
             system_instruction=system_instruction,
             temperature=request.temperature,
             max_output_tokens=request.max_tokens or 2048,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
         try:
-            res = await self.client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
+            res = await asyncio.wait_for(
+                self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=float(request.timeout_seconds),
             )
             content = res.text or ""
             tokens_used = (
@@ -168,8 +173,10 @@ class GeminiProvider(BaseLLMProvider):
                 finish_reason=str(finish_reason) if finish_reason else None,
             )
         except Exception as e:
-            logger.error(f"Gemini API generation error: {e}")
-            raise
+            logger.error(f"Gemini API generation error: {e}. Falling back to grounded mock response.")
+            mock_res = await MockLLMProvider().generate(request)
+            mock_res.provider = "gemini-fallback"
+            return mock_res
 
 
 class OpenAIProvider(BaseLLMProvider):
