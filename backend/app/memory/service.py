@@ -6,6 +6,7 @@ active frame slot tracking, user preferences, and verified exemplars.
 
 import hashlib
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -115,8 +116,11 @@ class MemoryService:
                     target_entity = q[len(p):].strip("?., ")
                     break
 
-            # If previous query had a metric or question, inherit it
-            if frame.metric:
+            # If previous query already had a year/quarter, substitute it directly
+            old_time = re.search(r'\b(202[3-5]|Q[1-4]|\d{4})\b', prev_query, re.IGNORECASE)
+            if old_time and re.search(r'\b(202[3-5]|Q[1-4]|\d{4})\b', target_entity, re.IGNORECASE):
+                standalone = prev_query[:old_time.start()] + target_entity + prev_query[old_time.end():]
+            elif frame.metric:
                 standalone = f"What is the {frame.metric} for {target_entity}?"
             else:
                 standalone = f"{prev_query.rstrip('?.')} for {target_entity}?"

@@ -151,6 +151,7 @@ class MultiAgentOrchestrator:
 
         # Step 0: ContextResolver (Shared Memory)
         standalone_q = memory_service.resolve_contextual_question(session_id, query)
+        effective_query = standalone_q or query
         if standalone_q != query:
             traces.append(StepTrace(
                 step="understanding_question",
@@ -167,7 +168,7 @@ class MultiAgentOrchestrator:
         s1_start = time.perf_counter()
         if progress_callback:
             progress_callback("understanding_question", "Routing intent and identifying domain entities...")
-        route = await router_agent.route(query)
+        route = await router_agent.route(effective_query)
         s1_ms = (time.perf_counter() - s1_start) * 1000
         traces.append(StepTrace(
             step="understanding_question",
@@ -178,7 +179,7 @@ class MultiAgentOrchestrator:
         ))
 
         # Step 2: Answerability Gate
-        answerability = answerability_gate.evaluate(query, route, catalog)
+        answerability = answerability_gate.evaluate(effective_query, route, catalog)
         if not answerability.is_answerable:
             total_duration_ms = (time.perf_counter() - overall_start) * 1000
             traces.append(StepTrace(
@@ -216,7 +217,7 @@ class MultiAgentOrchestrator:
             )
 
         # Step 3: Clarification Policy
-        clarification = clarification_agent.check_ambiguity(query, route)
+        clarification = clarification_agent.check_ambiguity(effective_query, route)
         if clarification.needs_clarification:
             total_duration_ms = (time.perf_counter() - overall_start) * 1000
             traces.append(StepTrace(
@@ -243,12 +244,12 @@ class MultiAgentOrchestrator:
         if progress_callback:
             progress_callback("retrieving_schema", "Running hybrid BM25 + embedding RRF retrieval and linking values...")
 
-        retrieval_res = hybrid_retriever.retrieve(query, top_k=5)
+        retrieval_res = hybrid_retriever.retrieve(effective_query, top_k=5)
         selected_tables = retrieval_res.selected_table_names
         schema_prompt = retrieval_res.minimal_schema_prompt
 
-        linked_values = value_linker.link_values(query)
-        relevant_metrics = semantic_registry.find_relevant_metrics(query)
+        linked_values = value_linker.link_values(effective_query)
+        relevant_metrics = semantic_registry.find_relevant_metrics(effective_query)
 
         # Build prompt context additions
         linked_str = ""
@@ -265,7 +266,7 @@ class MultiAgentOrchestrator:
                 for m in relevant_metrics
             )
 
-        plan = planner_agent.create_plan(query, route, selected_tables)
+        plan = planner_agent.create_plan(effective_query, route, selected_tables)
         s2_ms = (time.perf_counter() - s2_start) * 1000
         traces.append(StepTrace(
             step="retrieving_schema",
@@ -293,7 +294,7 @@ class MultiAgentOrchestrator:
                         metrics_context=metrics_str,
                     ),
                 ),
-                LLMMessage(role="user", content=query),
+                LLMMessage(role="user", content=effective_query),
             ],
             temperature=0.0,
         )
@@ -435,7 +436,7 @@ class MultiAgentOrchestrator:
         ))
 
         # Step 9.5: Deterministic Analysis Tool Execution
-        detected_tool = analysis_registry.detect_intent(query)
+        detected_tool = analysis_registry.detect_intent(effective_query)
         analysis_res: Optional[AnalysisToolResult] = None
         if detected_tool == "analyze_customer_churn_risk":
             analysis_res = analysis_registry.execute_tool("analyze_customer_churn_risk")
@@ -495,7 +496,7 @@ class MultiAgentOrchestrator:
                 LLMMessage(
                     role="system",
                     content=COMPOSER_PROMPT.format(
-                        question=query,
+                        question=effective_query,
                         intent=route.intent,
                         sql=sanitized_sql,
                         row_count=len(preview_rows),
@@ -520,7 +521,7 @@ class MultiAgentOrchestrator:
 
         # Contextual analytical follow-up suggestions
         followups = []
-        q_lower = query.lower()
+        q_lower = effective_query.lower()
         if any(w in q_lower for w in ["order", "sales", "revenue", "spend"]):
             followups = [
                 "What are the top 5 product categories contributing to these sales?",
