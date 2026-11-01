@@ -121,6 +121,7 @@ class MultiAgentOrchestrator:
             duration_ms = (time.perf_counter() - overall_start) * 1000
             refusal_ans = AnswerabilityAssessment(
                 is_answerable=False,
+                confidence=1.0,
                 refusal_reason=f"Security violation: {inj_reason}",
                 available_alternatives=["Ask a direct question regarding ecommerce orders, customers, or metrics."],
             )
