@@ -120,6 +120,6 @@ def test_api_multi_agent_chat_endpoint(client):
     data = body["data"]
     assert "plan" in data
     assert "chart_spec" in data
-    assert data["chart_spec"]["chart_type"] in ["bar", "line", "table"]
+    assert data["chart_spec"]["chart_type"] in ["bar", "line", "pie", "table"]
     assert "trace_steps" in data
     assert len(data["trace_steps"]) >= 6

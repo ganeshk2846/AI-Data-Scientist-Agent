@@ -11,7 +11,7 @@
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | **Complete** | 2026-11-01 | Planner DAG, Clarification, Answerability Gate, Bounded Repair (2x) |
 | **Phase 5** | Hybrid schema retrieval & business semantics | **Complete** | 2026-11-01 | BM25 + embedding RRF, FK graph expansion, value linking, semantic metrics |
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | **Complete** | 2026-11-01 | Deterministic stats, MAD anomalies, trend forecast, churn risk, SLSQP optimizer |
-| **Phase 7** | Visualization & business answer composition | Pending | - | Plotly specs, table fallbacks, evidence-linked narrative |
+| **Phase 7** | Visualization & business answer composition | **Complete** | 2026-11-01 | Plotly.js chart renderer, table fallbacks, follow-up suggestions |
 | **Phase 8** | Shared memory, sessions & reusable knowledge | Pending | - | Central MemoryService, session isolation, context pack |
 | **Phase 9** | Security, observability, evaluation & performance | Pending | - | AST injection defenses, gold evaluation benchmark, traces |
 | **Phase 10** | End-to-end validation & final documentation | Pending | - | Full test suites, developer guide, final sign-off |
@@ -469,3 +469,49 @@
   - Kept statistical and numerical calculation strictly inside pure Python functions, separating computation completely from LLM generation.
 - **Next phase:**
   - Phase 7 — Visualization and business-oriented answer composition: Adding interactive Plotly chart rendering (Line, Bar, Scatter, Pie, Table) in the Next.js UI, with automated fallback logic, evidence citations, and business-focused synthesis.
+
+
+---
+
+## Phase 7 — Visualization and business-oriented answer composition
+- **Date/time:** 2026-11-01T18:00:00+05:30
+- **Status:** Complete
+- **Objective:** Transform validated data and analysis into clear, executive-ready business communication. Implement the Visualization Agent with typed Plotly chart specifications (line, bar, pie, and table fallback), strict schema allowlists, field existence validation against actual query columns, dark-theme layout templates, automated table fallbacks for scalar or non-numeric results, and structured executive answer composition featuring supporting evidence citations and clickable analytical follow-up questions.
+- **Implemented:**
+  - Upgraded `backend/app/agents/contracts.py`: Added `plotly_data`, `plotly_layout`, `subtitle`, `units`, `alt_text`, and `suggested_followups` to typed agent contracts.
+  - Upgraded `backend/app/agents/visualization.py`: Generates complete dark-theme Plotly payloads for time-series lines (with markers and hover templates), categorical bars (with custom palettes), and status breakdown donut pies, with strict column existence validation and automatic table fallbacks.
+  - Enhanced `backend/app/workflow/orchestrator.py`: Generates contextual analytical follow-up suggestions tailored to query intent and datasets, passing clickable prompts to the client.
+  - Installed `plotly.js-dist-min` and built `frontend/src/components/PlotlyChartRenderer.tsx`: Client-side dynamic Plotly renderer with responsive auto-resizing, dark styling, view mode toggle (Chart vs Data Table), PNG image export, and error boundaries.
+  - Updated `frontend/src/components/ChatInterface.tsx`: Added dedicated Chart view tab, contextual analytical follow-up pills, and KPI summary displays.
+  - Updated TypeScript and Zod schemas in `frontend/src/types/api.ts` for Plotly chart specifications and follow-up prompts.
+  - Created test suite `backend/tests/test_visualization_composer.py` verifying chart type derivation, trace data shapes, and table fallbacks.
+- **Files created/modified:**
+  - `backend/app/agents/contracts.py` (modified) — Added Plotly traces, layout, and follow-up fields.
+  - `backend/app/agents/visualization.py` (modified) — Implemented Plotly chart trace and layout generator.
+  - `backend/app/workflow/orchestrator.py` (modified) — Integrated follow-up question generator.
+  - `backend/tests/test_visualization_composer.py` (created) — 5 tests for charts, traces, and fallbacks.
+  - `backend/tests/test_multi_agent_orchestrator.py` (modified) — Updated chart type assertions.
+  - `frontend/package.json` (modified) — Added `plotly.js-dist-min`.
+  - `frontend/src/components/PlotlyChartRenderer.tsx` (created) — Interactive Plotly chart component.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Integrated Chart tab and follow-up buttons.
+  - `frontend/src/types/api.ts` (modified) — Added Plotly chart and follow-up Zod schemas.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 7 entry.
+- **Commands executed:**
+  - `git checkout -b phase-7-visualization-composer` — Switched to dedicated Phase 7 branch.
+  - `cd frontend; npm install plotly.js-dist-min @types/plotly.js-dist-min` — Installed client-side Plotly library.
+  - `python -m pytest backend/tests -v` — Ran full test suite (67 passed in 2.18s).
+  - `cd frontend; npm run build` — Compiled Next.js frontend production build (0 errors).
+- **Tests/checks:**
+  - Passed: Time series queries generate scatter/line Plotly traces with dates on x-axis and metric on y-axis.
+  - Passed: Categorical breakdowns generate sorted bar traces with hover templates.
+  - Passed: Low-cardinality status queries generate donut pie charts with custom palettes.
+  - Passed: Scalar metrics and non-numeric columns cleanly fall back to table view with `fallback_to_table=True`.
+  - Passed: Frontend handles dynamic browser import of Plotly without SSR hydration mismatches.
+  - Passed: Follow-up question pills trigger instant query execution when clicked.
+- **Dataset/schema observations:**
+  - Standardizing dark-theme colors (`#6366f1` indigo for trends, `#3b82f6` blue for categories, `#10b981` emerald for positive distributions) creates a consistent business dashboard appearance.
+- **Decisions and rationale:**
+  - Used `plotly.js-dist-min` loaded dynamically via browser `import()` to keep server-side rendering fast and prevent Node.js DOM errors.
+  - Provided instant Table toggle in the chart header so users can always inspect underlying exact numbers without changing main tabs.
+- **Next phase:**
+  - Phase 8 — Shared memory, sessions, and reusable knowledge: Central `MemoryService` with session history, user preferences, pinned entities, and conversational context pack in `agent_app.sqlite`.

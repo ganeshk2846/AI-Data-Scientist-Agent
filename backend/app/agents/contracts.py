@@ -100,3 +100,9 @@ class ChartSpecification(BaseModel):
     description: Optional[str] = None
     data_points_count: int = 0
     fallback_to_table: bool = False
+    subtitle: Optional[str] = None
+    color_field: Optional[str] = None
+    units: Optional[str] = None
+    alt_text: Optional[str] = None
+    plotly_data: List[Dict[str, Any]] = Field(default_factory=list)
+    plotly_layout: Dict[str, Any] = Field(default_factory=dict)
