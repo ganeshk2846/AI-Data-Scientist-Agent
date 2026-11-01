@@ -99,6 +99,79 @@ class MockLLMProvider(BaseLLMProvider):
             return "SELECT order_status, COUNT(*) AS order_count, ROUND(SUM(total_amount), 2) AS total_amount FROM orders GROUP BY order_status;"
 
 
+class GeminiProvider(BaseLLMProvider):
+    """Google Gemini API Provider using the official google-genai SDK."""
+
+    def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
+        from google import genai
+        self.client = genai.Client(api_key=api_key)
+        self.model = model
+
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        from google.genai import types
+
+        system_instruction: Optional[str] = None
+        contents = []
+
+        for m in request.messages:
+            if m.role == "system":
+                if system_instruction:
+                    system_instruction += "\n\n" + m.content
+                else:
+                    system_instruction = m.content
+            else:
+                role = "user" if m.role == "user" else "model"
+                contents.append(
+                    types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=m.content)],
+                    )
+                )
+
+        if not contents and system_instruction:
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=system_instruction)],
+                )
+            )
+            system_instruction = None
+
+        config = types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=request.temperature,
+            max_output_tokens=request.max_tokens or 2048,
+        )
+
+        try:
+            res = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=config,
+            )
+            content = res.text or ""
+            tokens_used = (
+                res.usage_metadata.total_token_count
+                if res.usage_metadata and hasattr(res.usage_metadata, "total_token_count")
+                else None
+            )
+            finish_reason = (
+                res.candidates[0].finish_reason.name
+                if res.candidates and hasattr(res.candidates[0], "finish_reason") and res.candidates[0].finish_reason
+                else None
+            )
+            return LLMResponse(
+                content=content,
+                model=self.model,
+                provider="gemini",
+                tokens_used=tokens_used,
+                finish_reason=str(finish_reason) if finish_reason else None,
+            )
+        except Exception as e:
+            logger.error(f"Gemini API generation error: {e}")
+            raise
+
+
 class OpenAIProvider(BaseLLMProvider):
     """OpenAI API Provider."""
 
@@ -130,6 +203,13 @@ class OpenAIProvider(BaseLLMProvider):
 def get_llm_provider() -> BaseLLMProvider:
     """Factory returning the active LLM provider based on application settings."""
     provider_type = settings.LLM_PROVIDER.lower()
+
+    if provider_type == "gemini" and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("your_"):
+        try:
+            return GeminiProvider(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
+        except Exception as e:
+            logger.warning(f"Failed to instantiate Gemini provider: {e}. Falling back to Mock.")
+            return MockLLMProvider()
 
     if provider_type == "openai" and settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
         try:

@@ -81,3 +81,11 @@ def test_chat_query_endpoint(client):
     assert data["query_result"]["row_count"] > 0
     assert "composed_answer" in data
 
+
+def test_gemini_provider_instantiation():
+    from backend.app.llm.client import GeminiProvider
+    provider = GeminiProvider(api_key="AIzaSyTestMockKey", model="gemini-2.0-flash")
+    assert provider.model == "gemini-2.0-flash"
+    assert provider.client is not None
+
+
