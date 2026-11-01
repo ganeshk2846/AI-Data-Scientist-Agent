@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | **Phase 0** | Repository and dataset reconnaissance | **Complete** | 2026-11-01 | [DATASET_PROFILE.md](docs/DATASET_PROFILE.md), `scripts/inspect_db.py`, `.gitignore`, `README.md` |
 | **Phase 1** | Project foundation and developer experience | **Complete** | 2026-11-01 | FastAPI & Next.js skeletons, health endpoints, test harness |
-| **Phase 2** | Read-only database connection & schema preparation | Pending | - | DB manager, metadata catalogue, async preparation job |
+| **Phase 2** | Read-only database connection & schema preparation | **Complete** | 2026-11-01 | Schema catalogue, profiling service, async preparation job, table inspector UI |
 | **Phase 3** | NL question API & first reliable vertical slice | Pending | - | Chat endpoint, schema retriever, SQL validator, runner |
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | Pending | - | LangGraph orchestration, Router, Planner, Clarification, Verifier |
 | **Phase 5** | Hybrid schema retrieval & business semantics | Pending | - | BM25 + embedding RRF, value linking, semantic metrics |
@@ -157,3 +157,67 @@
   - Phase 2 — Read-only database connection and schema preparation: Building robust schema introspection, catalogue persistence in agent-owned store, idempotent asynchronous preparation jobs, and schema readiness UI.
 
 
+
+
+---
+
+## Phase 2 — Read-only database connection and schema preparation
+- **Date/time:** 2026-11-01T17:10:00+05:30
+- **Status:** Complete
+- **Objective:** Build the trustworthy data foundation. Implement read-only database connection manager, schema introspection and profile generation, idempotent caching in agent store, typed models for tables/columns/PKs/FKs/indexes, asynchronous preparation jobs, and schema readiness UI.
+- **Implemented:**
+  - Implemented typed schema models (`backend/app/schema/models.py`): `ColumnModel`, `ForeignKeyModel`, `IndexModel`, `TableModel`, `DatabaseCatalog`, `PreparationJobState`, and minimal prompt formatter (`to_minimal_prompt_schema`).
+  - Built `SchemaService` (`backend/app/schema/service.py`) for read-only schema introspection, column profiling, distinct/null calculations, date/numeric candidate heuristics, and low-cardinality safe value extraction.
+  - Implemented deterministic SHA-256 source fingerprinting (combining file size, mtime, and schema DDL) with idempotent caching in `data/schema_catalog_cache.json`.
+  - Built asynchronous `SchemaJobManager` (`backend/app/schema/job.py`) executing non-blocking background preparation jobs in a thread pool executor with live table-by-table progress tracking.
+  - Built schema REST API endpoints (`backend/app/api/v1/endpoints/schema.py`):
+    - `POST /api/v1/schema/prepare` (trigger preparation with optional force refresh)
+    - `GET /api/v1/schema/status` (preparation readiness and catalogue summary)
+    - `GET /api/v1/schema/jobs/{job_id}` (progress metrics for specific job)
+    - `GET /api/v1/schema/catalog` (full typed catalog payload)
+    - `GET /api/v1/schema/tables` (list of table summaries)
+    - `GET /api/v1/schema/tables/{table_name}` (detailed table schema and profile)
+  - Created interactive frontend schema explorer (`frontend/src/components/SchemaReadinessSection.tsx`):
+    - Real-time preparation progress indicator and trigger buttons
+    - Searchable table list with row counts and column counts
+    - Deep table profile inspector rendering columns, SQLite types, PK/FK/Date badges, null percentages, distinct counts, sample values, and foreign key lineages.
+  - Added 10 automated unit and integration tests (`backend/tests/test_schema_service.py`) covering fingerprinting, full database profiling, caching idempotency, minimal prompt formatting, API routes, 404 handling, and temporary test databases.
+- **Files created/modified:**
+  - `backend/app/schema/__init__.py` (created) — Schema package init.
+  - `backend/app/schema/models.py` (created) — Pydantic v2 schema catalogue and job models.
+  - `backend/app/schema/service.py` (created) — Read-only introspection and profiling engine.
+  - `backend/app/schema/job.py` (created) — Asynchronous preparation job manager.
+  - `backend/app/api/v1/endpoints/schema.py` (created) — Schema and catalog REST endpoints.
+  - `backend/app/api/v1/router.py` (modified) — Mounted schema router.
+  - `backend/tests/test_schema_service.py` (created) — 10 unit and integration tests for schema service.
+  - `frontend/src/types/api.ts` (modified) — Added Zod schemas and TypeScript types for catalogue and preparation.
+  - `frontend/src/lib/api.ts` (modified) — Added API fetchers for schema status, prepare, tables, and table detail.
+  - `frontend/src/components/SchemaReadinessSection.tsx` (created) — Interactive schema preparation and explorer component.
+  - `frontend/src/app/page.tsx` (modified) — Integrated `SchemaReadinessSection` into home dashboard.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Appended Phase 2 record.
+- **Commands executed:**
+  - `git checkout -b phase-2-schema-preparation` — Switched to dedicated Phase 2 branch.
+  - `python -m pytest backend/tests -v` — Ran 22 backend tests (all 22 passed in 0.82s).
+  - `cd frontend; npm run build` — Built frontend production bundle verifying TypeScript contracts and static page generation.
+- **Tests/checks:**
+  - Passed: Introspection of all 30 tables and 334,503 rows with 44 foreign key declarations against `ecommerce.sqlite`.
+  - Passed: Source fingerprint verification (deterministic 64-char hex string).
+  - Passed: Minimal prompt schema formatting without leaking sensitive raw values.
+  - Passed: REST endpoints `/api/v1/schema/status`, `/tables`, `/tables/orders`, `/catalog`.
+  - Passed: Asynchronous job lifecycle and 404 handling on unknown tables.
+  - Passed: Temporary database profiling integration test.
+  - Passed: Frontend production build (`next build`) compiled with 0 errors.
+- **Dataset/schema observations:**
+  - Discovered and cataloged safe distinct values for low-cardinality fields: `payments.payment_status` contains only `paid` and `voided`; `orders.order_status` contains `delivered` and `cancelled`; `promotions` contains 4 named promotional events; `customer_segments` contains 6 distinct tiers.
+  - Confirmed 0 mutations to `ecommerce.sqlite`.
+- **Decisions and rationale:**
+  - Used file modification time + size + DDL hash for fingerprinting to detect warehouse changes without scanning all 334k rows.
+  - In-process `ThreadPoolExecutor` handles background schema profiling without blocking the asyncio event loop or requiring external workers.
+  - Cache is saved to `data/schema_catalog_cache.json` in the application store rather than modifying the source business database.
+- **Known issues / limitations:**
+  - Large text columns (like support ticket descriptions or review texts) are profiled for null/distinct counts and length without full-text indexing at this stage (lexical BM25 index will be added in Phase 5).
+- **Security/data-safety notes:**
+  - Full raw table records are never sent to prompt generation; `to_minimal_prompt_schema` emits structural definitions and low-cardinality metadata only.
+  - `ecommerce.sqlite` remains strictly read-only (`mode=ro`).
+- **Next phase:**
+  - Phase 3 — Natural-language question API and first reliable vertical slice: Chat/session APIs, provider-agnostic LLM interface, simple Router, schema-grounded single SQL generation, validation, safe execution, progress states, and results display.
