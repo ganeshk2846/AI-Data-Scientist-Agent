@@ -192,7 +192,7 @@ Verified calculations checked against `ecommerce.sqlite`:
 - **G04 (Cancelled Orders)**: 650 orders
 - **G05 (Average Order Value)**: $1,209.43
 - **G06 (Customer Segments)**: 6 distinct segments
-- **G07 (Total Payments)**: 18,274 transactions
+- **G07 (Total Payments)**: 17,924 transactions
 
 ---
 

@@ -16,8 +16,8 @@ All evaluations are executed systematically via `scripts/run_evaluation.py` with
 | **Answerability Refusal Recall** | **≥ 95.0%** | **100.0%** (5/5) | **PASS** |
 | **Gold SQL Numerical Equivalence** | **≥ 90.0%** | **100.0%** (10/10) | **PASS** |
 | **Intent Routing Accuracy** | **≥ 85.0%** | **100.0%** (5/5) | **PASS** |
-| **Validation Latency (p50)** | **≤ 50.0 ms** | **1.27 ms** | **PASS** |
-| **Validation Latency (p95)** | **≤ 150.0 ms** | **14.72 ms** | **PASS** |
+| **Validation Latency (p50)** | **≤ 50.0 ms** | **0.68 ms** | **PASS** |
+| **Validation Latency (p95)** | **≤ 150.0 ms** | **5.16 ms** | **PASS** |
 
 ---
 
