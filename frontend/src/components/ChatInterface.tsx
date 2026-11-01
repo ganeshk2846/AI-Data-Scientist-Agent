@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { executeChatQuery } from "@/lib/api";
 import { MultiAgentWorkflowResult } from "@/types/api";
@@ -53,7 +53,11 @@ const WORKFLOW_STEPS = [
 ];
 
 export function ChatInterface() {
-  const [sessionId, setSessionId] = useState<string>("sess-" + Math.random().toString(36).substring(2, 9));
+  const [sessionId, setSessionId] = useState<string>("sess-default");
+
+  useEffect(() => {
+    setSessionId("sess-" + Math.random().toString(36).substring(2, 9));
+  }, []);
   const [queryInput, setQueryInput] = useState("");
   const [activeTab, setActiveTab] = useState<"narrative" | "chart" | "analysis" | "sql" | "data" | "plan" | "trace">("narrative");
   const [copiedSql, setCopiedSql] = useState(false);
@@ -105,7 +109,7 @@ export function ChatInterface() {
             Phase 8 Shared Memory Active
           </span>
           <div className="ml-auto flex items-center space-x-2">
-            <span className="text-[11px] font-mono text-muted-foreground px-2 py-0.5 rounded bg-muted/60">
+            <span suppressHydrationWarning className="text-[11px] font-mono text-muted-foreground px-2 py-0.5 rounded bg-muted/60">
               {sessionId}
             </span>
             <button
