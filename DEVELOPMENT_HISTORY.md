@@ -9,7 +9,7 @@
 | **Phase 2** | Read-only database connection & schema preparation | **Complete** | 2026-11-01 | Schema catalogue, profiling service, async preparation job, table inspector UI |
 | **Phase 3** | NL question API & first reliable vertical slice | **Complete** | 2026-11-01 | Router, Grounder, sqlglot guardrail, vertical slice chat UI |
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | **Complete** | 2026-11-01 | Planner DAG, Clarification, Answerability Gate, Bounded Repair (2x) |
-| **Phase 5** | Hybrid schema retrieval & business semantics | Pending | - | BM25 + embedding RRF, value linking, semantic metrics |
+| **Phase 5** | Hybrid schema retrieval & business semantics | **Complete** | 2026-11-01 | BM25 + embedding RRF, FK graph expansion, value linking, semantic metrics |
 | **Phase 6** | Reliable analysis tools (descriptive, predictive) | Pending | - | Deterministic stats, time-series forecasting, churn risk |
 | **Phase 7** | Visualization & business answer composition | Pending | - | Plotly specs, table fallbacks, evidence-linked narrative |
 | **Phase 8** | Shared memory, sessions & reusable knowledge | Pending | - | Central MemoryService, session isolation, context pack |
@@ -355,3 +355,55 @@
   - No private internal chain-of-thought is exposed; only concise step statuses and action summaries are streamed.
 - **Next phase:**
   - Phase 5 — Hybrid schema retrieval and business semantics: Building BM25 lexical search + local embedding retrieval with Reciprocal Rank Fusion (RRF), foreign key graph expansion, low-cardinality value linking, and semantic business metric definitions.
+
+
+---
+
+## Phase 5 — Hybrid schema retrieval and business semantics
+- **Date/time:** 2026-11-01T17:35:00+05:30
+- **Status:** Complete
+- **Objective:** Scale schema grounding beyond simple token matches by building a hybrid retrieval system combining BM25 lexical precision with semantic embedding similarity via Reciprocal Rank Fusion (RRF, $k=60$). Enhance candidate table selection with foreign-key graph traversal, low-cardinality categorical value linking, and canonical business metric formulas (gross revenue, net revenue, AOV, return rate, CSAT, ROAS).
+- **Implemented:**
+  - Implemented `backend/app/retrieval/corpus.py`: Generates rich textual representations for all 30 tables combining schema names, column types, descriptions, domain tags, foreign key relationships, and representative categorical sample values.
+  - Implemented `backend/app/retrieval/bm25.py`: Lexical BM25Okapi retriever over tokenized schema corpus documents.
+  - Implemented `backend/app/retrieval/embeddings.py`: Local TF-IDF cosine similarity retriever providing embedding-style dense semantic matching without external network latency or cloud dependencies.
+  - Implemented `backend/app/retrieval/hybrid.py`: Hybrid retriever fusing BM25 and embedding scores via Reciprocal Rank Fusion ($k=60$), followed by automated 1-hop foreign key graph expansion to include intermediate relational bridge tables.
+  - Implemented `backend/app/retrieval/value_linker.py`: Low-cardinality categorical value linker mapping user phrases (e.g. "delivered", "VIP", "credit card", "electronics", "refunded") directly to verified SQLite table/column filter expressions.
+  - Implemented `backend/app/retrieval/semantics.py`: Semantic metric registry codifying standard business formulas and filters for Gross Revenue, Net Revenue, Average Order Value (AOV), Return Rate, Customer Satisfaction (CSAT), and Return on Ad Spend (ROAS).
+  - Implemented `backend/app/api/v1/endpoints/retrieval.py`: REST endpoints `/api/v1/retrieval/search` and `/api/v1/retrieval/metrics`.
+  - Integrated hybrid retrieval and value linking into `backend/app/workflow/orchestrator.py` and connected grounding tags to the Next.js UI (`frontend/src/components/ChatInterface.tsx`).
+- **Files created/modified:**
+  - `backend/app/retrieval/corpus.py` (created) — Rich schema document generation.
+  - `backend/app/retrieval/bm25.py` (created) — BM25Okapi lexical retriever.
+  - `backend/app/retrieval/embeddings.py` (created) — Local TF-IDF semantic embedding retriever.
+  - `backend/app/retrieval/hybrid.py` (created) — RRF fusion and FK graph expansion.
+  - `backend/app/retrieval/value_linker.py` (created) — Low-cardinality categorical value linker.
+  - `backend/app/retrieval/semantics.py` (created) — Semantic metric catalog with SQL formulas.
+  - `backend/app/api/v1/endpoints/retrieval.py` (created) — Retrieval diagnostics and metrics endpoints.
+  - `backend/app/api/v1/router.py` (modified) — Mounted retrieval router.
+  - `backend/app/workflow/orchestrator.py` (modified) — Integrated hybrid retrieval into orchestrator flow.
+  - `backend/tests/test_hybrid_retrieval.py` (created) — 8 comprehensive unit and integration tests.
+  - `frontend/src/types/api.ts` (modified) — Added Zod schemas for retrieval diagnostics and metrics.
+  - `frontend/src/lib/api.ts` (modified) — Added API helper functions for retrieval endpoints.
+  - `frontend/src/components/ChatInterface.tsx` (modified) — Displayed RRF-grounded table tags.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 5 details.
+- **Commands executed:**
+  - `git checkout -b phase-5-hybrid-retrieval` — Switched to dedicated Phase 5 branch.
+  - `python -m pytest backend/tests -v` — Ran full test suite (49 passed in 2.26s).
+  - `cd frontend; npm run build` — Compiled Next.js frontend production build (0 errors).
+- **Tests/checks:**
+  - Passed: BM25 retriever ranks high-relevance schema documents accurately.
+  - Passed: Local TF-IDF semantic embedding retriever captures domain similarity.
+  - Passed: Reciprocal Rank Fusion ($k=60$) successfully balances lexical and semantic rankings.
+  - Passed: Foreign key graph expansion automatically bridges joins (e.g. `orders` -> `order_items` -> `products`).
+  - Passed: Value linker extracts entities ("delivered", "credit card", "VIP") with correct column filters.
+  - Passed: Semantic metric registry retrieves business definitions with exact verified formulas.
+  - Passed: REST endpoints `/retrieval/search` and `/retrieval/metrics` return typed payloads.
+- **Dataset/schema observations:**
+  - Lexical queries for "customer orders" accurately retrieve both `customers` and `orders`, with FK expansion adding `customer_segment_history` and `order_items` when relevant.
+  - Value linking correctly maps common terms to SQLite data types without case mismatches.
+- **Decisions and rationale:**
+  - Used local TF-IDF semantic representation to avoid network egress, non-deterministic API timeouts, and external credential dependencies during schema indexing.
+  - RRF constant $k=60$ prevents any single outlier ranking from skewing candidate selection.
+- **Next phase:**
+  - Phase 6 — Reliable analysis tools: Descriptive, diagnostic, predictive, and prescriptive analysis tools in Python (period-over-period comparisons, trend decomposition, anomaly detection, churn risk, cohort retention, and what-if simulation).

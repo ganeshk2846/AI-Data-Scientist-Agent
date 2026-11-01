@@ -11,6 +11,10 @@ import {
   TableListResponseSchema,
   TableModel,
   TableSummary,
+  BusinessMetric,
+  BusinessMetricsListResponseSchema,
+  RetrievalDiagnosticPayload,
+  RetrievalDiagnosticResponseSchema,
 } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -81,6 +85,33 @@ export async function executeChatQuery(queryText: string): Promise<MultiAgentWor
   const parsed = MultiAgentWorkflowResponseSchema.safeParse(json);
   if (!parsed.success || !parsed.data.data) {
     throw new Error(parsed.data?.error?.message || "Failed to execute multi-agent business query");
+  }
+  return parsed.data.data;
+}
+
+
+export async function fetchBusinessMetrics(): Promise<BusinessMetric[]> {
+  const url = `${API_BASE_URL}/api/v1/retrieval/metrics`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+  const json = await res.json();
+  const parsed = BusinessMetricsListResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch business metrics");
+  }
+  return parsed.data.data;
+}
+
+export async function searchRetrieval(query: string, topK: number = 5): Promise<RetrievalDiagnosticPayload> {
+  const url = `${API_BASE_URL}/api/v1/retrieval/search`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ query, top_k: topK }),
+  });
+  const json = await res.json();
+  const parsed = RetrievalDiagnosticResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to execute hybrid retrieval search");
   }
   return parsed.data.data;
 }
