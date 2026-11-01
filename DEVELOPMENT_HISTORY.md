@@ -5,7 +5,7 @@
 | Phase | Title | Status | Completion Date | Milestone / Deliverables |
 |---|---|---|---|---|
 | **Phase 0** | Repository and dataset reconnaissance | **Complete** | 2026-11-01 | [DATASET_PROFILE.md](docs/DATASET_PROFILE.md), `scripts/inspect_db.py`, `.gitignore`, `README.md` |
-| **Phase 1** | Project foundation and developer experience | Pending | - | FastAPI & Next.js skeletons, health endpoints, test harness |
+| **Phase 1** | Project foundation and developer experience | **Complete** | 2026-11-01 | FastAPI & Next.js skeletons, health endpoints, test harness |
 | **Phase 2** | Read-only database connection & schema preparation | Pending | - | DB manager, metadata catalogue, async preparation job |
 | **Phase 3** | NL question API & first reliable vertical slice | Pending | - | Chat endpoint, schema retriever, SQL validator, runner |
 | **Phase 4** | Multi-agent workflow, planning & bounded repair | Pending | - | LangGraph orchestration, Router, Planner, Clarification, Verifier |
@@ -76,4 +76,84 @@
   - Source database access is locked to `mode=ro`.
   - `.gitignore` rigorously prevents accidental check-ins of `.env`, `ecommerce.sqlite`, agent SQLite state, or runtime logs.
 - **Next phase:**
-  - Phase 1 — Project foundation and developer experience: Scaffolding FastAPI backend, Next.js frontend, Pydantic configuration, health/readiness endpoints, structured error models, and initial automated test harness.
+  - Phase 1 — Project foundation and developer experience.
+
+---
+
+## Phase 1 — Project foundation and developer experience
+- **Date/time:** 2026-11-01T17:05:00+05:30
+- **Status:** Complete
+- **Objective:** Establish a clean, runnable, testable application skeleton with modular frontend and backend, typed Pydantic configuration, health/readiness endpoints, structured error handling, request ID middleware, safe logging with secret redaction, and an automated test harness.
+- **Implemented:**
+  - Scaffolded FastAPI backend package (`backend/app`) with typed configuration (`Settings` via `pydantic-settings`).
+  - Added strict read-only database connection manager (`backend/app/db/connection.py`) with URI `mode=ro` enforcement and write-probe verification.
+  - Implemented structured API response envelopes (`APIResponse[T]`, `ErrorDetail`) and comprehensive exception handlers for domain, HTTP, validation, and generic server errors.
+  - Implemented `RequestIdMiddleware` attaching and propagating `X-Request-ID` and timing metrics (`X-Process-Time-Ms`).
+  - Implemented safe logging (`SafeFormatter`) with automated regex masking for API keys, tokens, and secrets.
+  - Built health and readiness API endpoints:
+    - `GET /health` and `GET /api/v1/health` for basic liveness probe.
+    - `GET /ready` and `GET /api/v1/ready` for comprehensive multi-dependency readiness (database read-only status, table/row count, LLM configuration status, app store directory readiness).
+    - `GET /api/v1/system/status` for safe system diagnostics and configuration metrics.
+  - Scaffolded Next.js App Router frontend (`frontend/`) using React, TypeScript, Tailwind CSS, TanStack Query, Lucide icons, and Zod schemas for contract validation.
+  - Created responsive frontend dashboard featuring real-time readiness card, architectural pipeline visualization, and domain summaries.
+  - Added automated test suites in `backend/tests` covering config, database connection, health probes, and structured error responses.
+- **Files created/modified:**
+  - `backend/pyproject.toml` (created) — Backend package metadata and pytest configuration.
+  - `backend/requirements.txt` (created) — Pinned backend dependencies.
+  - `backend/app/main.py` (created) — FastAPI entrypoint, middleware, lifespan, and router mounts.
+  - `backend/app/core/config.py` (created) — Pydantic v2 settings with path resolution and secret redaction.
+  - `backend/app/core/models.py` (created) — Response envelope, error models, and health/readiness schemas.
+  - `backend/app/core/errors.py` (created) — Domain exceptions and unified FastAPI error handlers.
+  - `backend/app/core/logging.py` (created) — Secret-masking logger configuration.
+  - `backend/app/db/connection.py` (created) — Read-only SQLite connection manager and probe.
+  - `backend/app/api/v1/router.py` (created) — Aggregated v1 API router.
+  - `backend/app/api/v1/endpoints/health.py` (created) — Health, ready, and status endpoints.
+  - `backend/tests/conftest.py` (created) — Pytest fixtures and TestClient setup.
+  - `backend/tests/test_config.py` (created) — Tests for configuration and secret redaction.
+  - `backend/tests/test_health.py` (created) — Tests for /health, /ready, and /api/v1/system/status.
+  - `backend/tests/test_db_connection.py` (created) — Tests for read-only connection, query, and write blocking.
+  - `backend/tests/test_errors.py` (created) — Tests for 404 and structured error envelopes.
+  - `frontend/package.json` (created) — Next.js, React, Tailwind, TanStack Query, and Zod manifest.
+  - `frontend/tsconfig.json` (created) — TypeScript configuration.
+  - `frontend/next.config.mjs` (created) — Next.js config with backend API proxy rewrites.
+  - `frontend/tailwind.config.ts` (created) — Tailwind CSS styling setup.
+  - `frontend/postcss.config.js` (created) — PostCSS plugins.
+  - `frontend/src/app/globals.css` (created) — Theme styling and CSS variables.
+  - `frontend/src/app/layout.tsx` (created) — Root layout with metadata and TanStack Query provider.
+  - `frontend/src/app/providers.tsx` (created) — QueryClientProvider setup.
+  - `frontend/src/app/page.tsx` (created) — Interactive readiness and architecture dashboard.
+  - `frontend/src/types/api.ts` (created) — Zod runtime schemas and TypeScript interfaces.
+  - `frontend/src/lib/api.ts` (created) — API client for readiness probe with Zod validation.
+  - `frontend/src/components/Header.tsx` (created) — Application header with backend status badge.
+  - `frontend/src/components/HealthReadinessCard.tsx` (created) — Interactive readiness card.
+  - `DEVELOPMENT_HISTORY.md` (modified) — Updated status matrix and appended Phase 1 record.
+  - `README.md` (modified) — Added local development commands and endpoint documentation.
+- **Commands executed:**
+  - `git checkout -b phase-1-foundation` — Created dedicated Phase 1 branch.
+  - `python -m pytest backend/tests -v` — Ran 12 backend unit/integration tests (all 12 passed in 0.13s).
+  - `cd frontend; npm install` — Installed frontend dependencies (added 395 packages in 1m).
+  - `cd frontend; npm run build` — Compiled Next.js production build (100% successful with 0 errors).
+  - `cd frontend; npm run test` — Verified frontend contract validation scripts.
+- **Tests/checks:**
+  - Passed: Backend test suite (12/12 passed):
+    - `test_settings_defaults`, `test_resolved_paths`, `test_secret_redaction`
+    - `test_verify_database_immutability`, `test_readonly_select_query`, `test_readonly_write_blocked`, `test_check_database_readiness`
+    - `test_custom_exception_serialization`
+    - `test_health_endpoint`, `test_api_v1_health_endpoint`, `test_ready_endpoint`, `test_system_status_endpoint`
+  - Passed: Frontend production build (`npm run build`) compiled successfully with static prerendering.
+  - Passed: Secret check: `.env.example` has only placeholders; `.gitignore` rigorously prevents secrets, `ecommerce.sqlite`, and build artifacts from tracking.
+- **Dataset/schema observations:**
+  - Verified live integration with `ecommerce.sqlite` through `check_database_readiness()`: exactly 30 tables and 334,503 rows reported dynamically over the `/ready` API endpoint.
+- **Decisions and rationale:**
+  - Adopted TanStack Query in frontend for automatic retry and caching of readiness state.
+  - Added Next.js API rewrite proxy (`/api/backend/:path*` -> `http://localhost:8000/api/v1/:path*`) to prevent CORS friction during development.
+  - Standardized all API error responses on `APIResponse[None]` envelope with machine-readable `code` and correlation `request_id`.
+- **Known issues / limitations:**
+  - LLM provider runs in mock/unconfigured mode by default until developer provides valid API credentials in `.env`; backend reports this explicitly without blocking server boot.
+- **Security/data-safety notes:**
+  - `ecommerce.sqlite` is opened strictly with `mode=ro` and verified with a live write probe on startup.
+  - `SafeFormatter` strips authorization bearer tokens and API keys from console logs.
+- **Next phase:**
+  - Phase 2 — Read-only database connection and schema preparation: Building robust schema introspection, catalogue persistence in agent-owned store, idempotent asynchronous preparation jobs, and schema readiness UI.
+
+

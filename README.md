@@ -75,10 +75,35 @@ AI_FOR_BI_P/
 
 ## 5. Getting Started & Verification
 
-### Prerequisites
-- **Python:** 3.11+ (tested on Python 3.14.7)
-- **Node.js:** v20+ (tested on Node v24.20.0, npm 11.19.0)
-- **Git:** 2.40+ (tested on git version 2.51.1)
+### Local Development Commands
+
+#### 1. Start the FastAPI Backend
+```bash
+# From workspace root
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+- API Documentation (Swagger): `http://localhost:8000/docs`
+- Health Probe: `http://localhost:8000/health`
+- Readiness Probe: `http://localhost:8000/ready`
+- System Status: `http://localhost:8000/api/v1/system/status`
+
+#### 2. Run Backend Unit & Integration Tests
+```bash
+python -m pytest backend/tests -v
+```
+
+#### 3. Start the Next.js Frontend
+```bash
+cd frontend
+npm run dev
+```
+- Web Application UI: `http://localhost:3000`
+
+#### 4. Build Frontend for Production
+```bash
+cd frontend
+npm run build
+```
 
 ### Environment Configuration
 Copy the template environment file:
@@ -119,3 +144,4 @@ python scripts/generate_dataset_profile.py
 | **Phase 10** | End-to-End Validation & Final Documentation | Pending | - | - |
 
 See [DEVELOPMENT_HISTORY.md](DEVELOPMENT_HISTORY.md) for detailed execution history, command outcomes, and design decisions.
+
