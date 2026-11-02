@@ -29,6 +29,7 @@ class RetrievalSearchRequest(BaseModel):
 class MetricApproveRequest(BaseModel):
     metric_key: str = Field(..., min_length=1)
     approved_by: str = Field(default="user")
+    fingerprint: Optional[str] = Field(default=None, description="Active database fingerprint")
 
 
 class RetrievalDiagnosticPayload(BaseModel):
@@ -109,7 +110,9 @@ async def approve_metric(
     request: Request,
 ) -> APIResponse[SemanticMetricDefinition]:
     request_id = getattr(request.state, "request_id", None)
-    approved = dynamic_semantic_engine.approve_metric(body.metric_key, approved_by=body.approved_by)
+    catalog = schema_service.get_cached_catalog()
+    active_fp = body.fingerprint or (getattr(catalog, "fingerprint", None) if catalog else None)
+    approved = dynamic_semantic_engine.approve_metric(body.metric_key, fingerprint=active_fp, approved_by=body.approved_by)
     if not approved:
         raise HTTPException(status_code=404, detail=f"Metric '{body.metric_key}' not found.")
     return APIResponse(success=True, data=approved, request_id=request_id)

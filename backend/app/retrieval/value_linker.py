@@ -1,11 +1,14 @@
 """
 Value Linker for safe, low-cardinality categorical entities.
 Maps fuzzy or colloquial user expressions to exact database literal values.
+Operates dynamically against the active schema catalog, with e-commerce mappings
+strictly gated on verified schema domain compatibility.
 """
 
 import re
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from backend.app.schema.models import DatabaseCatalog
 
 
 class LinkedValue(BaseModel):
@@ -16,7 +19,8 @@ class LinkedValue(BaseModel):
     confidence: float = 1.0
 
 
-KNOWN_LITERAL_MAPPINGS = [
+# Domain-specific mappings: Gated strictly on e-commerce schema presence
+ECOMMERCE_LITERAL_MAPPINGS = [
     # Customer segments
     (r"\bvip\b", "customer_segments", "segment_name", "VIP"),
     (r"\bloyal\b", "customer_segments", "segment_name", "Loyal"),
@@ -47,29 +51,76 @@ KNOWN_LITERAL_MAPPINGS = [
     (r"\bdirect\b", "marketing_channels", "channel_name", "Direct"),
 ]
 
+# Backward compatibility alias
+KNOWN_LITERAL_MAPPINGS = ECOMMERCE_LITERAL_MAPPINGS
+
 
 class ValueLinker:
-    """Links natural language tokens to database literal values."""
+    """Links natural language tokens to database literal values with domain isolation."""
 
-    def link_values(self, query: str) -> List[LinkedValue]:
+    def link_values(self, query: str, catalog: Optional[DatabaseCatalog] = None) -> List[LinkedValue]:
         query_lower = query.lower()
         linked: List[LinkedValue] = []
+        seen_keys = set()
 
-        for pattern, table, col, exact_val in KNOWN_LITERAL_MAPPINGS:
-            match = re.search(pattern, query_lower)
-            if match:
-                linked.append(
-                    LinkedValue(
-                        user_mention=match.group(0),
-                        target_table=table,
-                        target_column=col,
-                        exact_db_value=exact_val,
-                        confidence=0.98,
-                    )
-                )
+        cat = catalog
+        if cat is None:
+            try:
+                from backend.app.schema.service import schema_service
+                cat = schema_service.get_cached_catalog()
+            except Exception:
+                pass
+
+        # 1. Dynamic Discovery from Active Schema Catalog (Domain-Independent)
+        if cat and cat.tables:
+            for tbl_name, tbl_model in cat.tables.items():
+                for col in tbl_model.columns:
+                    # Scan low-cardinality categorical columns
+                    if col.sample_values and (col.distinct_count <= 50 or len(col.sample_values) <= 20):
+                        for sample in col.sample_values:
+                            sample_str = str(sample).strip()
+                            if len(sample_str) >= 2:
+                                pattern = rf"\b{re.escape(sample_str.lower())}\b"
+                                match = re.search(pattern, query_lower)
+                                if match:
+                                    pair_key = (tbl_name, col.name, sample_str)
+                                    if pair_key not in seen_keys:
+                                        seen_keys.add(pair_key)
+                                        linked.append(
+                                            LinkedValue(
+                                                user_mention=match.group(0),
+                                                target_table=tbl_name,
+                                                target_column=col.name,
+                                                exact_db_value=sample_str,
+                                                confidence=0.95,
+                                            )
+                                        )
+
+        # 2. Specialized E-commerce Mappings: Only applied if schema has matching tables and columns
+        if cat and cat.tables:
+            is_ecom = "orders" in cat.tables or "customer_segments" in cat.tables
+            if is_ecom:
+                for pattern, table, col, exact_val in ECOMMERCE_LITERAL_MAPPINGS:
+                    # Verify table and column exist in active catalog
+                    if table in cat.tables:
+                        col_names = {c.name.lower() for c in cat.tables[table].columns}
+                        if col.lower() in col_names:
+                            match = re.search(pattern, query_lower)
+                            if match:
+                                pair_key = (table, col, exact_val)
+                                if pair_key not in seen_keys:
+                                    seen_keys.add(pair_key)
+                                    linked.append(
+                                        LinkedValue(
+                                            user_mention=match.group(0),
+                                            target_table=table,
+                                            target_column=col,
+                                            exact_db_value=exact_val,
+                                            confidence=0.98,
+                                        )
+                                    )
 
         return linked
 
 
 value_linker = ValueLinker()
-

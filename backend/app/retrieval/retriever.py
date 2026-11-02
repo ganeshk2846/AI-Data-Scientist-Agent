@@ -73,9 +73,17 @@ class SchemaGrounder:
                     if t in catalog.tables:
                         selected.add(t)
 
-        # If nothing matched, default to core business table: orders
+        # If lexical and synonym matching returned no tables, match query terms to column names
         if not selected:
-            selected.add("orders")
+            for word in query_lower.split():
+                if len(word) >= 3:
+                    for tbl_name, tbl_model in catalog.tables.items():
+                        if any(word in col.name.lower() for col in tbl_model.columns):
+                            selected.add(tbl_name)
+                            if len(selected) >= max_tables:
+                                break
+                if selected:
+                    break
 
         # 3. Graph expansion via Foreign Keys:
         # If order_items is selected and products is referenced, or customers and segments

@@ -33,6 +33,24 @@ def analyze_customer_churn_risk(
     cur = conn.cursor()
 
     try:
+        # Verify required schema tables exist in the target database
+        required_tables = {"customer_segments", "customer_segment_history", "orders"}
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        existing_tables = {r[0] for r in cur.fetchall()}
+        missing = required_tables - existing_tables
+        if missing:
+            return AnalysisToolResult(
+                tool_name="analyze_customer_churn_risk",
+                analysis_type=AnalysisType.CHURN_RISK,
+                success=False,
+                provenance=ProvenanceInfo(
+                    record_count=0,
+                    computed_at=now_iso,
+                    method_name="customer_segment_churn_analysis",
+                ),
+                abstain_reason=f"Target database does not support customer churn analysis: missing required tables ({', '.join(sorted(missing))}).",
+            )
+
         # Query current active customer segments and total lifetime spend from orders
         query = """
             SELECT 

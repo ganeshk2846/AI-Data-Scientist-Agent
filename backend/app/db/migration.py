@@ -36,30 +36,62 @@ def run_agent_store_migration(app_db_path: Optional[Path] = None) -> None:
                 );
             """)
 
-            # 2. Create Active Semantic Metrics Table
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS semantic_metrics (
-                    id TEXT PRIMARY KEY,
-                    metric_key TEXT NOT NULL UNIQUE,
-                    display_name TEXT NOT NULL,
-                    formula_sql TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    derivation_type TEXT NOT NULL,
-                    verified_by TEXT,
-                    description TEXT,
-                    confidence_score REAL DEFAULT 0.5,
-                    fingerprint TEXT DEFAULT 'default',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-
-            # Non-destructive check for fingerprint column
+            # 2. Check semantic_metrics table
             cur = conn.cursor()
-            cur.execute("PRAGMA table_info(semantic_metrics);")
-            cols = [r[1] for r in cur.fetchall()]
-            if "fingerprint" not in cols:
-                conn.execute("ALTER TABLE semantic_metrics ADD COLUMN fingerprint TEXT DEFAULT 'default';")
+            cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='semantic_metrics';")
+            table_row = cur.fetchone()
+
+            if not table_row:
+                conn.execute("""
+                    CREATE TABLE semantic_metrics (
+                        id TEXT PRIMARY KEY,
+                        metric_key TEXT NOT NULL,
+                        display_name TEXT NOT NULL,
+                        formula_sql TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        derivation_type TEXT NOT NULL,
+                        verified_by TEXT,
+                        description TEXT,
+                        confidence_score REAL DEFAULT 0.5,
+                        fingerprint TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(fingerprint, metric_key)
+                    );
+                """)
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_metrics_fp ON semantic_metrics(fingerprint);")
+            else:
+                sql_def = table_row[0]
+                # If table exists with legacy UNIQUE(metric_key) constraint instead of UNIQUE(fingerprint, metric_key)
+                if "UNIQUE(fingerprint, metric_key)" not in sql_def and "UNIQUE (fingerprint, metric_key)" not in sql_def:
+                    # Non-destructive migration to composite uniqueness
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS semantic_metrics_v2 (
+                            id TEXT PRIMARY KEY,
+                            metric_key TEXT NOT NULL,
+                            display_name TEXT NOT NULL,
+                            formula_sql TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            derivation_type TEXT NOT NULL,
+                            verified_by TEXT,
+                            description TEXT,
+                            confidence_score REAL DEFAULT 0.5,
+                            fingerprint TEXT NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(fingerprint, metric_key)
+                        );
+                    """)
+                    conn.execute("""
+                        INSERT OR REPLACE INTO semantic_metrics_v2
+                        SELECT id, metric_key, display_name, formula_sql, status, derivation_type, verified_by, description, confidence_score,
+                               CASE WHEN fingerprint IS NULL OR fingerprint = 'default' THEN '9c51abb2f2569a4a1e4ef4a0d1b806294b3f972ca0527d12f34ae9285e9e15ab' ELSE fingerprint END,
+                               created_at, updated_at
+                        FROM semantic_metrics;
+                    """)
+                    conn.execute("DROP TABLE semantic_metrics;")
+                    conn.execute("ALTER TABLE semantic_metrics_v2 RENAME TO semantic_metrics;")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_semantic_metrics_fp ON semantic_metrics(fingerprint);")
 
         logger.info(f"Verified agent_app.sqlite schema migration at {target_path}")
 

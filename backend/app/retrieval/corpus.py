@@ -77,8 +77,12 @@ class SchemaCorpus:
         self._build_corpus()
 
     def _build_corpus(self):
+        is_ecom = "orders" in self.catalog.tables and "customers" in self.catalog.tables
         for name, tbl in self.catalog.tables.items():
-            domain_desc = DOMAIN_DESCRIPTIONS.get(name, "General Operational Data")
+            if is_ecom and name in DOMAIN_DESCRIPTIONS:
+                domain_desc = DOMAIN_DESCRIPTIONS[name]
+            else:
+                domain_desc = f"Operational data table '{name}' with {len(tbl.columns)} attributes." 
             col_names = [c.name for c in tbl.columns]
 
             col_descs = []

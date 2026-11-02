@@ -97,9 +97,13 @@ class DatabaseConnectionManager:
                 self._persist_config(config, params)
                 self._active_config = config
                 try:
-                    from backend.app.retrieval.semantics import dynamic_semantic_engine
-                    fp = self._active_adapter.compute_fingerprint() if self._active_adapter else "default"
-                    dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp)
+                    from backend.app.retrieval.semantics import dynamic_semantic_engine, is_ecommerce_compatible
+                    fp = self._active_adapter.compute_fingerprint() if self._active_adapter else None
+                    if fp:
+                        from backend.app.schema.service import schema_service
+                        cat = schema_service.profile_database(force_refresh=False)
+                        if cat and is_ecommerce_compatible(cat):
+                            dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp, catalog=cat)
                 except Exception as e:
                     logger.debug(f"Could not seed canonical metrics on init: {e}")
                 logger.info(f"Successfully seeded baseline active database: {config.name}")
@@ -234,6 +238,28 @@ class DatabaseConnectionManager:
             # 5. Persist to agent store
             self._persist_config(updated_config, params)
             self._active_config = updated_config
+
+            # 6. Invalidate previous schema and retrieval caches
+            try:
+                from backend.app.retrieval.hybrid import hybrid_retriever
+                hybrid_retriever.catalog = None
+                hybrid_retriever.corpus = None
+                hybrid_retriever.bm25 = None
+                hybrid_retriever.vector_store = None
+                from backend.app.schema.service import schema_service
+                schema_service.clear_cache()
+            except Exception as e:
+                logger.debug(f"Retrieval cache reset on activation: {e}")
+
+            # 7. Check e-commerce compatibility for canonical metric seeding
+            try:
+                from backend.app.retrieval.semantics import dynamic_semantic_engine, is_ecommerce_compatible
+                from backend.app.schema.service import schema_service
+                cat = schema_service.profile_database(force_refresh=True)
+                if cat and is_ecommerce_compatible(cat):
+                    dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp, catalog=cat)
+            except Exception as e:
+                logger.debug(f"Post-activation canonical metric check: {e}")
 
             logger.info(f"Successfully activated database: {config.name} ({config.engine})")
             return self._active_adapter

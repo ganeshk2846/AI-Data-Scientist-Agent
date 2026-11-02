@@ -406,3 +406,111 @@ Establish persistent, offline schema retrieval and dynamic semantic intelligence
 
 ### I. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+
+---
+
+# PHASE 3.1 RECORD: DOMAIN ISOLATION AND SEMANTIC INTEGRITY REMEDIATION
+
+- **Execution Date:** November 2026
+- **Git Branch:** `v2/phase-3.1-domain-isolation-fix`
+- **Parent Commit:** `6714d00`
+- **Author Roles:** Principal AI Architect, Senior AI Agent Engineer, Database Systems Engineer, Senior Python Backend Engineer, Lead Test Engineer
+- **Remediation Scope:** Strict Architectural Domain Isolation, Cross-Database Semantic Integrity, Decoupling of Hardcoded Business Assumptions.
+
+---
+
+### A. Architectural Context & Objectives
+Following the Phase 3 Architectural Audit, the semantic layer was diagnosed with partial domain dependence:
+1. **Default Fingerprint Leak:** `DynamicSemanticEngine.get_authoritative_metrics()` executed `WHERE (fingerprint = ? OR fingerprint = 'default')`, which leaked e-commerce baseline metrics into newly connected, unrelated databases.
+2. **Ungated Static Fallback in Prompt Context:** `orchestrator.py` fell back to `semantic_registry.find_relevant_metrics()` when an unfamiliar database had no approved metrics, injecting e-commerce formulas into the LLM prompt.
+3. **Global Uniqueness Collision:** `semantic_metrics` table enforced `UNIQUE(metric_key)` rather than `UNIQUE(fingerprint, metric_key)`, preventing distinct databases from having identical metric keys.
+4. **Hardcoded Literal & Domain Couplings:** `value_linker.py` (21 static e-commerce regexes), `corpus.py` (30 hardcoded e-commerce table descriptions), `retriever.py` (unconditional fallback forcing `orders`), and `churn.py` (hardcoded queries crashing on non-ecommerce schemas).
+
+Phase 3.1 systematically remediated these defects without rebuilding the completed Phase 3 infrastructure.
+
+---
+
+### B. Implementation Details & File Modifications
+
+1. **`backend/app/db/migration.py`:**
+   - Applied transactional, non-destructive migration on `agent_app.sqlite`.
+   - Updated `semantic_metrics` table constraint to `UNIQUE(fingerprint, metric_key)` with index `idx_semantic_metrics_fp`.
+   - Migrated legacy `fingerprint = 'default'` records to the verified `ecommerce.db` fingerprint (`9c51abb2f2569a4a1e4ef4a0d1b806294b3f972ca0527d12f34ae9285e9e15ab`).
+
+2. **`backend/app/retrieval/semantics.py`:**
+   - Added `is_ecommerce_compatible(catalog: Optional[DatabaseCatalog]) -> bool` requiring core entities (`orders`) and attributes (`total_amount`, `order_status`).
+   - Gated `seed_baseline_canonical_metrics()` on verified catalog compatibility; refuses to seed under `'default'` or into unfamiliar domains.
+   - Refactored `get_authoritative_metrics(fingerprint)` and `list_metrics(fingerprint)` to require exact fingerprint matching (`WHERE status = ? AND fingerprint = ?`). Completely eliminated `OR fingerprint = 'default'`.
+   - Enhanced AST validation in `infer_metrics_from_schema()` to cross-reference extracted identifiers against catalog columns, enforcing `VALIDATED_CANDIDATE` only when columns exist.
+   - Scoped `approve_metric(metric_key, fingerprint)` to prevent cross-database approval reuse.
+   - Gated `format_authoritative_prompt_context(fingerprint)` to return empty string if no approved metrics exist for the active database.
+
+3. **`backend/app/workflow/orchestrator.py`:**
+   - Removed `semantic_registry.find_relevant_metrics()` fallback from the SQL generation prompt builder.
+   - Set `metrics_str = authoritative_context or ""`. If no `USER_APPROVED` metrics exist for the active database fingerprint, an empty semantic context is passed to the LLM.
+   - Passed `catalog=catalog` to `value_linker.link_values()` for schema-aware token resolution.
+
+4. **`backend/app/retrieval/value_linker.py`:**
+   - Replaced static global scanning with two-tier resolution:
+     1. Dynamic discovery from active catalog: scans low-cardinality columns (`distinct_count <= 50`, `sample_values`) across all tables in the active catalog.
+     2. Specialized e-commerce mappings: gated strictly on active catalog presence of `orders` / `customer_segments` and verified column existence.
+
+5. **`backend/app/retrieval/corpus.py`:**
+   - Gated `DOMAIN_DESCRIPTIONS` on active schema verification (`orders` and `customers` in catalog).
+   - Unfamiliar tables dynamically receive descriptive schema metadata reflecting column count and attributes rather than e-commerce defaults.
+
+6. **`backend/app/retrieval/retriever.py`:**
+   - Removed the unconditional fallback that forced `selected.add("orders")`.
+   - Implemented column-name matching when keyword matching yields no table, never selecting tables absent from the active catalog.
+
+7. **`backend/app/analysis/churn.py`:**
+   - Added schema introspection verification checking for required tables (`customer_segments`, `customer_segment_history`, `orders`).
+   - Gracefully abstains with `success=False` and clear diagnostic `abstain_reason` on incompatible databases without raising unhandled SQL exceptions.
+
+8. **`backend/app/api/v1/endpoints/retrieval.py`:**
+   - Extended `MetricApproveRequest` with `fingerprint: Optional[str] = None`.
+   - Wired `approve_metric` endpoint to resolve active catalog fingerprint and pass it to `dynamic_semantic_engine.approve_metric()`.
+
+9. **`backend/app/db/manager.py`:**
+   - In `activate_database()` and `initialize()`: verified e-commerce compatibility before calling `seed_baseline_canonical_metrics(fingerprint=fp)`.
+   - Cleared in-memory schema and hybrid retrieval caches on activation and disconnect.
+
+---
+
+### C. New Cross-Domain Regression Suite (`test_phase3_1_domain_isolation.py`)
+Created 11 comprehensive automated tests using isolated temporary test databases:
+- **Test A (`test_a_ecommerce_compatibility`):** E-commerce database accesses compatible canonical metrics with exact fingerprint.
+- **Test B (`test_b_healthcare_isolation`):** Synthetic Healthcare DB (`patients`, `billing`) never receives e-commerce canonical metrics; returns 0 metrics and empty prompt context.
+- **Test C (`test_c_database_switching`):** Connect e-commerce -> switch Healthcare -> reconnect e-commerce; verifies strict database isolation without cross-contamination.
+- **Test D (`test_d_no_static_fallback`):** Unfamiliar database receives empty semantic context; static registry returns empty for non-ecommerce catalog.
+- **Test E (`test_e_approval_lifecycle`):** `AUTO_INFERRED` and `VALIDATED_CANDIDATE` metrics remain non-authoritative; approval with wrong fingerprint fails; approval with matching fingerprint upgrades status to `USER_APPROVED`.
+- **Test F (`test_f_schema_changes_invalidation`):** Restructuring schema topology changes the computed fingerprint, isolating outdated definitions.
+- **Test G (`test_g_retriever_no_orders_fallback`):** Query on Healthcare schema never forces `orders` table.
+- **Test H (`test_h_specialized_analytics_churn_safety`):** Churn analysis safely abstains with `success=False` on Healthcare schema without crashing.
+- **Test I (`test_i_value_linker_isolation`):** E-commerce literal mappings are suppressed on Healthcare schema; dynamic tokens linked from active table samples.
+- **Test J (`test_j_reconnection_persistence`):** Approved definitions survive disconnect and reconnect to the same database.
+- **Test K (`test_k_live_ollama_unfamiliar_domain_inference`):** Live local Ollama `qwen3:4b` dynamically infers, AST-validates, and persists domain-specific metrics on a synthetic University Library schema (`books`, `loans`).
+
+---
+
+### D. Empirical Test Execution & Timing Verification
+
+| Test Suite | Command | Collected | Passed | Failed | Skipped | Actual Duration | LLM Mode |
+|:---|:---|---:|---:|---:|---:|---:|:---:|
+| **Phase 3.1 Unit Suite (Tests A–J)** | `pytest backend/tests/test_phase3_1_domain_isolation.py -k "not test_k"` | 10 | 10 | 0 | 0 | **1.58s** | Offline / Mock |
+| **Phase 3.1 Live Ollama (Test K)** | `pytest backend/tests/test_phase3_1_domain_isolation.py -k "test_k"` | 1 | 1 | 0 | 0 | **61.81s** | Live local Ollama `qwen3:4b` |
+| **Phase 3.1 Full Suite (Tests A–K)** | `pytest backend/tests/test_phase3_1_domain_isolation.py` | 11 | 11 | 0 | 0 | **65.28s** | Mixed (Unit + Live Ollama) |
+| **Active V2 Fast Unit Suite** | `pytest backend/tests/test_adapters.py backend/tests/test_read_only_safety.py backend/tests/test_phase3_retrieval_semantics.py backend/tests/test_phase3_1_domain_isolation.py -k "not test_k"` | 33 | 33 | 0 | 0 | **14.05s** | Offline / Mock |
+| **Phase 2 Vertical Slice Suite** | `pytest backend/tests/test_vertical_slice.py` | 8 | 8 | 0 | 0 | **218.46s** | Live local Ollama `qwen3:4b` |
+| **Total Active V2 Suite** | Phase 1 + Phase 2 + Phase 3 + Phase 3.1 | 42 | 42 | 0 | 0 | **~297s** | Full Live Ollama Verification |
+
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before and after Phase 3.1: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E` (100% bitwise invariant; 0 writes).
+- **Tracked Legacy V1 Failures (17 items):**
+  - All 17 historical baseline test failures remain cleanly isolated and unchanged. Zero new regressions.
+
+---
+
+### E. Phase Completion Status
+**COMPLETED AND VERIFIED.**

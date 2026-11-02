@@ -91,6 +91,21 @@ CANONICAL_METRICS: Dict[str, BusinessMetric] = {
 }
 
 
+def is_ecommerce_compatible(catalog: Optional[DatabaseCatalog]) -> bool:
+    """
+    Checks if a database catalog is compatible with canonical e-commerce metrics.
+    Requires core entities ('orders') and critical attributes ('total_amount', 'order_status').
+    """
+    if not catalog or not catalog.tables:
+        return False
+    if "orders" not in catalog.tables:
+        return False
+    order_cols = {c.name.lower() for c in catalog.tables["orders"].columns}
+    if not {"total_amount", "order_status"}.issubset(order_cols):
+        return False
+    return True
+
+
 class DynamicSemanticEngine:
     """
     Manages dynamic semantic metric discovery, AST validation,
@@ -106,31 +121,62 @@ class DynamicSemanticEngine:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def seed_baseline_canonical_metrics(self, fingerprint: str = "default") -> int:
-        """Seeds canonical baseline metrics into semantic_metrics table as USER_APPROVED."""
+    def seed_baseline_canonical_metrics(
+        self,
+        fingerprint: Optional[str] = None,
+        catalog: Optional[DatabaseCatalog] = None,
+    ) -> int:
+        """
+        Seeds canonical baseline metrics into semantic_metrics table as USER_APPROVED
+        strictly for verified, compatible e-commerce database schemas.
+        Never seeds under 'default' and never seeds into unfamiliar domains.
+        """
         with self._lock:
+            # 1. Verify schema compatibility if catalog provided
+            if catalog is not None and not is_ecommerce_compatible(catalog):
+                logger.info("Skipping canonical e-commerce metric seeding: schema is not e-commerce compatible.")
+                return 0
+
+            # 2. Require valid specific fingerprint (never 'default')
+            fp = fingerprint or (getattr(catalog, "fingerprint", None) if catalog else None)
+            if not fp or fp == "default":
+                logger.warning("Refusing to seed canonical metrics under empty or 'default' fingerprint.")
+                return 0
+
             conn = self._get_connection()
             seeded_count = 0
             try:
                 with conn:
                     for key, metric in CANONICAL_METRICS.items():
+                        # If catalog is provided, verify this specific metric's target tables exist
+                        if catalog is not None:
+                            table_missing = any(t not in catalog.tables for t in metric.target_tables)
+                            if table_missing:
+                                continue
+
                         cur = conn.cursor()
                         cur.execute(
-                            "SELECT metric_key FROM semantic_metrics WHERE metric_key = ?;",
-                            (key,),
+                            "SELECT metric_key FROM semantic_metrics WHERE metric_key = ? AND fingerprint = ?;",
+                            (key, fp),
                         )
                         if not cur.fetchone():
                             now_str = datetime.now(timezone.utc).isoformat()
+                            metric_id = f"metric_{fp[:12]}_{key}"
                             cur.execute(
                                 """
                                 INSERT INTO semantic_metrics (
                                     id, metric_key, display_name, formula_sql,
                                     status, derivation_type, verified_by, description,
                                     confidence_score, fingerprint, created_at, updated_at
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(fingerprint, metric_key) DO UPDATE SET
+                                    display_name = excluded.display_name,
+                                    formula_sql = excluded.formula_sql,
+                                    status = excluded.status,
+                                    updated_at = CURRENT_TIMESTAMP;
                                 """,
                                 (
-                                    f"metric_{key}",
+                                    metric_id,
                                     key,
                                     metric.display_name,
                                     metric.formula,
@@ -139,13 +185,13 @@ class DynamicSemanticEngine:
                                     "system_baseline",
                                     metric.description,
                                     1.0,
-                                    fingerprint,
+                                    fp,
                                     now_str,
                                     now_str,
                                 ),
                             )
                             seeded_count += 1
-                logger.info(f"Seeded {seeded_count} canonical metrics into store (fp: {fingerprint})")
+                logger.info(f"Seeded {seeded_count} canonical metrics into store (fp: {fp})")
                 return seeded_count
             finally:
                 conn.close()
@@ -243,13 +289,24 @@ Example format:
                                 display = str(raw.get("display_name", key.replace("_", " ").title()))
                                 desc = str(raw.get("description", ""))
 
-                                # AST Validation on formula
+                                # AST Validation on formula and catalog column grounding
                                 is_valid = False
+                                val_errors: List[str] = []
                                 try:
-                                    # Test parsing formula inside a SELECT
-                                    sqlglot.parse_one(f"SELECT {formula}")
-                                    is_valid = True
-                                except Exception:
+                                    parsed = sqlglot.parse_one(f"SELECT {formula}")
+                                    # Verify all referenced columns exist in at least one catalog table
+                                    for col_node in parsed.find_all(sqlglot.exp.Column):
+                                        col_name = col_node.name.lower()
+                                        col_found = False
+                                        for tbl in catalog.tables.values():
+                                            if any(c.name.lower() == col_name for c in tbl.columns):
+                                                col_found = True
+                                                break
+                                        if not col_found:
+                                            val_errors.append(f"Column '{col_name}' not found in catalog")
+                                    is_valid = len(val_errors) == 0
+                                except Exception as err:
+                                    val_errors.append(str(err))
                                     is_valid = False
 
                                 status = (
@@ -258,7 +315,7 @@ Example format:
                                     else MetricStatus.AUTO_INFERRED
                                 )
                                 now_str = datetime.now(timezone.utc).isoformat()
-                                metric_id = f"inferred_{key}"
+                                metric_id = f"inferred_{fp[:12]}_{key}"
 
                                 cur = conn.cursor()
                                 cur.execute(
@@ -268,7 +325,7 @@ Example format:
                                         status, derivation_type, verified_by, description,
                                         confidence_score, fingerprint, created_at, updated_at
                                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                    ON CONFLICT(metric_key) DO UPDATE SET
+                                    ON CONFLICT(fingerprint, metric_key) DO UPDATE SET
                                         display_name = excluded.display_name,
                                         formula_sql = excluded.formula_sql,
                                         status = excluded.status,
@@ -309,28 +366,52 @@ Example format:
 
             return inferred_results
 
-    def approve_metric(self, metric_key: str, approved_by: str = "user") -> Optional[SemanticMetricDefinition]:
+    def approve_metric(
+        self,
+        metric_key: str,
+        fingerprint: Optional[str] = None,
+        approved_by: str = "user",
+    ) -> Optional[SemanticMetricDefinition]:
         """
         Transitions candidate metric from AUTO_INFERRED / VALIDATED_CANDIDATE
-        to authoritative USER_APPROVED status.
+        to authoritative USER_APPROVED status strictly for the matching database fingerprint.
         """
         with self._lock:
             conn = self._get_connection()
             try:
                 with conn:
                     cur = conn.cursor()
-                    cur.execute(
-                        """
-                        UPDATE semantic_metrics
-                        SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
-                        WHERE metric_key = ?;
-                        """,
-                        (MetricStatus.USER_APPROVED.value, approved_by, metric_key),
-                    )
+                    if fingerprint:
+                        cur.execute(
+                            """
+                            UPDATE semantic_metrics
+                            SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
+                            WHERE metric_key = ? AND fingerprint = ?;
+                            """,
+                            (MetricStatus.USER_APPROVED.value, approved_by, metric_key, fingerprint),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            UPDATE semantic_metrics
+                            SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
+                            WHERE metric_key = ?;
+                            """,
+                            (MetricStatus.USER_APPROVED.value, approved_by, metric_key),
+                        )
                     if cur.rowcount == 0:
                         return None
 
-                    cur.execute("SELECT * FROM semantic_metrics WHERE metric_key = ?;", (metric_key,))
+                    if fingerprint:
+                        cur.execute(
+                            "SELECT * FROM semantic_metrics WHERE metric_key = ? AND fingerprint = ?;",
+                            (metric_key, fingerprint),
+                        )
+                    else:
+                        cur.execute(
+                            "SELECT * FROM semantic_metrics WHERE metric_key = ?;",
+                            (metric_key,),
+                        )
                     row = cur.fetchone()
                     if row:
                         return SemanticMetricDefinition(
@@ -349,32 +430,26 @@ Example format:
 
     def get_authoritative_metrics(self, fingerprint: Optional[str] = None) -> List[SemanticMetricDefinition]:
         """
-        Returns ONLY metrics with USER_APPROVED provenance.
-        Unapproved metrics (AUTO_INFERRED, VALIDATED_CANDIDATE) are strictly excluded.
+        Returns ONLY metrics with USER_APPROVED provenance matching the exact database fingerprint.
+        Unapproved metrics (AUTO_INFERRED, VALIDATED_CANDIDATE) and metrics from other databases
+        are strictly excluded.
         """
+        if not fingerprint:
+            return []
+
         with self._lock:
             conn = self._get_connection()
             results = []
             try:
                 cur = conn.cursor()
-                if fingerprint:
-                    cur.execute(
-                        """
-                        SELECT * FROM semantic_metrics
-                        WHERE status = ? AND (fingerprint = ? OR fingerprint = 'default')
-                        ORDER BY metric_key ASC;
-                        """,
-                        (MetricStatus.USER_APPROVED.value, fingerprint),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT * FROM semantic_metrics
-                        WHERE status = ?
-                        ORDER BY metric_key ASC;
-                        """,
-                        (MetricStatus.USER_APPROVED.value,),
-                    )
+                cur.execute(
+                    """
+                    SELECT * FROM semantic_metrics
+                    WHERE status = ? AND fingerprint = ?
+                    ORDER BY metric_key ASC;
+                    """,
+                    (MetricStatus.USER_APPROVED.value, fingerprint),
+                )
                 rows = cur.fetchall()
                 for r in rows:
                     results.append(
@@ -398,7 +473,7 @@ Example format:
         fingerprint: Optional[str] = None,
         status: Optional[MetricStatus] = None,
     ) -> List[SemanticMetricDefinition]:
-        """Lists metrics with optional filtering by status and database fingerprint."""
+        """Lists metrics with optional filtering by status and exact database fingerprint."""
         with self._lock:
             conn = self._get_connection()
             results = []
@@ -410,7 +485,7 @@ Example format:
                     query += " AND status = ?"
                     params.append(status.value)
                 if fingerprint:
-                    query += " AND (fingerprint = ? OR fingerprint = 'default')"
+                    query += " AND fingerprint = ?"
                     params.append(fingerprint)
                 query += " ORDER BY metric_key ASC;"
 
@@ -439,8 +514,11 @@ Example format:
     ) -> str:
         """
         Formats authoritative business metric calculation formulas for LLM Text-to-SQL context.
-        Guarantees that only USER_APPROVED metrics are injected.
+        Guarantees that only USER_APPROVED metrics for the matching fingerprint are injected.
         """
+        if not fingerprint:
+            return ""
+
         metrics = self.get_authoritative_metrics(fingerprint)
         if not metrics:
             return ""
@@ -477,28 +555,31 @@ class SemanticRegistry:
     def __init__(self, engine: DynamicSemanticEngine = dynamic_semantic_engine):
         self.engine = engine
 
-    def get_metric(self, name: str) -> Optional[BusinessMetric]:
+    def get_metric(self, name: str, fingerprint: Optional[str] = None) -> Optional[BusinessMetric]:
         name_clean = name.lower().strip()
+        # Check active store for the specific database fingerprint first
+        if fingerprint:
+            metrics = self.engine.get_authoritative_metrics(fingerprint=fingerprint)
+            for m in metrics:
+                if m.metric_key == name_clean:
+                    return BusinessMetric(
+                        name=m.metric_key,
+                        display_name=m.display_name,
+                        formula=m.formula_sql,
+                        description=m.description or "",
+                        target_tables=[],
+                        is_verified=True,
+                    )
         if name_clean in CANONICAL_METRICS:
             return CANONICAL_METRICS[name_clean]
-        # Check active store
-        metrics = self.engine.get_authoritative_metrics()
-        for m in metrics:
-            if m.metric_key == name_clean:
-                return BusinessMetric(
-                    name=m.metric_key,
-                    display_name=m.display_name,
-                    formula=m.formula_sql,
-                    description=m.description or "",
-                    target_tables=[],
-                    is_verified=True,
-                )
         return None
 
     def list_metrics(self) -> List[BusinessMetric]:
         return list(CANONICAL_METRICS.values())
 
-    def find_relevant_metrics(self, query: str) -> List[BusinessMetric]:
+    def find_relevant_metrics(self, query: str, catalog: Optional[DatabaseCatalog] = None) -> List[BusinessMetric]:
+        if catalog is not None and not is_ecommerce_compatible(catalog):
+            return []
         q_lower = query.lower()
         matched = []
         for m in CANONICAL_METRICS.values():

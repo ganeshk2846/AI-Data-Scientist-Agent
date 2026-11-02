@@ -288,8 +288,7 @@ class MultiAgentOrchestrator:
         selected_tables = retrieval_res.selected_table_names
         schema_prompt = retrieval_res.minimal_schema_prompt
 
-        linked_values = value_linker.link_values(effective_query)
-        relevant_metrics = semantic_registry.find_relevant_metrics(effective_query)
+        linked_values = value_linker.link_values(effective_query, catalog=catalog)
 
         # Build prompt context additions
         linked_str = ""
@@ -301,14 +300,9 @@ class MultiAgentOrchestrator:
 
         fp = getattr(catalog, "fingerprint", None)
         authoritative_context = dynamic_semantic_engine.format_authoritative_prompt_context(fingerprint=fp, query=effective_query)
-        metrics_str = ""
-        if authoritative_context:
-            metrics_str = authoritative_context
-        elif relevant_metrics:
-            metrics_str = "VERIFIED METRIC DEFINITIONS:\n" + "\n".join(
-                f"- {m.display_name}: Formula: {m.formula} ({m.description})"
-                for m in relevant_metrics
-            )
+        # Strict isolation: Only USER_APPROVED metrics for the active fingerprint are injected.
+        # If no approved metrics exist, metrics_str remains empty. Unapproved candidates and static fallback are strictly omitted.
+        metrics_str = authoritative_context or ""
 
         plan = planner_agent.create_plan(effective_query, route, selected_tables)
         s2_ms = (time.perf_counter() - s2_start) * 1000
