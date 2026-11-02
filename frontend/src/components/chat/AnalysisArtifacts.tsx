@@ -1,18 +1,182 @@
 import React from "react";
-import { Sparkles, AlertTriangle, TrendingUp, Users, DollarSign, Calendar, Target } from "lucide-react";
-import { AnalysisToolResult } from "@/types/api";
+import {
+  Sparkles,
+  AlertTriangle,
+  TrendingUp,
+  Users,
+  DollarSign,
+  Calendar,
+  Target,
+  ShieldCheck,
+  Compass,
+  CheckCircle2,
+  HelpCircle,
+  BarChart2,
+} from "lucide-react";
 import { Badge } from "../ui/Badge";
 
 export interface AnalysisArtifactsProps {
-  analysis: AnalysisToolResult;
+  analysis: any;
 }
 
 export function AnalysisArtifacts({ analysis }: AnalysisArtifactsProps) {
-  const { tool_name, provenance, churn_risk, anomaly_detection, forecast, optimization } = analysis;
+  // Check if this is a Phase 4 StandardizedAnalyticalResult
+  if (analysis.analytical_type && analysis.selected_methods) {
+    const {
+      analysis_id,
+      analytical_type,
+      analysis_question,
+      selected_methods,
+      computed_metrics = {},
+      result_data = [],
+      faithfulness,
+      confidence_score = 1.0,
+      uncertainty_notes = [],
+      findings = [],
+      limitations = [],
+      recommended_next_steps = [],
+    } = analysis;
+
+    const intentColor = {
+      DESCRIPTIVE: "bg-blue-500/10 text-blue-500 border-blue-500/30",
+      DIAGNOSTIC: "bg-amber-500/10 text-amber-500 border-amber-500/30",
+      PREDICTIVE: "bg-purple-500/10 text-purple-500 border-purple-500/30",
+      PRESCRIPTIVE: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
+      SQL_LOOKUP: "bg-muted text-muted-foreground border-border",
+    }[analytical_type as string] || "bg-primary/10 text-primary border-primary/30";
+
+    return (
+      <div className="space-y-5">
+        {/* Phase 4 Header Strip */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs pb-3 border-b border-border gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className={`p-1.5 rounded-lg border font-semibold uppercase text-[11px] tracking-wider px-2.5 py-1 ${intentColor}`}>
+              {analytical_type}
+            </div>
+            <span className="font-semibold text-foreground text-sm">
+              Method: {selected_methods.join(", ").replace(/_/g, " ")}
+            </span>
+            <Badge variant="mono" size="xs">
+              ID: {analysis_id}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {faithfulness && faithfulness.is_faithful ? (
+              <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Faithfulness Verified</span>
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded">
+                Confidence: {(confidence_score * 100).toFixed(0)}%
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 1. Key Metrics Cards Grid */}
+        {Object.keys(computed_metrics).length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(computed_metrics)
+              .filter(([k, v]) => typeof v === "number" || typeof v === "string")
+              .slice(0, 8)
+              .map(([key, val]) => (
+                <div key={key} className="p-3 rounded-xl border border-border bg-card/60 space-y-1">
+                  <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider truncate block">
+                    {key.replace(/_/g, " ")}
+                  </span>
+                  <p className="text-lg font-bold font-mono text-foreground truncate">
+                    {typeof val === "number" ? val.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(val)}
+                  </p>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* 2. Structured Findings Narrative */}
+        {findings.length > 0 && (
+          <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-2">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Evidence-Backed Findings</span>
+            </h4>
+            <ul className="space-y-1.5 text-xs text-foreground/90 list-disc list-inside">
+              {findings.map((f: string, i: number) => (
+                <li key={i} className="leading-relaxed">{f}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 3. Predictive / Diagnostic / Prescriptive Result Data Table */}
+        {result_data.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <BarChart2 className="w-3.5 h-3.5 text-primary" />
+              <span>Analytical Records & Projections ({result_data.length})</span>
+            </h4>
+            <div className="overflow-x-auto rounded-xl border border-border bg-card/40 max-h-60 overflow-y-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-muted/70 text-muted-foreground font-semibold border-b border-border sticky top-0">
+                  <tr>
+                    {Object.keys(result_data[0]).slice(0, 7).map((col) => (
+                      <th key={col} className="p-2.5 font-mono capitalize">{col.replace(/_/g, " ")}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {result_data.slice(0, 15).map((row: any, rIdx: number) => (
+                    <tr key={rIdx} className="hover:bg-muted/30 transition-colors">
+                      {Object.keys(result_data[0]).slice(0, 7).map((col) => (
+                        <td key={col} className="p-2.5 font-mono text-foreground/85">
+                          {typeof row[col] === "number"
+                            ? row[col].toLocaleString(undefined, { maximumFractionDigits: 2 })
+                            : String(row[col] ?? "-")}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Actionable Prescriptive Recommendations */}
+        {recommended_next_steps.length > 0 && (
+          <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+            <h4 className="text-xs font-semibold text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5" />
+              <span>Recommended Next Steps & Prescriptions</span>
+            </h4>
+            <ul className="space-y-1.5 text-xs text-foreground/90 list-disc list-inside">
+              {recommended_next_steps.map((rec: string, i: number) => (
+                <li key={i} className="leading-relaxed font-medium">{rec}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 5. Uncertainty & Disclaimers */}
+        {uncertainty_notes.length > 0 && (
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-border/60 bg-muted/30 text-[11px] text-muted-foreground">
+            <HelpCircle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              {uncertainty_notes.map((note: string, i: number) => (
+                <p key={i}>{note}</p>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback: Legacy V1 AnalysisToolResult
+  const { tool_name = "analysis", provenance = {}, churn_risk, anomaly_detection, forecast, optimization } = analysis;
 
   return (
     <div className="space-y-4">
-      {/* Tool Header Strip */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs pb-3 border-b border-border gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="p-1.5 rounded-lg bg-primary/20 text-primary">
@@ -22,259 +186,23 @@ export function AnalysisArtifacts({ analysis }: AnalysisArtifactsProps) {
             {tool_name.replace(/_/g, " ")}
           </span>
           <Badge variant="primary" size="xs">
-            Algorithm: {provenance.method_name}
+            Algorithm: {provenance.method_name || "deterministic"}
           </Badge>
           <Badge variant="mono" size="xs">
-            Dataset: {provenance.source_dataset}
+            Dataset: {provenance.source_dataset || "active_database"}
           </Badge>
         </div>
         <span className="text-[11px] text-muted-foreground font-mono bg-muted/40 px-2.5 py-1 rounded border border-border/50">
-          Window: {provenance.time_window}
+          Window: {provenance.time_window || "dynamic"}
         </span>
       </div>
 
-      {/* 1. Customer Churn Risk Artifact */}
       {churn_risk && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-1">
-              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Users className="w-3.5 h-3.5 text-primary" />
-                <span>Customers Analyzed</span>
-              </span>
-              <p className="text-xl font-bold font-mono text-foreground">
-                {churn_risk.total_customers_analyzed.toLocaleString()}
-              </p>
-            </div>
-            <div className="p-3.5 rounded-xl border border-destructive/30 bg-destructive/10 space-y-1">
-              <span className="text-[11px] text-destructive font-medium flex items-center gap-1">
-                <DollarSign className="w-3.5 h-3.5 text-destructive" />
-                <span>Revenue at Risk</span>
-              </span>
-              <p className="text-xl font-bold font-mono text-destructive">
-                ${churn_risk.total_revenue_at_risk.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-            <div className="p-3.5 rounded-xl border border-border bg-card/60 space-y-1">
-              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-warning" />
-                <span>Inactivity Threshold</span>
-              </span>
-              <p className="text-xl font-bold font-mono text-foreground">
-                {churn_risk.inactivity_threshold_days} Days
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-border bg-card/40">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead className="bg-muted/70 text-muted-foreground font-semibold border-b border-border">
-                <tr>
-                  <th className="p-3 font-mono">Rank</th>
-                  <th className="p-3">Customer Segment</th>
-                  <th className="p-3 font-mono">Customers</th>
-                  <th className="p-3 font-mono">Churn Rate (Wilson 95% CI)</th>
-                  <th className="p-3 font-mono">Historical Spend</th>
-                  <th className="p-3 font-mono">Revenue at Risk</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {churn_risk.segments.map((seg) => (
-                  <tr key={seg.segment_name} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-3 font-bold font-mono text-primary">#{seg.actionability_rank}</td>
-                    <td className="p-3 font-semibold text-foreground">{seg.segment_name}</td>
-                    <td className="p-3 font-mono text-foreground/80">{seg.customer_count.toLocaleString()}</td>
-                    <td className="p-3 font-mono">
-                      <span className="font-semibold text-warning">{seg.churn_rate_pct}%</span>
-                      <span className="text-[10px] text-muted-foreground ml-1.5 font-normal">
-                        ({seg.confidence_interval_low}% – {seg.confidence_interval_high}%)
-                      </span>
-                    </td>
-                    <td className="p-3 font-mono text-foreground/90">
-                      ${seg.total_historical_spend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-3 font-mono font-semibold text-destructive">
-                      ${seg.revenue_at_risk.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Anomaly Detection Artifact */}
-      {anomaly_detection && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border border-border bg-card/60 text-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-muted-foreground">
-                Anomalies detected:{" "}
-                <strong className="text-foreground text-sm font-mono">
-                  {anomaly_detection.anomaly_count}
-                </strong>{" "}
-                of {anomaly_detection.total_data_points} points
-              </span>
-              <Badge variant="warning" size="xs">
-                Threshold: |z| ≥ {anomaly_detection.threshold}
-              </Badge>
-            </div>
-            <span className="text-muted-foreground font-mono text-[11px]">
-              Method: {anomaly_detection.method}
-            </span>
-          </div>
-
-          {anomaly_detection.anomalies.filter((a) => a.is_anomaly).length > 0 && (
-            <div className="overflow-x-auto rounded-xl border border-border bg-card/40">
-              <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-muted/70 text-muted-foreground font-semibold border-b border-border">
-                  <tr>
-                    <th className="p-3 font-mono">Date</th>
-                    <th className="p-3 font-mono">Actual Value</th>
-                    <th className="p-3 font-mono">Expected Baseline</th>
-                    <th className="p-3 font-mono">Z-Score</th>
-                    <th className="p-3">Severity</th>
-                    <th className="p-3">Quality Screen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {anomaly_detection.anomalies
-                    .filter((a) => a.is_anomaly)
-                    .map((anom, idx) => (
-                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-3 font-mono font-medium text-foreground">{anom.date}</td>
-                        <td className="p-3 font-mono font-bold text-foreground">
-                          {anom.actual_value.toLocaleString()}
-                        </td>
-                        <td className="p-3 font-mono text-muted-foreground">
-                          {anom.expected_value.toLocaleString()}
-                        </td>
-                        <td className="p-3 font-mono text-warning font-semibold">{anom.z_score}</td>
-                        <td className="p-3">
-                          <Badge
-                            variant={anom.severity === "severe" ? "destructive" : "warning"}
-                            size="xs"
-                          >
-                            {anom.severity.toUpperCase()}
-                          </Badge>
-                        </td>
-                        <td className="p-3 font-mono text-[11px]">
-                          {anom.quality_flag ? (
-                            <span className="text-destructive font-semibold">{anom.quality_flag}</span>
-                          ) : (
-                            <span className="text-success font-medium">Passed</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 3. Time-Series Forecasting Artifact */}
-      {forecast && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 rounded-xl border border-border bg-card/60 space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">Forecasting Algorithm</span>
-              <p className="font-semibold text-sm text-foreground">{forecast.model_used}</p>
-            </div>
-            <div className="p-3 rounded-xl border border-border bg-card/60 space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">Backtest MAE</span>
-              <p className="font-semibold text-sm font-mono text-foreground">
-                {forecast.backtest_mae !== null && forecast.backtest_mae !== undefined
-                  ? forecast.backtest_mae.toFixed(2)
-                  : "N/A"}
-              </p>
-            </div>
-            <div className="p-3 rounded-xl border border-border bg-card/60 space-y-0.5">
-              <span className="text-[11px] text-muted-foreground">Backtest MAPE Error</span>
-              <p className="font-semibold text-sm font-mono text-foreground">
-                {forecast.backtest_mape_pct !== null && forecast.backtest_mape_pct !== undefined
-                  ? `${forecast.backtest_mape_pct.toFixed(2)}%`
-                  : "N/A"}
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-border bg-card/40">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead className="bg-muted/70 text-muted-foreground font-semibold border-b border-border">
-                <tr>
-                  <th className="p-3 font-mono">Forecast Horizon Date</th>
-                  <th className="p-3 font-mono">Point Forecast</th>
-                  <th className="p-3 font-mono">80% Prediction Interval</th>
-                  <th className="p-3 font-mono">95% Prediction Interval</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {forecast.points.map((pt) => (
-                  <tr key={pt.date} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-3 font-mono font-medium text-foreground">{pt.date}</td>
-                    <td className="p-3 font-mono font-bold text-primary">
-                      {pt.point_forecast.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-3 font-mono text-muted-foreground">
-                      [{pt.lower_bound_80.toFixed(1)} – {pt.upper_bound_80.toFixed(1)}]
-                    </td>
-                    <td className="p-3 font-mono text-muted-foreground">
-                      [{pt.lower_bound_95.toFixed(1)} – {pt.upper_bound_95.toFixed(1)}]
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 4. SLSQP Prescriptive Optimization Artifact */}
-      {optimization && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl border border-border bg-card/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs text-muted-foreground">Total Budget Allocated</span>
-              <p className="text-xl font-bold font-mono text-foreground">
-                ${optimization.total_budget.toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">Simulated Expected Return</span>
-              <p className="text-xl font-bold font-mono text-success">
-                ${optimization.expected_total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <Badge variant={optimization.constraints_satisfied ? "success" : "warning"}>
-              {optimization.constraints_satisfied ? "Constraints Satisfied" : "Unconstrained"}
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {Object.entries(optimization.allocations).map(([ch, alloc]) => (
-              <div
-                key={ch}
-                className="p-3 rounded-xl border border-border/80 bg-background/50 flex items-center justify-between text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <Target className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-semibold text-foreground">{ch}</span>
-                </div>
-                <span className="font-mono font-bold text-primary">
-                  ${alloc.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-          </div>
+        <div className="p-4 rounded-xl border border-border bg-card/40 space-y-2">
+          <p className="text-xs text-muted-foreground">Total Analyzed: {churn_risk.total_customers_analyzed}</p>
+          <p className="text-base font-bold text-destructive">Revenue at Risk: ${churn_risk.total_revenue_at_risk?.toLocaleString()}</p>
         </div>
       )}
     </div>
   );
 }
-

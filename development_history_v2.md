@@ -594,3 +594,122 @@ Created 11 comprehensive automated tests using isolated temporary test databases
 
 ### C. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+---
+
+## 6. Phase 4 — Domain-Independent AI Data Analyst & Data Scientist Engine
+
+- **Git Branch:** `v2/phase-4-analytical-intelligence`
+- **Parent Commit:** `137e7af`
+- **Date:** November 2026
+- **Status:** COMPLETED AND VERIFIED
+
+### A. Architectural Objectives & Implementation
+
+Phase 4 transforms the Conversational Data Scientist Agent from a text-to-SQL query tool into a full-fledged, domain-independent analytical and data science engine. The platform natively answers the four canonical analytical questions across diverse database domains (E-commerce, Healthcare, University Library, Manufacturing) without hardcoding business assumptions:
+
+1. **Analytical Foundation & Pydantic v2 Contracts (`backend/app/analysis/contracts_v2.py`):**
+   - Defined `IntentCategory`: `DESCRIPTIVE`, `DIAGNOSTIC`, `PREDICTIVE`, `PRESCRIPTIVE`, `SQL_LOOKUP`.
+   - Defined `ComplexityLevel`: `SIMPLE`, `MODERATE`, `COMPLEX`, `ADVANCED`.
+   - Defined `AnalyticalMethod`: `SQL_QUERY_ONLY`, `DESCRIPTIVE_STATISTICS`, `TREND_ANALYSIS`, `VARIANCE_DECOMPOSITION`, `ANOMALY_DETECTION`, `STATISTICAL_CORRELATION`, `HYPOTHESIS_TESTING`, `TIME_SERIES_FORECAST`, `CONSTRAINED_OPTIMIZATION`, `WHAT_IF_SIMULATION`.
+   - Frozen schemas: `StandardizedAnalyticalResult`, `AnalyticalPlan`, `IntentClassificationResult`, `FaithfulnessReport`.
+
+2. **Intent & Complexity Classification with Ambiguity Detection (`backend/app/analysis/intent_classifier.py`):**
+   - Multi-domain corpus of 105 representative training queries balanced across all 5 intents and all 4 target domains.
+   - Sublinear TF-IDF vectorizer (unigrams + bigrams) paired with balanced, calibrated Logistic Regression models.
+   - Built-in evaluation benchmark achieving **>80% accuracy** and **>79% macro F1** on stratified hold-out validation.
+   - Multi-intent ambiguity detection identifying conflicting historical vs. predictive inquiries, prompting for clarification.
+
+3. **Schema-Grounded Analytical Planner (`backend/app/analysis/planner.py`):**
+   - Automatically inspects the active database catalog to discover relevant primary tables, time dimensions, and target metric columns.
+   - Formulates an executable `AnalyticalPlan` specifying selected analytical methods, output formats, and domain-independent validation requirements.
+   - Enforces abstention guardrails when a question lacks requisite schema dimensions (e.g. predictive forecasting without a time dimension).
+
+4. **AST-Guarded Read-Only Data Extractor (`backend/app/analysis/data_extractor.py`):**
+   - Synthesizes clean, minimal SQL queries retrieving temporal, metric, and categorical dimension columns.
+   - Enforces AST SQL validation and multi-engine read-only safety guardrails before query execution.
+
+5. **Descriptive Analytics Engine — *What Happened?* (`backend/app/analysis/descriptive_engine.py`):**
+   - Computes core KPIs and summary statistics (count, sum, mean, median, standard deviation, IQR, min, max, percentiles).
+   - Generates chronological time-series aggregations, rolling moving averages, and overall growth rates.
+   - Automatically computes period-over-period comparisons (prior vs. current period delta and percentage change).
+   - Segments metrics across categorical dimensions.
+
+6. **Diagnostic Analytics Engine — *Why Did It Happen?* (`backend/app/analysis/diagnostic_engine.py`):**
+   - Decomposes variance across categorical dimensions between chronological periods, computing absolute deltas and percentage contribution to overall variance.
+   - Ranks root-cause drivers by contribution magnitude.
+   - Implements multi-method anomaly detection: `IsolationForest` (unsupervised, contamination=0.08) for datasets with $\ge 15$ records, falling back to Robust Median Absolute Deviation (MAD) Z-score.
+   - Computes Pearson and Spearman rank correlation with two-tailed $p$-values and hypothesis testing ($H_0: \rho = 0$).
+   - Formulates mandatory non-causal disclaimer: *"Correlation and observational variance decomposition reflect statistical association, not confirmed counterfactual causality."*
+
+7. **Predictive Analytics Engine — *What Could Happen Next?* (`backend/app/analysis/predictive_engine.py`):**
+   - Enforces minimum observation guardrail (requires $\ge 10$ continuous historical data points).
+   - Implements multi-model forecasting competition across:
+     - Naive (flat last-value baseline)
+     - Seasonal Naive (lagged seasonal baseline)
+     - Exponential Smoothing (Holt-Winters additive trend via `statsmodels`)
+     - Autoregressive Integrated Moving Average (ARIMA via `statsmodels`)
+     - LightGBM Gradient Boosting with autoregressive lag features (`lag_1`, `lag_2`, `lag_3`, `rolling_mean_3`)
+   - Employs rolling out-of-sample backtesting validation split to select the model achieving the lowest Symmetric Mean Absolute Percentage Error (sMAPE).
+   - Generates multi-step point forecasts and computes 80% and 95% prediction intervals.
+
+8. **Prescriptive Analytics Engine — *What Should We Do Next?* (`backend/app/analysis/prescriptive_engine.py`):**
+   - Solves constrained resource allocation optimization problems using SciPy (`scipy.optimize.minimize` SLSQP) subject to non-negativity and budget equality constraints.
+   - Executes what-if scenario simulations modeling parameter shocks and price/cost elasticities across sensitivity ranges.
+   - Generates structured recommendation plans detailing expected impacts, implementation effort, and trade-off matrices.
+   - Enforces mandatory Safe Recommendation Boundary: *"Recommendations and optimization outputs provide advisory business intelligence. Operational execution requires separate human review and authorization."* Zero automatic mutation execution.
+
+9. **Result Faithfulness & Validation Engine (`backend/app/analysis/faithfulness.py`):**
+   - Verifies analytical narrative claims against computed data before presentation.
+   - Flags contradictory delta claims (claiming an increase when ground truth decreased).
+   - Flags unverified percentage or monetary numbers not supported by ground truth calculations.
+
+10. **Unified Orchestration & Conversational Memory (`backend/app/analysis/orchestrator.py`):**
+    - Implements the complete 7-step analytical lifecycle:
+      1. Conversational context lookup.
+      2. Intent & complexity classification.
+      3. Schema-grounded analytical planning.
+      4. AST-guarded read-only data extraction.
+      5. Specialized generic analytical engine execution.
+      6. Result faithfulness validation.
+      7. Standardized result assembly and session cache update.
+    - Preserves context across multi-turn conversational follow-ups (e.g. Turn 1 establishes sales trend; Turn 2 asks "Why did they decrease?" and inherits table and metric context).
+
+11. **REST API & Frontend Integration:**
+    - Exposed REST endpoints in `backend/app/api/v1/endpoints/analytics.py`:
+      - `POST /api/v1/analytics/classify`: Intent and complexity classification with method recommendations.
+      - `POST /api/v1/analytics/plan`: Schema-grounded analytical plan formulation.
+      - `POST /api/v1/analytics/execute`: End-to-end analytical workflow execution.
+      - `GET /api/v1/analytics/evaluate-classifier`: Hold-out benchmark evaluation metrics.
+    - Updated `frontend/src/types/api.ts` and `frontend/src/lib/api.ts` with TypeScript interfaces and API client calls.
+    - Enriched `frontend/src/components/chat/AnalysisArtifacts.tsx` to render interactive analytical artifact cards: intent badge, faithfulness validation shield, KPI metrics grid, findings callouts, records table, recommendations with trade-offs, and safe boundary disclaimers. Production build verified (`npm run build` completed with 0 errors).
+
+---
+
+### B. Empirical Test Execution & Verification
+
+| Test Suite | File | Tests | Passed | Duration | Analytical Verification Focus |
+|:---|:---|---:|---:|---:|:---|
+| **Intent Classification** | `test_phase4_intent_classifier.py` | 4 | 4 | 0.15s | Cross-domain classification, complexity grading, ambiguity detection, benchmark metrics (Accuracy: >80%, F1: >79%) |
+| **Analytical Planner** | `test_phase4_analytical_planner.py` | 2 | 2 | 0.13s | Schema grounding, temporal/metric dimension discovery, predictive abstention |
+| **Descriptive Engine** | `test_phase4_descriptive.py` | 4 | 4 | 0.08s | Summary statistics, chronological trends, rolling averages, period-over-period comparison |
+| **Diagnostic Engine** | `test_phase4_diagnostic.py` | 3 | 3 | 0.07s | Variance decomposition & driver ranking, anomaly detection, correlation & non-causal disclaimer |
+| **Predictive Engine** | `test_phase4_predictive.py` | 3 | 3 | 0.18s | Multi-model backtesting (Naive/ARIMA/LightGBM), prediction intervals, sample size abstention (<10 records) |
+| **Prescriptive Engine** | `test_phase4_prescriptive.py` | 3 | 3 | 0.08s | SciPy constrained optimization, what-if scenario simulations, safe advisory boundary enforcement |
+| **Result Faithfulness** | `test_phase4_faithfulness.py` | 3 | 3 | 0.02s | Validated claims pass, contradictory delta direction blocked, unverified numbers flagged |
+| **Cross-Domain Validation** | `test_phase4_cross_domain.py` | 4 | 4 | 0.51s | Validated across 4 distinct domains: E-commerce, Healthcare, University Library, Manufacturing |
+| **Unified Orchestrator & API** | `test_phase4_orchestrator.py` | 3 | 3 | 0.19s | Conversational multi-turn memory, FastAPI endpoints (`/execute`, `/classify`) |
+| **Phase 4 Subtotal** | **All 9 Phase 4 Suites** | **29** | **29** | **0.94s** | **100% Pass Rate** |
+| **Full Active V2 Regression** | **Phase 1 + 2 + 3 + 3.1 + 3.2 + 4** | **83** | **83** | **270.13s** | **Zero Regressions Across Entire V2 Architecture** |
+
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before Phase 4: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - `ecommerce.db` SHA-256 after Phase 4: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - **Status:** Invariance confirmed (100% bitwise match, 0 writes).
+- **Tracked Legacy V1 Failures (17 items):**
+  - All 17 historical baseline test failures remain isolated and unchanged. Zero new regressions.
+
+---
+
+### C. Phase Completion Status
+**COMPLETED AND VERIFIED.**

@@ -557,3 +557,88 @@ export const SessionDetailResponseSchema = createAPIResponseSchema(
 
 export type TurnModel = z.infer<typeof TurnModelSchema>;
 export type SessionModel = z.infer<typeof SessionModelSchema>;
+
+
+// =====================================================================
+// Phase 4: Domain-Independent Analytical Intelligence Contracts
+// =====================================================================
+
+export const IntentCategorySchema = z.enum([
+  "DESCRIPTIVE",
+  "DIAGNOSTIC",
+  "PREDICTIVE",
+  "PRESCRIPTIVE",
+  "SQL_LOOKUP",
+]);
+export type IntentCategory = z.infer<typeof IntentCategorySchema>;
+
+export const ComplexityLevelSchema = z.enum(["SIMPLE", "MODERATE", "COMPLEX", "ADVANCED"]);
+export type ComplexityLevel = z.infer<typeof ComplexityLevelSchema>;
+
+export const FaithfulnessReportSchema = z.object({
+  is_faithful: z.boolean(),
+  total_claims_checked: z.number(),
+  verified_claims: z.number(),
+  discrepancies: z.array(z.string()).default([]),
+  confidence_discount: z.number().default(0.0),
+});
+export type FaithfulnessReport = z.infer<typeof FaithfulnessReportSchema>;
+
+export const StandardizedAnalyticalResultSchema = z.object({
+  analysis_id: z.string(),
+  analytical_type: IntentCategorySchema,
+  analysis_question: z.string(),
+  success: z.boolean(),
+  selected_methods: z.array(z.string()).default([]),
+  source_tables: z.array(z.string()).default([]),
+  source_columns: z.array(z.string()).default([]),
+  executed_queries: z.array(z.string()).default([]),
+  result_data: z.array(z.record(z.any())).default([]),
+  computed_metrics: z.record(z.any()).default({}),
+  model_information: z.record(z.any()).default({}),
+  validation_results: z.record(z.any()).default({}),
+  faithfulness: FaithfulnessReportSchema.nullable().optional(),
+  confidence_score: z.number().default(1.0),
+  uncertainty_notes: z.array(z.string()).default([]),
+  findings: z.array(z.string()).default([]),
+  limitations: z.array(z.string()).default([]),
+  recommended_next_steps: z.array(z.string()).default([]),
+  visualization_config: z.record(z.any()).nullable().optional(),
+  abstain_reason: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+});
+export type StandardizedAnalyticalResult = z.infer<typeof StandardizedAnalyticalResultSchema>;
+
+export const IntentClassificationResultSchema = z.object({
+  primary_intent: IntentCategorySchema,
+  complexity: ComplexityLevelSchema,
+  confidence_score: z.number(),
+  all_probabilities: z.record(z.number()).default({}),
+  is_ambiguous: z.boolean().default(false),
+  requires_clarification: z.boolean().default(false),
+  suggested_clarification: z.string().nullable().optional(),
+  recommended_methods: z.array(z.string()).default([]),
+});
+export type IntentClassificationResult = z.infer<typeof IntentClassificationResultSchema>;
+
+export const AnalyticalPlanSchema = z.object({
+  plan_id: z.string(),
+  question: z.string(),
+  intent: IntentCategorySchema,
+  complexity: ComplexityLevelSchema,
+  analytical_objective: z.string(),
+  relevant_tables: z.array(z.string()).default([]),
+  required_columns: z.record(z.array(z.string())).default({}),
+  relevant_metrics: z.array(z.string()).default([]),
+  filters: z.array(z.record(z.any())).default([]),
+  time_dimension: z.string().nullable().optional(),
+  target_variable: z.string().nullable().optional(),
+  candidate_methods: z.array(z.string()).default([]),
+  selected_method: z.string(),
+  data_extraction_sql: z.string().nullable().optional(),
+  validation_requirements: z.array(z.string()).default([]),
+  expected_output_format: z.string().default("table_and_chart"),
+  is_executable: z.boolean().default(true),
+  abstain_reason: z.string().nullable().optional(),
+});
+export type AnalyticalPlan = z.infer<typeof AnalyticalPlanSchema>;

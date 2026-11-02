@@ -289,3 +289,63 @@ export async function streamChatQuery(
     onError(err.message || "Failed to connect to stream");
   }
 }
+
+
+// =====================================================================
+// Phase 4: Domain-Independent Analytics Client Functions
+// =====================================================================
+
+export async function classifyAnalyticsIntent(question: string) {
+  const url = `${API_BASE_URL}/api/v1/analytics/classify`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to classify question");
+  }
+  return json.data;
+}
+
+export async function generateAnalyticsPlan(question: string, intentOverride?: string) {
+  const url = `${API_BASE_URL}/api/v1/analytics/plan`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ question, intent_override: intentOverride }),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to generate analytical plan");
+  }
+  return json.data;
+}
+
+export async function executeAnalytics(question: string, sessionId?: string) {
+  const url = `${API_BASE_URL}/api/v1/analytics/execute`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ question, session_id: sessionId }),
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to execute analysis");
+  }
+  return json.data;
+}
+
+export async function evaluateAnalyticsClassifier() {
+  const url = `${API_BASE_URL}/api/v1/analytics/evaluate-classifier`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error(json.error?.message || "Failed to evaluate classifier");
+  }
+  return json.data;
+}
