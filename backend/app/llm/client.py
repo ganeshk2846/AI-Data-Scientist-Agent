@@ -82,14 +82,19 @@ class MockLLMProvider(BaseLLMProvider):
 
     def _generate_grounded_sql(self, prompt: str) -> str:
         """Emits valid, verified SQL against real tables in ecommerce.sqlite."""
+        year_match = re.search(r'(?:^|\D)(202[0-9])(?:\D|$)', prompt)
+        target_year = year_match.group(1) if year_match else None
+
         if "order" in prompt and "status" in prompt:
             return "SELECT order_status, COUNT(*) AS order_count, ROUND(SUM(total_amount), 2) AS total_value FROM orders GROUP BY order_status ORDER BY order_count DESC;"
+        elif "churn" in prompt or ("segment" in prompt and "risk" in prompt):
+            return "SELECT cs.segment_name, COUNT(DISTINCT csh.customer_id) AS customers_at_risk, ROUND(SUM(o.total_amount), 2) AS revenue_at_risk FROM customer_segments cs JOIN customer_segment_history csh ON cs.segment_id = csh.segment_id JOIN customers c ON csh.customer_id = c.customer_id LEFT JOIN orders o ON c.customer_id = o.customer_id WHERE cs.segment_name = 'At Risk' AND (csh.valid_to IS NULL OR csh.valid_to >= DATETIME('now')) GROUP BY cs.segment_name;"
         elif "segment" in prompt or "customer" in prompt:
-            return "SELECT cs.segment_name, COUNT(c.customer_id) AS customer_count FROM customers c JOIN customer_segments cs ON c.current_segment_id = cs.segment_id GROUP BY cs.segment_name ORDER BY customer_count DESC;"
+            return "SELECT cs.segment_name, COUNT(DISTINCT csh.customer_id) AS customer_count FROM customer_segments cs JOIN customer_segment_history csh ON cs.segment_id = csh.segment_id WHERE csh.valid_to IS NULL GROUP BY cs.segment_name ORDER BY customer_count DESC;"
         elif "top" in prompt and "categor" in prompt:
             return "SELECT c.category_name, ROUND(SUM(oi.subtotal), 2) AS category_revenue FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id GROUP BY c.category_name ORDER BY category_revenue DESC LIMIT 5;"
-        elif "revenue" in prompt and "2024" in prompt:
-            return "SELECT strftime('%Y-%m', order_date) AS month, COUNT(order_id) AS order_volume, ROUND(SUM(total_amount), 2) AS monthly_revenue FROM orders WHERE strftime('%Y', order_date) = '2024' AND order_status = 'delivered' GROUP BY month ORDER BY month ASC;"
+        elif target_year and ("revenue" in prompt or "sales" in prompt):
+            return f"SELECT strftime('%Y', order_date) AS order_year, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE strftime('%Y', order_date) = '{target_year}' AND order_status = 'delivered';"
         elif "revenue" in prompt or "sales" in prompt:
             return "SELECT strftime('%Y', order_date) AS year, COUNT(order_id) AS total_orders, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE order_status = 'delivered' GROUP BY year ORDER BY year ASC;"
         elif "payment" in prompt:

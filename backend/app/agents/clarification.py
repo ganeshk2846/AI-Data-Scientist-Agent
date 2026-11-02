@@ -29,7 +29,7 @@ UNSUPPORTED_DOMAINS = [
 class AnswerabilityGate:
     """Evaluates whether the business question can be faithfully answered by the dataset."""
 
-    def evaluate(self, query: str, route: RouteResult, catalog: DatabaseCatalog) -> AnswerabilityAssessment:
+    def evaluate(self, query: str, route: Optional[RouteResult] = None, catalog: Optional[DatabaseCatalog] = None) -> AnswerabilityAssessment:
         q_lower = query.lower()
 
         # Check for completely unsupported domains

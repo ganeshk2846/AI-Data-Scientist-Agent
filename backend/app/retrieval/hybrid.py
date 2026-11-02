@@ -97,7 +97,7 @@ class HybridSchemaRetriever:
                     target_tokens = set(tokenize_text(target))
                     # Check if query shares tokens with target table or column, or expand key domain links
                     is_match = bool(q_tokens.intersection(target_tokens)) or any(t.startswith(q) or q.startswith(t) for q in q_tokens for t in target_tokens)
-                    if is_match or len(selected_table_map) < 4:
+                    if (is_match or len(selected_table_map) < 4) and target in self.corpus.documents:
                         doc = self.corpus.documents[target]
                         selected_table_map[target] = RetrievedTable(
                             table_name=target,

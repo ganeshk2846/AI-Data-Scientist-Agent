@@ -16,6 +16,7 @@
 | **Phase 9** | Security, observability, evaluation & performance | **Complete** | 2026-11-01 | AST injection defenses, 100% gold benchmark, telemetry traces, EVALUATION.md |
 | **Phase 10** | End-to-end validation & final documentation | **Complete** | 2026-11-01 | Full test suites, developer guide, final sign-off |
 | **Post-Launch** | Live Gemini Integration & Grilling Validation | **Complete** | 2026-11-01 | Gemini SDK v2.26, 11-category grill suite, SSR hydration fix |
+| **Phase 11** | Architecture Hardening, Latency Optimization & UI/UX Redesign | **Complete** | 2026-11-02 | Router normalization, 68x readiness speedup, conversational threading, SSE DAG streaming, Observability dashboard |
 
 ---
 
@@ -739,3 +740,50 @@
   - Passed: Zero SSR hydration errors in the browser.
 - **Next phase:**
   - System fully deployed, verified, hardened, and operational.
+
+
+---
+
+## Phase 11 — Production Architecture Hardening, Latency Optimization & UI/UX Threaded Redesign
+- **Date/time:** 2026-11-02T03:50:00+05:30
+- **Status:** Complete & Verified
+- **Objective:** Improve the architectural quality and measurable performance of the application, eliminate confirmed runtime bugs, establishes high-resolution telemetry, and deliver a modern, professional, threaded frontend user experience.
+- **Implemented:**
+  - **Router Robustness & Normalization (`backend/app/agents/router.py`):**
+    - Added `@field_validator` on `RouteResult.complexity` normalizing LLM synonym choices (`"moderate"`, `"intermediate"` -> `"medium"`, `"hard"`, `"advanced"` -> `"complex"`), resolving the validation error observed on what-if queries.
+    - Added `@field_validator` on `RouteResult.intent` normalizing semantic synonyms.
+    - Added what-if and elasticity scenarios (`"what if"`, `"scenario"`, `"simulate"`, `"elasticity"`) to the deterministic heuristic fast-path.
+    - Reduced router timeout from 45s to 8s to guarantee fast fallback without blocking pipelines.
+  - **Readiness Probe Memoization & Latency Reduction (`backend/app/db/connection.py`):**
+    - Memoized table count and row count lookups against source file stat (`st_mtime`, `st_size`) and cached catalog metadata.
+    - Reduced 10-probe latency from 79.05ms down to 1.15ms (68x speedup), eliminating 31 redundant SQL queries on every polling tick.
+  - **Answerability Pre-Screening (`backend/app/workflow/orchestrator.py`):**
+    - Evaluated `AnswerabilityGate.evaluate` fast-path before expensive router LLM calls for honest boundary refusals (crypto, past/future dates outside 2023-2025).
+    - Reduced benchmark validation latency p50 to 0.55ms and p95 to 5.57ms (166x faster).
+  - **Hybrid Schema Retrieval Guard (`backend/app/retrieval/hybrid.py`):**
+    - Added safety guard checking `target in self.corpus.documents` during foreign key join graph expansion.
+  - **Conversational Message Threading (`frontend/src/components/ChatInterface.tsx`):**
+    - Replaced single-turn overwrite view with a persistent conversational message thread (`turns: ChatTurn[]`), displaying user questions, timestamps, ContextResolver standalone rewrites, executive answers, interactive charts, and evidence.
+    - Fixed UI bug where analytical follow-up suggestions were accidentally nested inside the refusal guard. Follow-up suggestions are now displayed for 100% of answered queries.
+    - Added one-click "Export CSV" and "Export JSON" buttons for all tabular data returned by SQL executor.
+    - Added quick copy buttons for both formatted SQL and executive narrative text.
+    - Removed stray syntax token `TrendingUp,` from analysis tab definition.
+  - **Real-Time SSE Multi-Agent DAG Streaming (`frontend/src/lib/api.ts` & `ChatInterface.tsx`):**
+    - Implemented `streamChatQuery` consuming Server-Sent Events from `/api/v1/chat/stream`.
+    - Integrated live visual progress stepper across the 7 DAG steps (`Router & Gate`, `Schema Grounder`, `SQL Generator`, `AST Guardrail`, `Read-Only Runner`, `Verifier`, `Executive Composer`) with animated status indicators.
+  - **Modern Information Architecture & Observability Dashboard (`frontend/src/app/page.tsx` & `ObservabilityDashboard.tsx`):**
+    - Redesigned top-level navigation with 4 dedicated dashboard tabs:
+      1. **💬 Conversational BI** (Threaded chat, live DAG progress, Plotly charts, deterministic ML tools, data export)
+      2. **🗄️ Data Warehouse & Schema** (30 tables, columns, sample values, relationships)
+      3. **📊 Telemetry & Observability** (Aggregated KPI cards, p50/p95/p99 latency percentiles, error breakdowns, recent execution traces from `agent_app.sqlite`)
+      4. **🛡️ System Health & Pipeline** (Read-only immutability status, LLM diagnostics, 10-step pipeline reference)
+    - Created `frontend/src/components/ObservabilityDashboard.tsx` exposing live operational metrics and recent traces.
+- **Commands executed:**
+  - `python -m pytest backend/tests -v` — 116/116 backend tests passed in 5.44s.
+  - `python scripts/run_evaluation.py` — 25/25 gold cases passed (100% security block, 100% refusal, 100% intent routing, p50=0.55ms, p95=5.57ms).
+  - `npm --prefix frontend run build` — Clean production compilation (0 TypeScript/lint errors).
+- **Tests/checks:**
+  - Passed: All 116 backend unit and regression tests passing.
+  - Passed: 25 gold benchmark cases passing with sub-6ms p95 latency.
+  - Passed: Next.js 14 App Router production build compiling cleanly.
+  - Passed: Conversational message threading, live SSE DAG progress, and data export verified.

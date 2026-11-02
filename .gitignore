@@ -55,3 +55,4 @@ Thumbs.db
 
 # Application generated cache & data
 data/
+*.tsbuildinfo

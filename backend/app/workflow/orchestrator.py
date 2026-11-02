@@ -164,6 +164,45 @@ class MultiAgentOrchestrator:
         catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
         llm = get_llm_provider()
 
+        # Step 0.5: Fast-Path Answerability Screening (Enforces Honest Refusal before expensive routing)
+        pre_assessment = answerability_gate.evaluate(effective_query, route=None, catalog=catalog)
+        if not pre_assessment.is_answerable:
+            total_duration_ms = (time.perf_counter() - overall_start) * 1000
+            traces.append(StepTrace(
+                step="understanding_question",
+                status="failed",
+                duration_ms=round(total_duration_ms, 2),
+                message=f"Answerability Gate Refusal: {pre_assessment.refusal_reason}",
+            ))
+            default_route = RouteResult(intent="descriptive", confidence=1.0, reasoning="Fast-path refusal before routing")
+            observability_tracer.record_run_trace(
+                RunTraceRecord(
+                    run_id=run_id,
+                    session_id=session_id,
+                    query=query,
+                    intent=default_route.intent,
+                    latency_ms=total_duration_ms,
+                    sql_executed=None,
+                    row_count=0,
+                    cost_estimate_usd=0.0,
+                    error_class="answerability_refusal",
+                    verification_status="refused",
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                )
+            )
+            return MultiAgentWorkflowResult(
+                run_id=run_id,
+                session_id=session_id,
+                query=query,
+                standalone_query=standalone_q,
+                route=default_route,
+                answerability=pre_assessment,
+                composed_answer=f"### Question Not Answerable From Warehouse\n\n{pre_assessment.refusal_reason}\n\n**Suggested Available Topics:**\n" + "\n".join(f"- {alt}" for alt in pre_assessment.available_alternatives),
+                limitations=[pre_assessment.refusal_reason or "Unsupported domain"],
+                trace_steps=traces,
+                total_duration_ms=round(total_duration_ms, 2),
+            )
+
         # Step 1: Router
         s1_start = time.perf_counter()
         if progress_callback:
@@ -367,30 +406,43 @@ class MultiAgentOrchestrator:
             message=f"SQL validated successfully (repair attempts: {len(repair_attempts)}).",
         ))
 
-        # Step 7: Execution (with possible execution repair)
+        # Step 7: Execution (with bounded execution repair up to 2 attempts)
         s5_start = time.perf_counter()
         if progress_callback:
             progress_callback("running_query", "Executing read-only query on ecommerce.sqlite...")
         query_result: Optional[QueryExecutionResult] = None
-        try:
-            query_result = sql_executor.execute_query(sanitized_sql)
-        except Exception as exec_err:
-            if len(repair_attempts) < 2:
-                logger.warning(f"Query execution error: {exec_err}. Attempting repair...")
-                exec_repair = await sql_repair_loop.attempt_repair(
-                    query=query,
-                    failing_sql=sanitized_sql,
-                    error_message=str(exec_err),
-                    schema_context=schema_prompt,
-                    catalog=catalog,
-                    attempt_number=len(repair_attempts) + 1,
-                )
-                repair_attempts.append(exec_repair)
-                if exec_repair.validation_passed:
-                    sanitized_sql = exec_repair.repaired_sql
-                    query_result = sql_executor.execute_query(sanitized_sql)
-            if not query_result:
-                raise exec_err
+        attempt_exec = 0
+        last_exec_err: Optional[Exception] = None
+        while attempt_exec < 2:
+            try:
+                query_result = sql_executor.execute_query(sanitized_sql)
+                break
+            except Exception as exec_err:
+                last_exec_err = exec_err
+                attempt_exec += 1
+                if len(repair_attempts) < 2:
+                    logger.warning(f"Query execution error: {exec_err}. Attempting repair {attempt_exec}...")
+                    try:
+                        exec_repair = await sql_repair_loop.attempt_repair(
+                            query=effective_query,
+                            failing_sql=sanitized_sql,
+                            error_message=str(exec_err),
+                            schema_context=schema_prompt,
+                            catalog=catalog,
+                            attempt_number=len(repair_attempts) + 1,
+                        )
+                        repair_attempts.append(exec_repair)
+                        if exec_repair.validation_passed and exec_repair.repaired_sql:
+                            sanitized_sql = exec_repair.repaired_sql
+                            continue
+                    except Exception as rep_err:
+                        logger.warning(f"Repair attempt failed: {rep_err}")
+                break
+
+        if not query_result:
+            if last_exec_err:
+                raise last_exec_err
+            raise RuntimeError("SQL query execution failed to return results.")
 
         s5_ms = (time.perf_counter() - s5_start) * 1000
         traces.append(StepTrace(

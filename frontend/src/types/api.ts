@@ -378,7 +378,9 @@ export const AnalysisToolResultSchema = z.object({
 
 export const MultiAgentWorkflowResultSchema = z.object({
   run_id: z.string(),
+  session_id: z.string().default("default_session"),
   query: z.string(),
+  standalone_query: z.string().nullable().optional(),
   route: RouteResultSchema,
   answerability: AnswerabilityAssessmentSchema,
   clarification: ClarificationResponseSchema.nullable().optional(),
@@ -490,3 +492,68 @@ export type ForecastPoint = z.infer<typeof ForecastPointSchema>;
 export type SegmentChurnRisk = z.infer<typeof SegmentChurnRiskSchema>;
 
 export type QueryExecutionResult = z.infer<typeof QueryExecutionResultSchema>;
+
+
+// Observability and Telemetry Schemas
+export const RunTraceRecordSchema = z.object({
+  run_id: z.string(),
+  session_id: z.string(),
+  query: z.string(),
+  intent: z.string(),
+  latency_ms: z.number(),
+  sql_executed: z.string().nullable().optional(),
+  row_count: z.number(),
+  cost_estimate_usd: z.number(),
+  error_class: z.string().nullable().optional(),
+  verification_status: z.string(),
+  created_at: z.string(),
+});
+
+export const ObservabilityMetricsSchema = z.object({
+  total_runs: z.number(),
+  success_rate_pct: z.number(),
+  latency_p50_ms: z.number(),
+  latency_p95_ms: z.number(),
+  latency_p99_ms: z.number(),
+  avg_latency_ms: z.number(),
+  safety_block_count: z.number(),
+  error_classes_breakdown: z.record(z.number()).default({}),
+});
+
+export const ObservabilityMetricsResponseSchema = createAPIResponseSchema(ObservabilityMetricsSchema);
+export const RunTraceListResponseSchema = createAPIResponseSchema(z.array(RunTraceRecordSchema));
+
+export type RunTraceRecord = z.infer<typeof RunTraceRecordSchema>;
+export type ObservabilityMetrics = z.infer<typeof ObservabilityMetricsSchema>;
+
+// Memory and Sessions Schemas
+export const TurnModelSchema = z.object({
+  turn_id: z.string(),
+  session_id: z.string(),
+  role: z.string(),
+  content: z.string(),
+  standalone_rewrite: z.string().nullable().optional(),
+  sql_executed: z.string().nullable().optional(),
+  artifact_ref_id: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+
+export const SessionModelSchema = z.object({
+  session_id: z.string(),
+  user_id: z.string().default("default_user"),
+  title: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  active_frame: z.any().optional(),
+});
+
+export const SessionListResponseSchema = createAPIResponseSchema(z.array(SessionModelSchema));
+export const SessionDetailResponseSchema = createAPIResponseSchema(
+  z.object({
+    session: SessionModelSchema,
+    turns: z.array(TurnModelSchema),
+  })
+);
+
+export type TurnModel = z.infer<typeof TurnModelSchema>;
+export type SessionModel = z.infer<typeof SessionModelSchema>;

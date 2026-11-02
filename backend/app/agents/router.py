@@ -5,8 +5,8 @@ Classifies user intent, question difficulty, and relevant domain entities.
 
 import json
 import re
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+from typing import Any, List, Literal, Optional
+from pydantic import BaseModel, Field, field_validator
 from backend.app.core.logging import logger
 from backend.app.llm.client import BaseLLMProvider, get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
@@ -29,6 +29,47 @@ class RouteResult(BaseModel):
     reasoning: str
     target_domains: List[str] = Field(default_factory=list)
     suggested_entities: List[str] = Field(default_factory=list)
+
+    @field_validator("intent", mode="before")
+    @classmethod
+    def normalize_intent(cls, v: Any) -> str:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            intent_map = {
+                "prediction": "predictive",
+                "forecast": "predictive",
+                "predictive": "predictive",
+                "comparison": "comparative",
+                "compare": "comparative",
+                "comparative": "comparative",
+                "trends": "trend",
+                "trending": "trend",
+                "trend": "trend",
+                "diagnosis": "diagnostic",
+                "cause": "diagnostic",
+                "diagnostic": "diagnostic",
+                "recommendation": "prescriptive",
+                "prescription": "prescriptive",
+                "prescriptive": "prescriptive",
+                "description": "descriptive",
+                "descriptive": "descriptive",
+            }
+            if v_lower in intent_map:
+                return intent_map[v_lower]
+        return v
+
+    @field_validator("complexity", mode="before")
+    @classmethod
+    def normalize_complexity(cls, v: Any) -> str:
+        if isinstance(v, str):
+            v_lower = v.strip().lower()
+            if v_lower in ["moderate", "medium", "intermediate", "average", "med"]:
+                return "medium"
+            if v_lower in ["hard", "difficult", "advanced", "complex", "high"]:
+                return "complex"
+            if v_lower in ["easy", "basic", "low", "simple"]:
+                return "simple"
+        return "simple"
 
 
 ROUTER_SYSTEM_PROMPT = """You are an expert Query Router for an enterprise Business Intelligence Data Scientist Agent.
@@ -99,6 +140,15 @@ class RouterAgent:
                 target_domains=["Customers & Segments", "Merchandising & Catalog"],
                 suggested_entities=["customers", "customer_segments", "categories"],
             )
+        elif any(w in lower for w in ["what if", "scenario", "simulate", "elasticity", "price increase", "price decrease"]):
+            return RouteResult(
+                intent="predictive",
+                confidence=0.90,
+                complexity="complex",
+                reasoning="Query asks for what-if scenario simulation or sensitivity analysis.",
+                target_domains=["Financials & Planning", "Merchandising & Catalog"],
+                suggested_entities=["orders", "products"],
+            )
         elif any(w in lower for w in ["should we", "recommend", "optimize", "action to take"]):
             return RouteResult(
                 intent="prescriptive",
@@ -117,6 +167,7 @@ class RouterAgent:
                     LLMMessage(role="user", content=query_clean),
                 ],
                 temperature=0.0,
+                timeout_seconds=8,
             )
             res = await self.llm.generate(req)
             # Parse JSON

@@ -71,8 +71,7 @@ def run_benchmark():
         if c.get("category") == "answerability_refusal":
             results["refusal_total"] += 1
             t0 = time.perf_counter()
-            route = asyncio.run(router_agent.route(c["question"]))
-            assessment = answerability_gate.evaluate(c["question"], route, catalog)
+            assessment = answerability_gate.evaluate(c["question"], route=None, catalog=catalog)
             dur = (time.perf_counter() - t0) * 1000
             results["latencies_ms"].append(dur)
             if not assessment.is_answerable:

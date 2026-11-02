@@ -77,12 +77,20 @@ def verify_database_immutability() -> bool:
             conn.close()
 
 
+# In-memory cache for readiness probe to avoid redundant table scans on static read-only database
+_READINESS_CACHE: Optional[tuple[float, int, DatabaseReadiness]] = None
+
+
 def check_database_readiness() -> DatabaseReadiness:
     """
     Inspects database state, connectivity, table count, and row count.
+    Memoizes results based on file modification timestamp and size to prevent
+    redundant table scans during high-frequency health probes.
     """
+    global _READINESS_CACHE
     db_path = settings.resolved_ecommerce_db_path
     if not db_path.exists():
+        _READINESS_CACHE = None
         return DatabaseReadiness(
             connected=False,
             read_only_verified=False,
@@ -91,32 +99,56 @@ def check_database_readiness() -> DatabaseReadiness:
         )
 
     try:
+        stat = db_path.stat()
+        file_mtime = stat.st_mtime
+        file_size = stat.st_size
+
+        if _READINESS_CACHE is not None:
+            cached_mtime, cached_size, cached_res = _READINESS_CACHE
+            if cached_mtime == file_mtime and cached_size == file_size:
+                return cached_res
+
         read_only_ok = verify_database_immutability()
-        with get_readonly_connection() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-            tbl_count = cur.fetchone()[0]
 
-            # Quick row count across all tables
-            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
-            tables = [r[0] for r in cur.fetchall()]
-            total_rows = 0
-            for t in tables:
-                cur.execute(f'SELECT COUNT(*) FROM "{t}";')
-                total_rows += cur.fetchone()[0]
+        # Check if schema catalog is already cached to avoid 30 table scans
+        tbl_count: Optional[int] = None
+        total_rows: Optional[int] = None
 
-            file_size = os.path.getsize(db_path)
+        try:
+            from backend.app.schema.service import schema_service
+            catalog = schema_service.get_cached_catalog()
+            if catalog and catalog.total_tables > 0:
+                tbl_count = catalog.total_tables
+                total_rows = catalog.total_rows
+        except Exception:
+            pass
 
-            return DatabaseReadiness(
-                connected=True,
-                read_only_verified=read_only_ok,
-                path=str(db_path),
-                size_bytes=file_size,
-                table_count=tbl_count,
-                total_rows=total_rows,
-            )
+        if tbl_count is None or total_rows is None:
+            with get_readonly_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+                tbl_count = cur.fetchone()[0]
+
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+                tables = [r[0] for r in cur.fetchall()]
+                total_rows = 0
+                for t in tables:
+                    cur.execute(f'SELECT COUNT(*) FROM "{t}";')
+                    total_rows += cur.fetchone()[0]
+
+        res = DatabaseReadiness(
+            connected=True,
+            read_only_verified=read_only_ok,
+            path=str(db_path),
+            size_bytes=file_size,
+            table_count=tbl_count,
+            total_rows=total_rows,
+        )
+        _READINESS_CACHE = (file_mtime, file_size, res)
+        return res
     except Exception as e:
         logger.error(f"Failed database readiness check: {e}")
+        _READINESS_CACHE = None
         return DatabaseReadiness(
             connected=False,
             read_only_verified=False,

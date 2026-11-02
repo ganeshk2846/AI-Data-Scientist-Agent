@@ -1,0 +1,680 @@
+{
+  "db_path": "ecommerce.db",
+  "table_count": 46,
+  "view_count": 8,
+  "index_count": 29,
+  "total_rows": 2418138,
+  "tables": {
+    "business_recommendations": {
+      "rows": 5000,
+      "column_count": 10,
+      "columns": [
+        "recommendation_id",
+        "recommendation_date",
+        "recommendation_type",
+        "entity_type",
+        "entity_id",
+        "recommendation_text",
+        "expected_impact",
+        "priority",
+        "confidence_score",
+        "model_name"
+      ],
+      "foreign_key_count": 0
+    },
+    "calendar_events": {
+      "rows": 1000,
+      "column_count": 6,
+      "columns": [
+        "event_id",
+        "event_name",
+        "event_date",
+        "event_type",
+        "city_id",
+        "demand_impact_factor"
+      ],
+      "foreign_key_count": 1
+    },
+    "cities": {
+      "rows": 100,
+      "column_count": 6,
+      "columns": [
+        "city_id",
+        "city_name",
+        "state_name",
+        "region_id",
+        "population",
+        "market_type"
+      ],
+      "foreign_key_count": 1
+    },
+    "competitor_pricing": {
+      "rows": 52400,
+      "column_count": 6,
+      "columns": [
+        "competitor_price_id",
+        "competitor_name",
+        "product_id",
+        "observation_date",
+        "competitor_price",
+        "competitor_stock_status"
+      ],
+      "foreign_key_count": 1
+    },
+    "countries": {
+      "rows": 5,
+      "column_count": 3,
+      "columns": [
+        "country_id",
+        "country_name",
+        "currency_code"
+      ],
+      "foreign_key_count": 0
+    },
+    "currency_exchange_rates": {
+      "rows": 9130,
+      "column_count": 5,
+      "columns": [
+        "rate_id",
+        "rate_date",
+        "currency_code",
+        "exchange_rate_to_usd",
+        "inverse_rate"
+      ],
+      "foreign_key_count": 0
+    },
+    "customer_addresses": {
+      "rows": 25475,
+      "column_count": 6,
+      "columns": [
+        "address_id",
+        "customer_id",
+        "city_id",
+        "address_type",
+        "postal_code",
+        "is_default"
+      ],
+      "foreign_key_count": 2
+    },
+    "customer_churn_predictions": {
+      "rows": 20000,
+      "column_count": 7,
+      "columns": [
+        "prediction_id",
+        "customer_id",
+        "prediction_date",
+        "churn_probability",
+        "churn_risk_category",
+        "model_name",
+        "model_version"
+      ],
+      "foreign_key_count": 1
+    },
+    "customer_interactions": {
+      "rows": 40000,
+      "column_count": 8,
+      "columns": [
+        "interaction_id",
+        "customer_id",
+        "interaction_date",
+        "interaction_type",
+        "interaction_channel",
+        "interaction_reason",
+        "resolution_status",
+        "satisfaction_score"
+      ],
+      "foreign_key_count": 1
+    },
+    "customer_loyalty": {
+      "rows": 15000,
+      "column_count": 7,
+      "columns": [
+        "loyalty_id",
+        "customer_id",
+        "loyalty_points",
+        "points_earned",
+        "points_redeemed",
+        "membership_start_date",
+        "membership_tier"
+      ],
+      "foreign_key_count": 1
+    },
+    "customer_segments": {
+      "rows": 10,
+      "column_count": 5,
+      "columns": [
+        "customer_segment_id",
+        "segment_name",
+        "segment_description",
+        "income_group",
+        "loyalty_level"
+      ],
+      "foreign_key_count": 0
+    },
+    "customer_segments_history": {
+      "rows": 50000,
+      "column_count": 6,
+      "columns": [
+        "segment_history_id",
+        "customer_id",
+        "segment_id",
+        "effective_date",
+        "segmentation_model",
+        "confidence_score"
+      ],
+      "foreign_key_count": 2
+    },
+    "customer_sessions": {
+      "rows": 100000,
+      "column_count": 11,
+      "columns": [
+        "session_id",
+        "customer_id",
+        "session_date",
+        "device_type",
+        "traffic_source",
+        "campaign_id",
+        "pages_viewed",
+        "session_duration_seconds",
+        "cart_abandoned",
+        "converted",
+        "order_id"
+      ],
+      "foreign_key_count": 3
+    },
+    "customers": {
+      "rows": 20000,
+      "column_count": 12,
+      "columns": [
+        "customer_id",
+        "first_name",
+        "last_name",
+        "gender",
+        "age",
+        "signup_date",
+        "city_id",
+        "customer_segment_id",
+        "acquisition_channel_id",
+        "customer_status",
+        "preferred_payment_method",
+        "is_active"
+      ],
+      "foreign_key_count": 3
+    },
+    "economic_indicators": {
+      "rows": 10000,
+      "column_count": 7,
+      "columns": [
+        "indicator_id",
+        "observation_date",
+        "country_id",
+        "inflation_rate",
+        "unemployment_rate",
+        "consumer_confidence_index",
+        "exchange_rate_index"
+      ],
+      "foreign_key_count": 1
+    },
+    "inventory_movements": {
+      "rows": 150000,
+      "column_count": 7,
+      "columns": [
+        "movement_id",
+        "product_id",
+        "warehouse_id",
+        "movement_date",
+        "movement_type",
+        "quantity",
+        "reference_id"
+      ],
+      "foreign_key_count": 2
+    },
+    "inventory_reorder_recommendations": {
+      "rows": 20000,
+      "column_count": 10,
+      "columns": [
+        "reorder_recommendation_id",
+        "product_id",
+        "warehouse_id",
+        "recommendation_date",
+        "current_stock",
+        "reorder_level",
+        "recommended_order_quantity",
+        "expected_demand",
+        "lead_time_days",
+        "priority"
+      ],
+      "foreign_key_count": 2
+    },
+    "inventory_stock": {
+      "rows": 300000,
+      "column_count": 8,
+      "columns": [
+        "inventory_id",
+        "product_id",
+        "warehouse_id",
+        "stock_date",
+        "available_quantity",
+        "reserved_quantity",
+        "reorder_level",
+        "safety_stock"
+      ],
+      "foreign_key_count": 2
+    },
+    "kpi_anomalies": {
+      "rows": 5000,
+      "column_count": 12,
+      "columns": [
+        "anomaly_id",
+        "detection_date",
+        "metric_name",
+        "dimension_name",
+        "dimension_value",
+        "anomaly_date",
+        "actual_value",
+        "expected_value",
+        "deviation_percentage",
+        "anomaly_type",
+        "severity",
+        "detection_method"
+      ],
+      "foreign_key_count": 0
+    },
+    "marketing_campaigns": {
+      "rows": 300,
+      "column_count": 8,
+      "columns": [
+        "campaign_id",
+        "campaign_name",
+        "marketing_channel_id",
+        "campaign_type",
+        "campaign_start_date",
+        "campaign_end_date",
+        "target_segment_id",
+        "campaign_status"
+      ],
+      "foreign_key_count": 2
+    },
+    "marketing_channels": {
+      "rows": 10,
+      "column_count": 3,
+      "columns": [
+        "marketing_channel_id",
+        "channel_name",
+        "channel_type"
+      ],
+      "foreign_key_count": 0
+    },
+    "marketing_expenses": {
+      "rows": 9097,
+      "column_count": 10,
+      "columns": [
+        "expense_id",
+        "campaign_id",
+        "expense_date",
+        "currency_code",
+        "exchange_rate_to_usd",
+        "advertising_cost",
+        "advertising_cost_usd",
+        "impressions",
+        "clicks",
+        "conversions"
+      ],
+      "foreign_key_count": 1
+    },
+    "operating_expenses": {
+      "rows": 25000,
+      "column_count": 6,
+      "columns": [
+        "expense_id",
+        "expense_date",
+        "expense_category",
+        "region_id",
+        "warehouse_id",
+        "expense_amount"
+      ],
+      "foreign_key_count": 2
+    },
+    "order_items": {
+      "rows": 250545,
+      "column_count": 13,
+      "columns": [
+        "order_item_id",
+        "order_id",
+        "product_id",
+        "seller_id",
+        "quantity",
+        "unit_cost",
+        "item_cost",
+        "unit_price",
+        "discount_amount",
+        "line_total",
+        "profit",
+        "line_total_usd",
+        "profit_usd"
+      ],
+      "foreign_key_count": 3
+    },
+    "order_status_history": {
+      "rows": 577260,
+      "column_count": 5,
+      "columns": [
+        "status_history_id",
+        "order_id",
+        "status",
+        "status_timestamp",
+        "status_reason"
+      ],
+      "foreign_key_count": 1
+    },
+    "orders": {
+      "rows": 150000,
+      "column_count": 17,
+      "columns": [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "order_status",
+        "city_id",
+        "sales_channel",
+        "campaign_id",
+        "payment_method",
+        "shipping_address_id",
+        "currency_code",
+        "exchange_rate_to_usd",
+        "subtotal",
+        "discount_amount",
+        "tax_amount",
+        "shipping_amount",
+        "total_amount",
+        "total_amount_usd"
+      ],
+      "foreign_key_count": 4
+    },
+    "payments": {
+      "rows": 150000,
+      "column_count": 7,
+      "columns": [
+        "payment_id",
+        "order_id",
+        "payment_date",
+        "payment_method",
+        "payment_status",
+        "transaction_amount",
+        "transaction_fee"
+      ],
+      "foreign_key_count": 1
+    },
+    "product_categories": {
+      "rows": 40,
+      "column_count": 4,
+      "columns": [
+        "category_id",
+        "category_name",
+        "parent_category_id",
+        "category_description"
+      ],
+      "foreign_key_count": 1
+    },
+    "product_demand_forecasts": {
+      "rows": 50000,
+      "column_count": 9,
+      "columns": [
+        "demand_forecast_id",
+        "product_id",
+        "warehouse_id",
+        "forecast_date",
+        "target_date",
+        "predicted_demand",
+        "lower_bound",
+        "upper_bound",
+        "model_name"
+      ],
+      "foreign_key_count": 2
+    },
+    "product_pricing_history": {
+      "rows": 8000,
+      "column_count": 7,
+      "columns": [
+        "pricing_id",
+        "product_id",
+        "effective_start_date",
+        "effective_end_date",
+        "selling_price",
+        "discount_percentage",
+        "price_change_reason"
+      ],
+      "foreign_key_count": 1
+    },
+    "product_promotions": {
+      "rows": 5000,
+      "column_count": 7,
+      "columns": [
+        "promotion_id",
+        "product_id",
+        "campaign_id",
+        "promotion_start_date",
+        "promotion_end_date",
+        "discount_percentage",
+        "promotion_type"
+      ],
+      "foreign_key_count": 2
+    },
+    "product_returns": {
+      "rows": 10532,
+      "column_count": 7,
+      "columns": [
+        "return_id",
+        "order_item_id",
+        "return_date",
+        "return_quantity",
+        "return_reason",
+        "refund_amount",
+        "return_status"
+      ],
+      "foreign_key_count": 1
+    },
+    "product_reviews": {
+      "rows": 50000,
+      "column_count": 9,
+      "columns": [
+        "review_id",
+        "customer_id",
+        "product_id",
+        "order_id",
+        "review_date",
+        "rating",
+        "review_text",
+        "sentiment",
+        "verified_purchase"
+      ],
+      "foreign_key_count": 3
+    },
+    "products": {
+      "rows": 2000,
+      "column_count": 10,
+      "columns": [
+        "product_id",
+        "product_name",
+        "category_id",
+        "brand",
+        "cost_price",
+        "base_selling_price",
+        "weight",
+        "launch_date",
+        "product_status",
+        "supplier_id"
+      ],
+      "foreign_key_count": 2
+    },
+    "purchase_order_items": {
+      "rows": 38977,
+      "column_count": 6,
+      "columns": [
+        "purchase_order_item_id",
+        "purchase_order_id",
+        "product_id",
+        "ordered_quantity",
+        "received_quantity",
+        "unit_cost"
+      ],
+      "foreign_key_count": 2
+    },
+    "purchase_orders": {
+      "rows": 20000,
+      "column_count": 8,
+      "columns": [
+        "purchase_order_id",
+        "supplier_id",
+        "warehouse_id",
+        "purchase_order_date",
+        "expected_delivery_date",
+        "actual_delivery_date",
+        "purchase_order_status",
+        "total_purchase_cost"
+      ],
+      "foreign_key_count": 2
+    },
+    "regions": {
+      "rows": 20,
+      "column_count": 3,
+      "columns": [
+        "region_id",
+        "region_name",
+        "country_id"
+      ],
+      "foreign_key_count": 1
+    },
+    "revenue_forecasts": {
+      "rows": 30000,
+      "column_count": 10,
+      "columns": [
+        "forecast_id",
+        "forecast_date",
+        "target_date",
+        "region_id",
+        "predicted_revenue",
+        "lower_bound",
+        "upper_bound",
+        "model_name",
+        "model_version",
+        "generated_at"
+      ],
+      "foreign_key_count": 1
+    },
+    "sales_forecasts": {
+      "rows": 50000,
+      "column_count": 8,
+      "columns": [
+        "sales_forecast_id",
+        "forecast_date",
+        "target_date",
+        "product_id",
+        "predicted_units",
+        "lower_bound",
+        "upper_bound",
+        "model_name"
+      ],
+      "foreign_key_count": 1
+    },
+    "sales_performance_metrics": {
+      "rows": 20000,
+      "column_count": 10,
+      "columns": [
+        "performance_id",
+        "metric_date",
+        "region_id",
+        "category_id",
+        "total_revenue",
+        "total_orders",
+        "units_sold",
+        "gross_profit",
+        "return_rate",
+        "average_order_value"
+      ],
+      "foreign_key_count": 2
+    },
+    "sellers": {
+      "rows": 500,
+      "column_count": 6,
+      "columns": [
+        "seller_id",
+        "seller_name",
+        "city_id",
+        "seller_rating",
+        "commission_rate",
+        "seller_status"
+      ],
+      "foreign_key_count": 1
+    },
+    "shipments": {
+      "rows": 142407,
+      "column_count": 9,
+      "columns": [
+        "shipment_id",
+        "order_id",
+        "warehouse_id",
+        "shipment_date",
+        "expected_delivery_date",
+        "actual_delivery_date",
+        "shipping_cost",
+        "shipment_status",
+        "delivery_delay_days"
+      ],
+      "foreign_key_count": 2
+    },
+    "stockout_history": {
+      "rows": 5000,
+      "column_count": 7,
+      "columns": [
+        "stockout_id",
+        "product_id",
+        "warehouse_id",
+        "stockout_start_date",
+        "stockout_end_date",
+        "estimated_lost_sales",
+        "estimated_lost_revenue"
+      ],
+      "foreign_key_count": 2
+    },
+    "suppliers": {
+      "rows": 200,
+      "column_count": 6,
+      "columns": [
+        "supplier_id",
+        "supplier_name",
+        "supplier_city_id",
+        "supplier_rating",
+        "lead_time_days",
+        "reliability_score"
+      ],
+      "foreign_key_count": 1
+    },
+    "tax_rates": {
+      "rows": 100,
+      "column_count": 6,
+      "columns": [
+        "tax_rate_id",
+        "country_id",
+        "tax_category",
+        "effective_start_date",
+        "effective_end_date",
+        "tax_percentage"
+      ],
+      "foreign_key_count": 1
+    },
+    "warehouses": {
+      "rows": 30,
+      "column_count": 6,
+      "columns": [
+        "warehouse_id",
+        "warehouse_name",
+        "city_id",
+        "warehouse_capacity",
+        "operating_cost",
+        "warehouse_type"
+      ],
+      "foreign_key_count": 1
+    }
+  }
+}
