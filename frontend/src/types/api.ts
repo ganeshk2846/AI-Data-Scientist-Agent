@@ -575,12 +575,35 @@ export type IntentCategory = z.infer<typeof IntentCategorySchema>;
 export const ComplexityLevelSchema = z.enum(["SIMPLE", "MODERATE", "COMPLEX", "ADVANCED"]);
 export type ComplexityLevel = z.infer<typeof ComplexityLevelSchema>;
 
+export const ClaimTypeSchema = z.enum([
+  "NUMERICAL",
+  "DIRECTIONAL",
+  "COMPARATIVE",
+  "STATISTICAL",
+  "DRIVER_CONTRIBUTION",
+  "CAUSAL",
+  "PREDICTIVE",
+  "RECOMMENDATION",
+]);
+export type ClaimType = z.infer<typeof ClaimTypeSchema>;
+
+export const StructuredClaimSchema = z.object({
+  claim_id: z.string(),
+  claim_type: ClaimTypeSchema,
+  statement: z.string(),
+  verified: z.boolean().default(false),
+  evidence_reference: z.string().nullable().optional(),
+  discrepancy: z.string().nullable().optional(),
+});
+export type StructuredClaim = z.infer<typeof StructuredClaimSchema>;
+
 export const FaithfulnessReportSchema = z.object({
   is_faithful: z.boolean(),
   total_claims_checked: z.number(),
   verified_claims: z.number(),
   discrepancies: z.array(z.string()).default([]),
   confidence_discount: z.number().default(0.0),
+  structured_claims: z.array(StructuredClaimSchema).default([]),
 });
 export type FaithfulnessReport = z.infer<typeof FaithfulnessReportSchema>;
 
@@ -618,6 +641,9 @@ export const IntentClassificationResultSchema = z.object({
   requires_clarification: z.boolean().default(false),
   suggested_clarification: z.string().nullable().optional(),
   recommended_methods: z.array(z.string()).default([]),
+  is_composite: z.boolean().default(false),
+  composite_intents: z.array(IntentCategorySchema).default([]),
+  execution_sequence: z.array(z.string()).default([]),
 });
 export type IntentClassificationResult = z.infer<typeof IntentClassificationResultSchema>;
 

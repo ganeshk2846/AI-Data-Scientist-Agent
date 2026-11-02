@@ -93,6 +93,45 @@ export function AnalysisArtifacts({ analysis }: AnalysisArtifactsProps) {
           </div>
         )}
 
+        {/* 1.5 Structured Claim Evidence Bindings */}
+        {faithfulness?.structured_claims && faithfulness.structured_claims.length > 0 && (
+          <div className="p-3.5 rounded-xl border border-border bg-card/40 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                <span>Evidence-Linked Claims ({faithfulness.verified_claims}/{faithfulness.total_claims_checked} Verified)</span>
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">
+                Faithfulness: {faithfulness.is_faithful ? "100%" : `${Math.round((faithfulness.verified_claims / Math.max(faithfulness.total_claims_checked, 1)) * 100)}%`}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+              {faithfulness.structured_claims.slice(0, 6).map((c: any) => (
+                <div
+                  key={c.claim_id}
+                  className={`p-2 rounded-lg border flex items-start gap-1.5 ${
+                    c.verified
+                      ? "border-emerald-500/20 bg-emerald-500/5 text-foreground/90"
+                      : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+                  }`}
+                >
+                  {c.verified ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-0.5 truncate">
+                    <p className="font-medium truncate">{c.statement}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono truncate">
+                      {c.verified ? `Ref: ${c.evidence_reference || "computed"}` : `Issue: ${c.discrepancy}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 2. Structured Findings Narrative */}
         {findings.length > 0 && (
           <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-2">

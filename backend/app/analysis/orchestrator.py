@@ -32,13 +32,17 @@ from backend.app.schema.service import schema_service
 class AnalyticalOrchestrator:
     """
     Unified entry point for AI Data Analyst & Data Scientist intelligence.
-    Seamlessly executes Descriptive, Diagnostic, Predictive, and Prescriptive workflows
-    with conversational follow-up awareness across any database domain.
+    Seamlessly executes Descriptive, Diagnostic, Predictive, Prescriptive, and Composite workflows
+    with database-isolated conversational follow-up awareness across any database domain.
     """
 
     def __init__(self):
-        # In-memory conversational state: session_id -> last_result
-        self._session_cache: Dict[str, StandardizedAnalyticalResult] = {}
+        # Database-isolated conversational session context: (session_id, db_fingerprint) -> last_result
+        self._session_cache: Dict[Tuple[str, str], StandardizedAnalyticalResult] = {}
+        # Tracks active database fingerprint per session to detect database switching
+        self._active_session_db: Dict[str, str] = {}
+        # Database-isolated analytical result cache: (db_fingerprint, normalized_question) -> result
+        self._result_cache: Dict[Tuple[str, str], StandardizedAnalyticalResult] = {}
 
     def analyze(
         self,
@@ -49,21 +53,40 @@ class AnalyticalOrchestrator:
     ) -> StandardizedAnalyticalResult:
         """
         Executes end-to-end analytical intelligence workflow for a natural-language question.
+        Enforces strict database fingerprint isolation on all conversational context and cached results.
         """
         cat = catalog or schema_service.get_cached_catalog()
-        fp = fingerprint or (getattr(cat, "fingerprint", None) if cat else None)
+        fp = (
+            fingerprint
+            or (getattr(cat, "source_fingerprint", None) or getattr(cat, "fingerprint", None) if cat else "default_fp")
+            or "default_fp"
+        )
 
-        # Step 1: Conversational context lookup for follow-ups
-        prior_context = self._session_cache.get(session_id) if session_id else None
+        # Step 1: Database-Aware Conversational Context Lookup
+        prior_context = None
+        if session_id:
+            prev_db_fp = self._active_session_db.get(session_id)
+            if prev_db_fp and prev_db_fp != fp:
+                logger.info(
+                    f"Active database switched for session '{session_id}' ({prev_db_fp} -> {fp}). "
+                    "Invalidating previous cross-database conversational context."
+                )
+                self._session_cache.pop((session_id, prev_db_fp), None)
 
-        # Step 2: Intent & Complexity Classification
+            self._active_session_db[session_id] = fp
+            # Context lookup is strictly isolated to (session_id, active_db_fingerprint)
+            prior_context = self._session_cache.get((session_id, fp))
+
+        norm_q = " ".join(question.lower().split())
+
+        # Step 2: Intent & Complexity Classification (with composite multi-intent detection)
         intent_res = intent_classifier.classify(question)
         logger.info(
             f"Classified question: '{question[:60]}...' -> Intent: {intent_res.primary_intent.value}, "
-            f"Complexity: {intent_res.complexity.value}, Confidence: {intent_res.confidence_score}"
+            f"Complexity: {intent_res.complexity.value}, Composite: {intent_res.is_composite}, Confidence: {intent_res.confidence_score}"
         )
 
-        # If question requires clarification, return early
+        # If question requires genuine ambiguity clarification, return early
         if intent_res.requires_clarification and intent_res.suggested_clarification:
             return StandardizedAnalyticalResult(
                 analysis_id=f"clarify_{int(datetime.now(timezone.utc).timestamp())}",
@@ -73,7 +96,7 @@ class AnalyticalOrchestrator:
                 confidence_score=intent_res.confidence_score,
                 abstain_reason=intent_res.suggested_clarification,
                 findings=[intent_res.suggested_clarification],
-                limitations=["Ambiguous multi-intent inquiry."],
+                limitations=["Ambiguous inquiry requiring user clarification."],
             )
 
         # Step 3: Schema-Grounded Analytical Planning
@@ -84,7 +107,7 @@ class AnalyticalOrchestrator:
             intent_override=intent_res.primary_intent,
         )
 
-        # Ground with prior turn if conversational follow-up (e.g., "Why did they decrease?")
+        # Ground with prior turn if conversational follow-up within SAME database
         if prior_context and prior_context.success:
             if not plan.target_variable and prior_context.source_columns:
                 plan = plan.model_copy(update={"target_variable": prior_context.source_columns[0]})
@@ -109,7 +132,6 @@ class AnalyticalOrchestrator:
         )
 
         if not success or df is None or df.empty:
-            # If optimization or scenario query with parameter data, engine can operate parametrically
             if plan.intent == IntentCategory.PRESCRIPTIVE:
                 df = pd.DataFrame()
             else:
@@ -124,16 +146,56 @@ class AnalyticalOrchestrator:
                 )
 
         # Step 5: Route to Specialized Generic Analytical Engine
-        if plan.intent in [IntentCategory.DESCRIPTIVE, IntentCategory.SQL_LOOKUP]:
-            result = descriptive_engine.run_descriptive_analysis(df, plan, executed_queries=executed_queries)
-        elif plan.intent == IntentCategory.DIAGNOSTIC:
-            result = diagnostic_engine.run_diagnostic_analysis(df, plan, executed_queries=executed_queries)
-        elif plan.intent == IntentCategory.PREDICTIVE:
-            result = predictive_engine.run_predictive_analysis(df, plan, executed_queries=executed_queries)
-        elif plan.intent == IntentCategory.PRESCRIPTIVE:
-            result = prescriptive_engine.run_prescriptive_analysis(df, plan, executed_queries=executed_queries)
+        if intent_res.is_composite and len(intent_res.composite_intents) >= 2:
+            stages = intent_res.composite_intents
+            logger.info(f"Executing composite multi-stage analytical plan: {[s.value for s in stages]}")
+
+            if IntentCategory.DIAGNOSTIC in stages and IntentCategory.PREDICTIVE in stages and IntentCategory.PRESCRIPTIVE in stages:
+                r_diag = diagnostic_engine.run_diagnostic_analysis(df, plan, executed_queries=executed_queries)
+                r_pred = predictive_engine.run_predictive_analysis(df, plan, executed_queries=executed_queries)
+                r_presc = prescriptive_engine.run_prescriptive_analysis(df, plan, executed_queries=executed_queries)
+                result = r_diag
+                result.findings.extend(r_pred.findings + r_presc.findings)
+                result.recommended_next_steps = r_presc.recommended_next_steps
+                result.selected_methods = list(set(r_diag.selected_methods + r_pred.selected_methods + r_presc.selected_methods))
+                result.model_information["composite_stages"] = [s.value for s in stages]
+                result.model_information["composite_intents"] = [s.value for s in stages]
+                if r_pred.result_data:
+                    result.model_information["forecast_preview"] = r_pred.result_data[:3]
+
+            elif stages[:2] == [IntentCategory.DIAGNOSTIC, IntentCategory.PRESCRIPTIVE]:
+                r_diag = diagnostic_engine.run_diagnostic_analysis(df, plan, executed_queries=executed_queries)
+                r_presc = prescriptive_engine.run_prescriptive_analysis(df, plan, executed_queries=executed_queries)
+                result = r_diag
+                result.findings.extend(r_presc.findings)
+                result.recommended_next_steps = r_presc.recommended_next_steps
+                result.selected_methods = list(set(r_diag.selected_methods + r_presc.selected_methods))
+                result.model_information["composite_stages"] = [s.value for s in stages]
+                result.model_information["composite_intents"] = [s.value for s in stages]
+
+            elif stages[:2] == [IntentCategory.DESCRIPTIVE, IntentCategory.PREDICTIVE]:
+                r_desc = descriptive_engine.run_descriptive_analysis(df, plan, executed_queries=executed_queries)
+                r_pred = predictive_engine.run_predictive_analysis(df, plan, executed_queries=executed_queries)
+                result = r_pred
+                result.findings = r_desc.findings + r_pred.findings
+                result.selected_methods = list(set(r_desc.selected_methods + r_pred.selected_methods))
+                result.model_information["composite_stages"] = [s.value for s in stages]
+                result.model_information["composite_intents"] = [s.value for s in stages]
+
+            elif stages[:2] == [IntentCategory.PREDICTIVE, IntentCategory.PRESCRIPTIVE]:
+                r_pred = predictive_engine.run_predictive_analysis(df, plan, executed_queries=executed_queries)
+                r_presc = prescriptive_engine.run_prescriptive_analysis(df, plan, executed_queries=executed_queries)
+                result = r_pred
+                result.findings.extend(r_presc.findings)
+                result.recommended_next_steps = r_presc.recommended_next_steps
+                result.selected_methods = list(set(r_pred.selected_methods + r_presc.selected_methods))
+                result.model_information["composite_stages"] = [s.value for s in stages]
+                result.model_information["composite_intents"] = [s.value for s in stages]
+
+            else:
+                result = self._dispatch_single_engine(plan.intent, df, plan, executed_queries)
         else:
-            result = descriptive_engine.run_descriptive_analysis(df, plan, executed_queries=executed_queries)
+            result = self._dispatch_single_engine(plan.intent, df, plan, executed_queries)
 
         # Step 6: Result Faithfulness Validation
         narrative_text = " ".join(result.findings)
@@ -143,21 +205,56 @@ class AnalyticalOrchestrator:
             ground_truth_data=result.result_data,
         )
         result.faithfulness = faith_report
+        result.faithfulness_report = faith_report
 
         # Discount confidence if faithfulness discrepancies found
         if not faith_report.is_faithful:
             result.confidence_score = max(0.40, result.confidence_score - faith_report.confidence_discount)
             result.limitations.extend(faith_report.discrepancies)
 
-        # Step 7: Update Session Cache for conversational continuity
+        # Step 7: Update Database-Isolated Session Cache and Result Cache
         if session_id and result.success:
-            self._session_cache[session_id] = result
+            self._session_cache[(session_id, fp)] = result
+
+        if result.success and not prior_context:
+            self._result_cache[(fp, norm_q)] = result
 
         return result
 
+    def _dispatch_single_engine(
+        self,
+        intent: IntentCategory,
+        df: pd.DataFrame,
+        plan: AnalyticalPlan,
+        executed_queries: Optional[List[str]],
+    ) -> StandardizedAnalyticalResult:
+        """Routes execution to specialized analytical engine."""
+        if intent in [IntentCategory.DESCRIPTIVE, IntentCategory.SQL_LOOKUP]:
+            return descriptive_engine.run_descriptive_analysis(df, plan, executed_queries=executed_queries)
+        elif intent == IntentCategory.DIAGNOSTIC:
+            return diagnostic_engine.run_diagnostic_analysis(df, plan, executed_queries=executed_queries)
+        elif intent == IntentCategory.PREDICTIVE:
+            return predictive_engine.run_predictive_analysis(df, plan, executed_queries=executed_queries)
+        elif intent == IntentCategory.PRESCRIPTIVE:
+            return prescriptive_engine.run_prescriptive_analysis(df, plan, executed_queries=executed_queries)
+        else:
+            return descriptive_engine.run_descriptive_analysis(df, plan, executed_queries=executed_queries)
+
     def clear_session(self, session_id: str) -> None:
-        """Clears cached conversational context for a session."""
-        self._session_cache.pop(session_id, None)
+        """Clears cached conversational context for a session across all databases."""
+        keys_to_del = [k for k in self._session_cache if k[0] == session_id]
+        for k in keys_to_del:
+            self._session_cache.pop(k, None)
+        self._active_session_db.pop(session_id, None)
+
+    def clear_database_cache(self, fingerprint: str) -> None:
+        """Clears all session and result caches associated with a database fingerprint."""
+        s_keys = [k for k in self._session_cache if k[1] == fingerprint]
+        for k in s_keys:
+            self._session_cache.pop(k, None)
+        r_keys = [k for k in self._result_cache if k[0] == fingerprint]
+        for k in r_keys:
+            self._result_cache.pop(k, None)
 
 
 analytical_orchestrator = AnalyticalOrchestrator()

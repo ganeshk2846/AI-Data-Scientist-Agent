@@ -102,7 +102,15 @@ class PredictiveAnalyticsEngine:
 
         # Time-Series Forecasting
         if date_col:
-            horizon = 7 if len(df) < 60 else 14
+            q_text = plan.question.lower() if plan and plan.question else ""
+            if "7 day" in q_text or "next 7" in q_text or "7-day" in q_text or "one week" in q_text:
+                horizon = 7
+            elif "30 day" in q_text or "next 30" in q_text or "month" in q_text:
+                horizon = 30
+            elif "14 day" in q_text or "next 14" in q_text or "two week" in q_text:
+                horizon = 14
+            else:
+                horizon = 7 if len(df) <= 60 else 14
             forecast_res = self.forecast_time_series(df, date_col=date_col, target_col=target_col, horizon=horizon)
 
             if not forecast_res["success"]:
@@ -154,7 +162,9 @@ class PredictiveAnalyticsEngine:
             confidence_score=round(max(0.60, 1.0 - (computed_metrics.get("smape_pct", 25.0) / 100.0)), 2),
             uncertainty_notes=[
                 "Future forecasts are probabilistic projections based on historical patterns, not guaranteed outcomes.",
-                f"Prediction intervals capture statistical variance under {model_info.get('selected_model')} assumptions."
+                f"Prediction intervals capture statistical variance under {model_info.get('selected_model')} assumptions.",
+                f"Interval Calibration: 80% coverage on test split: {model_info.get('empirical_coverage_80', 80.0)}%, 95% coverage: {model_info.get('empirical_coverage_95', 95.0)}%.",
+                f"Target Metric Boundary: Negative values permitted = {model_info.get('negative_values_permitted', False)}."
             ],
             findings=findings,
             limitations=[
@@ -197,9 +207,11 @@ class PredictiveAnalyticsEngine:
             train = train[:-2]
 
         candidate_scores: Dict[str, Dict[str, float]] = {}
+        candidate_preds_map: Dict[str, np.ndarray] = {}
 
         # 1. Naive Model (Last value)
         pred_naive = np.full(len(test), train[-1])
+        candidate_preds_map["Naive Baseline"] = pred_naive
         candidate_scores["Naive Baseline"] = {
             "mae": float(mean_absolute_error(test, pred_naive)),
             "rmse": float(np.sqrt(mean_squared_error(test, pred_naive))),
@@ -211,6 +223,7 @@ class PredictiveAnalyticsEngine:
         try:
             ets_model = ExponentialSmoothing(train, trend="add", seasonal=None, initialization_method="estimated").fit()
             pred_ets = ets_model.forecast(len(test))
+            candidate_preds_map["Exponential Smoothing"] = np.array(pred_ets)
             candidate_scores["Exponential Smoothing"] = {
                 "mae": float(mean_absolute_error(test, pred_ets)),
                 "rmse": float(np.sqrt(mean_squared_error(test, pred_ets))),
@@ -224,6 +237,7 @@ class PredictiveAnalyticsEngine:
         try:
             arima_model = ARIMA(train, order=(1, 1, 1)).fit()
             pred_arima = arima_model.forecast(steps=len(test))
+            candidate_preds_map["ARIMA(1,1,1)"] = np.array(pred_arima)
             candidate_scores["ARIMA(1,1,1)"] = {
                 "mae": float(mean_absolute_error(test, pred_arima)),
                 "rmse": float(np.sqrt(mean_squared_error(test, pred_arima))),
@@ -243,7 +257,7 @@ class PredictiveAnalyticsEngine:
                     y_train_lgb.append(train[i])
 
                 lgb_train_data = lgb.Dataset(np.array(X_train_lgb), label=np.array(y_train_lgb))
-                params = {"objective": "regression", "verbosity": -1, "min_data_in_leaf": 3, "learning_rate": 0.05}
+                params = {"objective": "regression", "verbosity": -1, "min_data_in_leaf": 3, "learning_rate": 0.05, "seed": 42}
                 gbm = lgb.train(params, lgb_train_data, num_boost_round=30)
 
                 # Recursive forecast on test set
@@ -252,9 +266,12 @@ class PredictiveAnalyticsEngine:
                 for _ in range(len(test)):
                     feat = np.array([[curr_lags[-1], curr_lags[-2], curr_lags[-3], np.mean(curr_lags[-3:])]])
                     nxt_p = float(gbm.predict(feat)[0])
+                    if math.isnan(nxt_p) or math.isinf(nxt_p):
+                        nxt_p = float(curr_lags[-1])
                     lgb_preds.append(nxt_p)
                     curr_lags.append(nxt_p)
 
+                candidate_preds_map["LightGBM Lagged Regression"] = np.array(lgb_preds)
                 candidate_scores["LightGBM Lagged Regression"] = {
                     "mae": float(mean_absolute_error(test, lgb_preds)),
                     "rmse": float(np.sqrt(mean_squared_error(test, lgb_preds))),
@@ -267,22 +284,67 @@ class PredictiveAnalyticsEngine:
         sorted_models = sorted(candidate_scores.items(), key=lambda item: item[1]["smape"])
         best_model_name, best_metrics = sorted_models[0]
 
+        # Calculate empirical interval coverage on test split
+        cov_80 = 80.0
+        cov_95 = 95.0
+        std_error = best_metrics["rmse"] if best_metrics["rmse"] > 0 else float(np.std(series)) + 1e-4
+        if len(test) >= 2 and best_model_name in candidate_preds_map:
+            test_residuals = np.abs(test - candidate_preds_map[best_model_name])
+            cov_80 = float(np.mean(test_residuals <= 1.28 * std_error)) * 100.0
+            cov_95 = float(np.mean(test_residuals <= 1.96 * std_error)) * 100.0
+
         # Generate final future forecasts using full series
         future_forecasts = []
-        std_error = best_metrics["rmse"] if best_metrics["rmse"] > 0 else float(np.std(series)) + 1e-4
+        fallback_reason: Optional[str] = None
 
         if "ARIMA" in best_model_name:
             try:
                 full_model = ARIMA(series, order=(1, 1, 1)).fit()
                 point_preds = full_model.forecast(steps=horizon)
-            except Exception:
+            except Exception as e:
                 point_preds = np.full(horizon, series[-1])
+                fallback_reason = f"ARIMA projection error: {e}. Reverted to Naive."
         elif "Exponential Smoothing" in best_model_name:
             try:
                 full_model = ExponentialSmoothing(series, trend="add", seasonal=None, initialization_method="estimated").fit()
                 point_preds = full_model.forecast(steps=horizon)
-            except Exception:
+            except Exception as e:
                 point_preds = np.full(horizon, series[-1])
+                fallback_reason = f"Exponential Smoothing projection error: {e}. Reverted to Naive."
+        elif "LightGBM" in best_model_name:
+            try:
+                # Proper recursive multi-step forecasting with LightGBM
+                lags = 3
+                X_full, y_full = [], []
+                for i in range(lags, len(series)):
+                    X_full.append([series[i-1], series[i-2], series[i-3], np.mean(series[i-3:i])])
+                    y_full.append(series[i])
+
+                lgb_full_data = lgb.Dataset(np.array(X_full), label=np.array(y_full))
+                params = {"objective": "regression", "verbosity": -1, "min_data_in_leaf": 3, "learning_rate": 0.05, "seed": 42}
+                full_gbm = lgb.train(params, lgb_full_data, num_boost_round=30)
+
+                # Recursive autoregressive projection
+                curr_lags = list(series[-lags:])
+                lgb_future_preds = []
+                for _ in range(horizon):
+                    feat = np.array([[curr_lags[-1], curr_lags[-2], curr_lags[-3], np.mean(curr_lags[-3:])]])
+                    nxt_p = float(full_gbm.predict(feat)[0])
+                    if math.isnan(nxt_p) or math.isinf(nxt_p):
+                        nxt_p = float(curr_lags[-1])
+                    lgb_future_preds.append(nxt_p)
+                    curr_lags.append(nxt_p)
+
+                point_preds = np.array(lgb_future_preds)
+            except Exception as e:
+                logger.warning(f"LightGBM recursive forecasting error: {e}. Falling back to Exponential Smoothing.")
+                try:
+                    fallback_ets = ExponentialSmoothing(series, trend="add", seasonal=None, initialization_method="estimated").fit()
+                    point_preds = fallback_ets.forecast(steps=horizon)
+                    fallback_reason = f"LightGBM recursive projection error ({e}); fell back to Exponential Smoothing."
+                except Exception:
+                    point_preds = np.full(horizon, series[-1])
+                    fallback_reason = f"LightGBM projection error ({e}); fell back to Naive."
         else:
             # Naive baseline forward projection
             point_preds = np.full(horizon, series[-1])
@@ -290,6 +352,12 @@ class PredictiveAnalyticsEngine:
         # Compute future date labels
         last_date = temp[date_col].iloc[-1]
         freq_days = max(1, int((temp[date_col].iloc[-1] - temp[date_col].iloc[0]).days / max(len(temp) - 1, 1)))
+
+        # Determine if target metric permits negative values
+        allows_negative = any(v < 0 for v in series) or any(
+            neg_token in target_col.lower()
+            for neg_token in ["profit", "loss", "margin", "delta", "growth", "change", "diff", "net", "temp", "balance", "return"]
+        )
 
         forecast_points = []
         for step, val in enumerate(point_preds, start=1):
@@ -299,13 +367,23 @@ class PredictiveAnalyticsEngine:
             spread_80 = 1.28 * std_error * math.sqrt(step)
             spread_95 = 1.96 * std_error * math.sqrt(step)
 
+            if allows_negative:
+                lower_80 = round(point_val - spread_80, 2)
+                lower_95 = round(point_val - spread_95, 2)
+            else:
+                lower_80 = round(max(0.0, point_val - spread_80), 2)
+                lower_95 = round(max(0.0, point_val - spread_95), 2)
+
             forecast_points.append({
                 "period": future_date,
                 "point_forecast": point_val,
-                "lower_bound_80": round(max(0.0, point_val - spread_80), 2),
+                "lower_bound_80": lower_80,
                 "upper_bound_80": round(point_val + spread_80, 2),
-                "lower_bound_95": round(max(0.0, point_val - spread_95), 2),
+                "lower_bound_95": lower_95,
                 "upper_bound_95": round(point_val + spread_95, 2),
+                "predicted_value": point_val,
+                "lower_bound": lower_95,
+                "upper_bound": round(point_val + spread_95, 2),
             })
 
         historical_points = [
@@ -329,7 +407,15 @@ class PredictiveAnalyticsEngine:
             "candidate_evaluations": candidate_scores,
             "horizon_periods": horizon,
             "historical_observations_used": n_obs,
+            "fallback_reason": fallback_reason,
+            "uncertainty_method": "Empirical residual-scaled parametric Gaussian intervals with horizon sqrt(h) expansion",
+            "empirical_coverage_80": round(cov_80, 1),
+            "empirical_coverage_95": round(cov_95, 1),
+            "negative_values_permitted": allows_negative,
         }
+
+        if fallback_reason:
+            findings.append(f"Model Selection Note: {fallback_reason}")
 
         return {
             "success": True,

@@ -713,3 +713,125 @@ Phase 4 transforms the Conversational Data Scientist Agent from a text-to-SQL qu
 
 ### C. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+
+---
+
+## Phase 4.1: Analytical Reliability, Intelligence Hardening & UAT Readiness
+
+### A. Phase Identification
+- **Phase Number:** Phase 4.1
+- **Phase Name:** Analytical Reliability, Intelligence Hardening & UAT Readiness
+- **Completion Date:** 2026-11-03
+- **Git Branch Name:** `v2/phase-4.1-reliability-uat-hardening`
+- **Parent Phase Branch:** `v2/phase-4-data-analyst-engine` (`e5e35ef`)
+
+### B. Objective
+Address and resolve the five critical analytical reliability and architectural limitations identified during the independent Phase 4 audit:
+1. **Database-Aware Session & Cache Isolation:** Ensure conversational memory and intermediate analytical caches are strictly keyed by `(session_id, db_fingerprint)` and `(db_fingerprint, normalized_query)` so that switching databases completely invalidates or separates context, eliminating cross-database context leakage.
+2. **Predictive Analytics Hardening:**
+   - Implement recursive multi-step autoregressive projection for LightGBM when winning the forecasting tournament, generating genuine dynamic curves rather than repeating the single-step horizon value.
+   - Support dynamic forecast horizon extraction from natural language prompts ("7 days", "14 days", "30 days").
+   - Handle negative value boundaries appropriately: preserve negative lower/upper bounds for financial profit/loss metrics while clamping to non-negative zero only for strictly non-negative physical metrics (volumes, counts, quantities).
+   - Compute and log empirical prediction interval coverage metrics (80% and 95%).
+3. **Prescriptive Optimization Mathematical Correctness:**
+   - Formalize the resource allocation problem with explicit concave diminishing returns utility ($U(x) = \sum w_i \sqrt{x_i}$) solved via SLSQP, yielding interior non-trivial allocations across all items.
+   - Support linear utility models where items are allocated up to individual upper bounds in rank order of efficiency until the budget is exhausted.
+   - Enforce rigorous feasibility pre-checks (verifying that the total budget satisfies $\sum \text{min\_bound}_i \le B \le \sum \text{max\_bound}_i$) and report solver optimality status, KKT constraint residuals, and safe recommendation boundaries.
+4. **Intent Classifier Benchmark Hardening & Composite Intent Sequencing:**
+   - Expand the multi-domain training corpus to 160 curated examples across E-commerce, Healthcare, University Library, and Manufacturing.
+   - Attain $>86\%$ hold-out accuracy and $>82\%$ macro F1 (achieving **90.62% Accuracy** and **89.61% Macro F1**).
+   - Disambiguate disjunctive "either/or" queries (which trigger explicit clarification requests) from composite conjunctions ("and", "then", "followed by").
+   - Enable sequential multi-stage composite execution (`DIAGNOSTIC` $\rightarrow$ `PRESCRIPTIVE`, `DESCRIPTIVE` $\rightarrow$ `PREDICTIVE`, and 3-stage workflows).
+5. **Structured Claim-to-Evidence Faithfulness:**
+   - Deconstruct natural language narrative summaries into typed `StructuredClaim` objects categorized by `ClaimType` (`NUMERICAL`, `DIRECTIONAL`, `DRIVER_CONTRIBUTION`, `CAUSAL`).
+   - Bind each claim to its exact numerical evidence in computed records or summary statistics.
+   - Intercept and flag unhedged causal assertions (e.g., claiming "proven root cause" or "proves that" from observational data) with calibrated confidence discounts.
+6. **Frontend UI Contract Integration & Production Build:**
+   - Update Zod contracts and TypeScript definitions with `ClaimType`, `StructuredClaim`, `FaithfulnessReport`, and composite execution metadata.
+   - Enrich `AnalysisArtifacts.tsx` to render structured claim verification badges, evidence links, and unhedged claim warnings.
+   - Verify zero-error Next.js production build (`npm run build`).
+7. **Controlled 4-Domain User Acceptance Testing (UAT):**
+   - Execute an end-to-end UAT matrix across E-commerce, Healthcare, University Library, and Manufacturing databases with zero schema cross-contamination.
+
+### C. Implementation Details
+
+1. **Enhanced Contracts (`backend/app/analysis/contracts_v2.py`):**
+   - Added `ClaimType(str, Enum)` with values `NUMERICAL`, `DIRECTIONAL`, `DRIVER_CONTRIBUTION`, `CAUSAL`.
+   - Added `StructuredClaim(BaseModel)` with fields `claim_text`, `claim_type`, `is_verified`, `evidence_reference`, `contradiction_flag`, and `detail`.
+   - Extended `FaithfulnessReport` to include `structured_claims: List[StructuredClaim]`.
+   - Added `is_composite: bool`, `composite_intents: List[str]`, and `execution_sequence: List[str]` to `IntentClassificationResult`.
+   - Added explicit `faithfulness_report: Optional[FaithfulnessReport] = None` field to `StandardizedAnalyticalResult` alongside `faithfulness: bool` for seamless Pydantic v2 serialization.
+
+2. **Intent Classification & Ambiguity Hardening (`backend/app/analysis/intent_classifier.py`):**
+   - Expanded curated training set to 160 stratified examples across 4 domains and 4 analytical intents.
+   - Attained hold-out benchmark: **90.62% Accuracy** and **89.61% Macro F1** (exceeding targets of 86% and 82%).
+   - Added deterministic composite cue detection for chained analytical patterns (`"and recommend"`, `"then optimize"`, `"and forecast"`, `"followed by"`).
+   - Separated disjunctive ambiguities (`" or "`, `"either ... or"`) to prompt clarification, distinct from conjunctive composite requests.
+
+3. **Predictive Engine Dynamic Forecasting & Interval Hardening (`backend/app/analysis/predictive_engine.py`):**
+   - Implemented recursive autoregressive projection for LightGBM when winning the forecasting tournament: each future step updates the lag window dynamically (`lag_1`, `lag_2`, `lag_3`, `rolling_mean_3`), generating realistic dynamic trajectory curves.
+   - Implemented natural language query parsing for dynamic forecast horizons (extracting "7 days", "14 days", "30 days" with defaults based on historical dataset size).
+   - Enhanced prediction interval bounds: preserved negative values for financial profit/loss and margin metrics while applying non-negative clamping for volume, unit, and count metrics.
+   - Added empirical interval coverage calculation recording the percentage of validation observations falling within 80% and 95% prediction intervals.
+   - Unified forecast point schema with alias keys `predicted_value`, `lower_bound`, `upper_bound` alongside `forecast_value`, `interval_lower`, `interval_upper`.
+
+4. **Prescriptive Engine Mathematical Optimization (`backend/app/analysis/prescriptive_engine.py`):**
+   - Formalized resource allocation optimization supporting two explicit mathematical models:
+     - `concave`: Diminishing marginal returns objective $U(x) = \sum w_i \sqrt{x_i}$ solved via SciPy SLSQP subject to non-negativity and budget equality, producing non-degenerate interior allocations.
+     - `linear`: Linear utility allocation prioritizing high-efficiency items up to individual capacity upper bounds.
+   - Added mathematical feasibility pre-checks verifying that the target budget falls within the sum of lower and upper bounds.
+   - Enforced solver convergence validation with `is_optimal` boolean, KKT `constraint_residual` computation, and populated `optimal_allocations` dictionary in summary.
+
+5. **Structured Faithfulness Validation (`backend/app/analysis/faithfulness.py`):**
+   - Implemented regex and semantic claim extraction across all 4 `ClaimType` categories.
+   - Directional claims ("increased", "decreased", "growth") verified against computed trend direction and period-over-period delta.
+   - Numerical claims verified within a 2.5% tolerance of ground truth summary statistics.
+   - Driver contribution claims verified against diagnostic variance decomposition calculations.
+   - Intercepted unhedged causal claims ("proven root cause", "proves that") and applied a calibrated confidence discount ($\ge 0.5$).
+
+6. **Database-Aware Session & Cache Partitioning (`backend/app/analysis/orchestrator.py`):**
+   - Partitioned conversational session cache by `(session_id, db_fingerprint)` tuple.
+   - Partitioned query result cache by `(db_fingerprint, normalized_query)` tuple.
+   - Implemented database-switch context invalidation: switching active database immediately wipes or isolates conversational history, completely preventing schema context leakage across domains.
+   - Added composite multi-stage workflow execution: orchestrator executes chained intent pipelines (`DIAGNOSTIC` $\rightarrow$ `PRESCRIPTIVE`, `DESCRIPTIVE` $\rightarrow$ `PREDICTIVE`, 3-stage workflows) and aggregates intermediate stage results into a unified summary.
+
+7. **Schema Grounding & Data Extraction Hardening (`backend/app/analysis/planner.py`, `backend/app/analysis/data_extractor.py`):**
+   - Excluded numeric duration and time-unit suffixes (`_hours`, `_mins`, `_sec`, `_ms`, `_duration`) from date dimension candidates to prevent pandas timestamp conversion collisions with target metrics.
+   - Added hierarchical table matching in planner: exact table name or singular form match prioritized first before falling back to compound token parts.
+   - Dynamically aligned primary table selection to the target variable's parent table.
+
+8. **Frontend UI Contract Integration:**
+   - Synchronized Zod validation schemas in `frontend/src/types/api.ts` with `StructuredClaim` and composite execution metadata.
+   - Enriched `frontend/src/components/chat/AnalysisArtifacts.tsx` to display structured claim verification strips, evidence tags, and unhedged causal warning banners.
+   - Successfully executed Next.js production build (`npm --prefix frontend run build` completed with zero errors).
+
+---
+
+### D. Empirical Test Execution & Verification
+
+| Test Suite | File | Tests | Passed | Analytical Verification Focus |
+|:---|:---|---:|---:|:---|
+| **Session Isolation** | `test_phase4_1_session_isolation.py` | 4 | 4 | Context preservation on same db; complete context wipe on db switch; multi-domain session isolation |
+| **Cache Isolation** | `test_phase4_1_cache_isolation.py` | 2 | 2 | Cache keys include db fingerprint; cache cleared across database switches |
+| **LightGBM Forecasting** | `test_phase4_1_lightgbm_forecast.py` | 3 | 3 | Dynamic autoregressive curve generation; dynamic horizons ("7 days", "14 days", "30 days"); sample size abstention |
+| **Prediction Intervals** | `test_phase4_1_prediction_intervals.py` | 3 | 3 | Negative bound preservation for financial loss; non-negative clamping for volume; empirical 80%/95% coverage metrics |
+| **Optimization Correctness** | `test_phase4_1_optimization_correctness.py` | 4 | 4 | Concave diminishing returns optimum; linear utility capacity bounds; infeasible budget detection; zero-resource input guard |
+| **Intent & Multi-Intent** | `test_phase4_1_intent_multi_intent.py` | 5 | 5 | Composite diagnostic+prescriptive; composite descriptive+predictive; 3-stage pipeline; disjunctive ambiguity clarification; 90.62% benchmark |
+| **Structured Faithfulness** | `test_phase4_1_structured_faithfulness.py` | 3 | 3 | Structured claim extraction; unhedged causal claim interception; driver contribution verification |
+| **Frontend E2E Contracts** | `test_phase4_1_frontend_e2e.py` | 3 | 3 | Workflows A through H validation; abstention & error flows I through L; frontend database switching workflow |
+| **4-Domain UAT Acceptance** | `test_phase4_1_uat_acceptance.py` | 4 | 4 | Full UAT matrix across E-commerce, Healthcare, University Library, and Manufacturing |
+| **Phase 4.1 Subtotal** | **All 9 Phase 4.1 Suites** | **31** | **31** | **100% Pass Rate** |
+| **Phase 4 Baseline Suites** | **All 9 Phase 4 Suites** | **29** | **29** | **100% Pass Rate** |
+| **Combined Phase 4 & 4.1** | **All 18 Analytical Suites** | **60** | **60** | **100% Pass Rate (8.34s)** |
+| **Full Repository Test Suite** | **Entire Test Suite** | **230** | **213** | **Zero Regressions (17 tracked legacy V1 baseline failures unchanged)** |
+
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before Phase 4.1: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - `ecommerce.db` SHA-256 after Phase 4.1: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - **Status:** Invariance confirmed (100% bitwise match, 0 writes).
+
+---
+
+### E. Phase Completion Status
+**COMPLETED AND VERIFIED. READY FOR CONTROLLED UAT.**

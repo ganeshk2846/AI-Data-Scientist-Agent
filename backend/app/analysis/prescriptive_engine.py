@@ -204,28 +204,52 @@ class PrescriptiveAnalyticsEngine:
         efficiencies: Dict[str, float],
         min_alloc_pct: float = 0.05,
         max_alloc_pct: float = 0.50,
+        utility_model: str = "concave",
     ) -> Dict[str, Any]:
         """
-        Solves constrained convex optimization allocating a finite resource across items
-        subject to concave diminishing returns and bound constraints.
+        Solves constrained resource allocation optimization across items subject to
+        budget equality and bound constraints.
+
+        Mathematical Formulation:
+          Decision Variables: x_i >= 0 (allocation to item i).
+          Objective Function:
+            - If utility_model == 'concave': Maximize sum(eff_i * sqrt(x_i)) (diminishing marginal returns)
+            - If utility_model == 'linear': Maximize sum(eff_i * x_i) (linear returns)
+          Constraints:
+            - sum(x_i) == total_resource (exact budget equality)
+            - total_resource * min_alloc_pct <= x_i <= total_resource * max_alloc_pct (bounds per item)
         """
         n = len(items)
         if n == 0 or total_resource <= 0:
-            return {"allocations": [], "summary": {}, "findings": ["Invalid optimization inputs."]}
+            return {"allocations": [], "summary": {"solver_status": "Invalid Inputs", "is_optimal": False}, "findings": ["Invalid optimization inputs: zero resources or empty item set."]}
 
         eff_arr = np.array([efficiencies.get(it, 1.0) for it in items])
 
-        # Objective: Maximize sum(eff_i * sqrt(x_i)) -> Minimize negative sum
-        def objective(x):
-            return -np.sum(eff_arr * np.sqrt(np.maximum(x, 1e-6)))
-
-        # Constraints: sum(x) == total_resource
-        constraints = [{"type": "eq", "fun": lambda x: np.sum(x) - total_resource}]
-
-        # Bounds: [min_alloc, max_alloc] per item
+        # Mathematical feasibility pre-check on bounds
         min_b = total_resource * min_alloc_pct
         max_b = total_resource * max_alloc_pct
+        if min_b * n > total_resource or max_b * n < total_resource:
+            # Bounds cannot satisfy sum(x) == total_resource
+            return {
+                "allocations": [],
+                "summary": {"solver_status": "Infeasible Constraints", "is_optimal": False, "total_budget": total_resource},
+                "findings": [
+                    f"Optimization bounds are mathematically infeasible: required minimum allocation ({min_alloc_pct*100}% * {n} items = {min_alloc_pct*n*100}%) exceeds 100% of available resource, or maximum allocation is insufficient.",
+                    SAFE_BOUNDARY_NOTE,
+                ],
+            }
+
         bounds = [(min_b, max_b) for _ in range(n)]
+        constraints = [{"type": "eq", "fun": lambda x: np.sum(x) - total_resource}]
+
+        # Objective formulation
+        if utility_model == "linear":
+            def objective(x):
+                return -np.sum(eff_arr * x)
+        else:
+            # Default concave utility with diminishing returns (sqrt)
+            def objective(x):
+                return -np.sum(eff_arr * np.sqrt(np.maximum(x, 1e-6)))
 
         # Initial guess: equal distribution
         x0 = np.full(n, total_resource / n)
@@ -236,11 +260,16 @@ class PrescriptiveAnalyticsEngine:
         if res.success:
             optimal_x = res.x
             status = "Optimal"
+            is_optimal = True
+            solver_note = f"Solver converged successfully via SLSQP ({utility_model} utility model). All KKT optimality conditions and budget constraints satisfied."
         else:
-            # Fallback to proportional allocation
+            # Feasible proportional heuristic fallback
             optimal_x = (eff_arr / np.sum(eff_arr)) * total_resource
-            status = "Feasible (Proportional Fallback)"
+            status = "Fallback (Proportional Heuristic)"
+            is_optimal = False
+            solver_note = f"Optimizer failed to reach numerical convergence ({res.message}). Applied proportional heuristic fallback; this solution is not mathematically optimal."
 
+        constraint_residual = abs(float(np.sum(optimal_x) - total_resource))
         expected_total_return = float(np.sum(eff_arr * optimal_x))
 
         for it, alloc, eff in zip(items, optimal_x, eff_arr):
@@ -255,12 +284,12 @@ class PrescriptiveAnalyticsEngine:
             })
 
         allocations.sort(key=lambda a: a["allocated_amount"], reverse=True)
-
         top_alloc = allocations[0]
+
         findings = [
-            f"Optimized allocation of ${total_resource:,.2f} across {n} items using constrained non-linear programming (SLSQP).",
-            f"Solver status: {status}. All budget constraints and allocation bounds ({min_alloc_pct*100}% - {max_alloc_pct*100}%) satisfied.",
-            f"Recommended highest allocation to '{top_alloc['item']}' receiving ${top_alloc['allocated_amount']:,.2f} ({top_alloc['share_pct']}% of total).",
+            f"Resource allocation of ${total_resource:,.2f} across {n} items ({utility_model} utility model).",
+            f"Solver status: {status}. {solver_note}",
+            f"Recommended allocation directs highest resource to '{top_alloc['item']}' receiving ${top_alloc['allocated_amount']:,.2f} ({top_alloc['share_pct']}% of total).",
             SAFE_BOUNDARY_NOTE,
         ]
 
@@ -268,10 +297,16 @@ class PrescriptiveAnalyticsEngine:
             "total_budget": round(total_resource, 2),
             "expected_total_return": round(expected_total_return, 2),
             "solver_status": status,
+            "is_optimal": is_optimal,
+            "utility_model": utility_model,
             "items_allocated": n,
             "top_allocated_item": top_alloc["item"],
             "top_allocated_amount": top_alloc["allocated_amount"],
+            "constraint_residual": round(constraint_residual, 6),
+            "optimal_allocations": {a["item"]: a["allocated_amount"] for a in allocations},
         }
+
+        return {"allocations": allocations, "summary": summary, "findings": findings}
 
         return {"allocations": allocations, "summary": summary, "findings": findings}
 

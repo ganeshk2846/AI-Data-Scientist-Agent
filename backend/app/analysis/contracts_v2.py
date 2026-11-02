@@ -71,6 +71,34 @@ class IntentClassificationResult(BaseModel):
     requires_clarification: bool = False
     suggested_clarification: Optional[str] = None
     recommended_methods: List[AnalyticalMethod] = Field(default_factory=list)
+    # Composite multi-intent support
+    is_composite: bool = False
+    composite_intents: List[IntentCategory] = Field(default_factory=list)
+    execution_sequence: List[str] = Field(default_factory=list)
+
+
+class ClaimType(str, Enum):
+    """Categories of factual, statistical, and narrative claims."""
+    NUMERICAL = "NUMERICAL"
+    DIRECTIONAL = "DIRECTIONAL"
+    COMPARATIVE = "COMPARATIVE"
+    STATISTICAL = "STATISTICAL"
+    DRIVER_CONTRIBUTION = "DRIVER_CONTRIBUTION"
+    CAUSAL = "CAUSAL"
+    PREDICTIVE = "PREDICTIVE"
+    RECOMMENDATION = "RECOMMENDATION"
+
+
+class StructuredClaim(BaseModel):
+    """Individual claim extracted from analysis narrative linked to empirical evidence."""
+    model_config = ConfigDict(frozen=True)
+
+    claim_id: str
+    claim_type: ClaimType
+    statement: str
+    verified: bool = False
+    evidence_reference: Optional[str] = None
+    discrepancy: Optional[str] = None
 
 
 class AnalyticalPlan(BaseModel):
@@ -98,12 +126,13 @@ class AnalyticalPlan(BaseModel):
 
 
 class FaithfulnessReport(BaseModel):
-    """Validation report ensuring narrative faithfulness against numerical facts."""
+    """Validation report ensuring narrative faithfulness against numerical facts and evidence."""
     is_faithful: bool = True
     total_claims_checked: int = 0
     verified_claims: int = 0
     discrepancies: List[str] = Field(default_factory=list)
     confidence_discount: float = 0.0
+    structured_claims: List[StructuredClaim] = Field(default_factory=list)
 
 
 class StandardizedAnalyticalResult(BaseModel):
@@ -121,6 +150,7 @@ class StandardizedAnalyticalResult(BaseModel):
     model_information: Dict[str, Any] = Field(default_factory=dict)
     validation_results: Dict[str, Any] = Field(default_factory=dict)
     faithfulness: Optional[FaithfulnessReport] = None
+    faithfulness_report: Optional[FaithfulnessReport] = None
     confidence_score: float = Field(default=1.0, ge=0.0, le=1.0)
     uncertainty_notes: List[str] = Field(default_factory=list)
     findings: List[str] = Field(default_factory=list)

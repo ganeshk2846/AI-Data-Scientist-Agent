@@ -84,19 +84,33 @@ class AnalyticalDataExtractor:
             return None
 
         primary_table = plan.relevant_tables[0]
+        if plan.target_variable and "." in plan.target_variable:
+            tgt_tbl = plan.target_variable.split(".")[0]
+            if tgt_tbl in catalog.tables:
+                primary_table = tgt_tbl
+        elif plan.time_dimension and "." in plan.time_dimension:
+            time_tbl = plan.time_dimension.split(".")[0]
+            if time_tbl in catalog.tables:
+                primary_table = time_tbl
+
         tbl_model = catalog.tables.get(primary_table)
         if not tbl_model:
             return None
 
+        existing_col_names = {c.name for c in tbl_model.columns}
+
         # Build columns to select
         cols = []
+        time_col_in_tbl = None
         if plan.time_dimension:
             t_col = plan.time_dimension.split(".")[-1]
-            cols.append(t_col)
+            if t_col in existing_col_names:
+                cols.append(t_col)
+                time_col_in_tbl = t_col
 
         if plan.target_variable:
             v_col = plan.target_variable.split(".")[-1]
-            if v_col not in cols:
+            if v_col in existing_col_names and v_col not in cols:
                 cols.append(v_col)
 
         # Also include dimension / categorical columns from this table (up to 8 columns total)
@@ -109,10 +123,9 @@ class AnalyticalDataExtractor:
         col_clause = ", ".join(cols)
         query = f"SELECT {col_clause} FROM {primary_table}"
 
-        # If time dimension present, order chronologically
-        if plan.time_dimension:
-            t_col = plan.time_dimension.split(".")[-1]
-            query += f" ORDER BY {t_col} ASC"
+        # If time dimension present in table, order chronologically
+        if time_col_in_tbl:
+            query += f" ORDER BY {time_col_in_tbl} ASC"
 
         query += " LIMIT 1000"
         return query

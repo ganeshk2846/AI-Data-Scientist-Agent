@@ -172,6 +172,10 @@ class DiagnosticAnalyticsEngine:
         temp[metric_col] = pd.to_numeric(temp[metric_col], errors="coerce")
         temp = temp.dropna(subset=[metric_col])
 
+        # Ensure period_col is distinct from metric_col
+        if period_col == metric_col:
+            period_col = None
+
         # If period_col exists, split chronologically; else split top vs remaining
         if period_col and period_col in temp.columns:
             temp[period_col] = pd.to_datetime(temp[period_col], errors="coerce")

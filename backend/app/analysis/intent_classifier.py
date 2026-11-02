@@ -153,6 +153,53 @@ TRAINING_DATA: List[Tuple[str, IntentCategory, ComplexityLevel]] = [
     ("What if supplier raw material prices rise by 8%, what is the impact on batch margins?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.MODERATE),
     ("Recommend preventive maintenance intervals to minimize unpredicted breakdowns", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
     ("How should we allocate inventory safety stock across our 3 regional warehouses?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("How should we allocate our $30k maintenance budget across machines?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+
+    # --- DESCRIPTIVE (Finance & Operations) ---
+    ("What was our total cash flow from operations last quarter?", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("Show monthly operating expenses breakdown across departments", IntentCategory.DESCRIPTIVE, ComplexityLevel.MODERATE),
+    ("What is our current debt-to-equity ratio and asset turnover?", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("Show the distribution of invoice processing times over the last 90 days", IntentCategory.DESCRIPTIVE, ComplexityLevel.MODERATE),
+    ("What were the gross profit margins by product line this fiscal year?", IntentCategory.DESCRIPTIVE, ComplexityLevel.MODERATE),
+    ("List total payroll expenditure by branch location for Q2", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("What was the average delivery lead time for domestic shipments?", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("Show monthly warehouse utility costs over the past 12 months", IntentCategory.DESCRIPTIVE, ComplexityLevel.MODERATE),
+
+    # --- DIAGNOSTIC (Finance & Operations) ---
+    ("Why did operating expenses surge by 20% in September?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("What drove the sudden deterioration in gross profit margin?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("What caused the increase in patient treatment costs between Q1 and Q2?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("Why is machine downtime significantly higher during night shifts?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("What are the primary drivers of book loan declines among graduate students?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("Detect anomalies in invoice processing amounts and expense claims", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("What is the correlation between marketing spend and customer acquisition?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("Why did cash flow decrease despite revenue growth?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("What caused the sharp increase in shipping carrier surcharge fees?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+    ("Why are customer return rates higher in the footwear category?", IntentCategory.DIAGNOSTIC, ComplexityLevel.COMPLEX),
+
+    # --- PREDICTIVE (Finance & Operations) ---
+    ("Forecast operating cash flow for the next 6 months", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("What will accounts receivable likely be at the end of next quarter?", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Predict inventory obsolescence rates for seasonal apparel", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Project hospital admission rates for the upcoming winter season", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Forecast total library checkouts for the next academic year", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("What is the projected factory electricity demand for next quarter?", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Forecast machine maintenance cost for the next 12 weeks", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Predict customer default probability for outstanding invoices", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("Project quarterly revenue growth across all business units", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("What will hospital ICU bed occupancy likely be next week?", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+
+    # --- PRESCRIPTIVE (Finance & Operations) ---
+    ("How should we allocate our $100k capital expenditure budget across plant upgrades?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("What should we do to optimize working capital and minimize holding costs?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.COMPLEX),
+    ("Recommend budget allocation between maintenance and new machinery", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("What if borrowing interest rates rise by 2%, how does our debt service coverage change?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.MODERATE),
+    ("How should we allocate nurse shifts to minimize overtime costs?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("Recommend discount strategies to clear slow-moving inventory without eroding margins", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("What actions should management take to reverse the operating margin decline?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.COMPLEX),
+    ("How should we optimize inventory reorder points to reduce stockouts?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("What if supplier shipping costs increase by 15%, how should we adjust retail prices?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.MODERATE),
+    ("Recommend optimal cash reserves to buffer against seasonal demand swings", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
 
     # --- SQL_LOOKUP (Direct / Simple Retrieval) ---
     ("Find customer with email address sarah.connor@example.com", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
@@ -165,6 +212,24 @@ TRAINING_DATA: List[Tuple[str, IntentCategory, ComplexityLevel]] = [
     ("Who is the primary contact for vendor Acme Supplies?", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
     ("Look up order details for order ID 10492", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
     ("Get book title with barcode 8839210", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("Find invoice with number INV-2026-091", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("What is the tax ID for vendor Global Logistics?", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("Look up employee email for staff ID 502", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("Show the manufacturer part number for component X-99", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("Find customer phone number for account 7721", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+    ("Find serial number for machine CNC-101", IntentCategory.SQL_LOOKUP, ComplexityLevel.SIMPLE),
+
+    # --- CROSS-DOMAIN UAT EXPANSIONS ---
+    ("Which treatment categories are associated with increasing costs?", IntentCategory.DIAGNOSTIC, ComplexityLevel.MODERATE),
+    ("Which machines contribute most to downtime?", IntentCategory.DIAGNOSTIC, ComplexityLevel.MODERATE),
+    ("What factors are associated with higher defect rates?", IntentCategory.DIAGNOSTIC, ComplexityLevel.MODERATE),
+    ("Which departments contribute most to budget overruns?", IntentCategory.DIAGNOSTIC, ComplexityLevel.MODERATE),
+    ("Which book categories are experiencing increasing demand?", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("Which product categories are experiencing increasing sales?", IntentCategory.DESCRIPTIVE, ComplexityLevel.SIMPLE),
+    ("What borrowing demand should we prepare for in the next 7 days?", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("What maintenance trends should we expect over the next 7 days?", IntentCategory.PREDICTIVE, ComplexityLevel.ADVANCED),
+    ("What resource allocation options should be evaluated?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
+    ("How should the maintenance budget be allocated across machines?", IntentCategory.PRESCRIPTIVE, ComplexityLevel.ADVANCED),
 ]
 
 
@@ -251,20 +316,32 @@ class IntentComplexityClassifier:
         q_lower = q_clean.lower()
 
         # Deterministic hard-rule checks for high-precision syntax tokens
-        # 1. Prescriptive what-if / simulation
-        if any(tok in q_lower for tok in ["what if", "simulate", "how should we allocate", "optimize", "recommend"]):
+        # 1. Prescriptive what-if / simulation / allocation
+        if any(tok in q_lower for tok in [
+            "what if", "simulate", "how should we allocate", "how should the", "budget be allocated",
+            "resource allocation", "allocation options", "optimize", "recommend"
+        ]):
             rule_intent = IntentCategory.PRESCRIPTIVE
         # 2. Predictive forecast / prediction
-        elif any(tok in q_lower for tok in ["forecast", "predict", "project", "expected next", "will our", "will be"]):
+        elif any(tok in q_lower for tok in [
+            "forecast", "predict", "project", "expected next", "will our", "will be",
+            "demand should we prepare for", "prepare for", "trends should we expect"
+        ]):
             rule_intent = IntentCategory.PREDICTIVE
-        # 3. Diagnostic why / cause / anomaly / drivers
-        elif any(tok in q_lower for tok in ["why did", "why are", "what caused", "what drove", "drivers of", "anomalies", "outlier", "decompose"]):
+        # 3. Diagnostic why / cause / anomaly / drivers / contributing factors
+        elif any(tok in q_lower for tok in [
+            "why did", "why are", "what caused", "what drove", "drivers of", "anomalies", "outlier",
+            "decompose", "associated with", "contribute most", "contributed most", "contribute to", "contributes to"
+        ]):
             rule_intent = IntentCategory.DIAGNOSTIC
         # 4. Lookup / specific record query
         elif any(tok in q_lower for tok in ["find customer", "lookup", "look up", "phone number for", "email address for", "serial number for", "isbn of"]):
             rule_intent = IntentCategory.SQL_LOOKUP
         # 5. Descriptive trend / aggregation / breakdown
-        elif any(tok in q_lower for tok in ["trend in", "monthly trend", "daily trend", "over time", "distribution of", "what is the average", "what was total", "what were total"]):
+        elif any(tok in q_lower for tok in [
+            "trend in", "monthly trend", "daily trend", "over time", "distribution of",
+            "what is the average", "what was total", "what were total", "experiencing increasing", "increasing demand"
+        ]):
             rule_intent = IntentCategory.DESCRIPTIVE
         else:
             rule_intent = None
@@ -293,24 +370,76 @@ class IntentComplexityClassifier:
         top_comp_str = comp_classes[np.argmax(comp_probs)]
         final_complexity = ComplexityLevel(top_comp_str)
 
-        # Ambiguity and clarification check
+        # Ambiguity and composite multi-intent check
         is_ambiguous = False
         requires_clarification = False
         clarification_msg = None
+        is_composite = False
+        composite_intents: List[IntentCategory] = []
+        execution_sequence: List[str] = []
 
-        # Check if query combines multiple conflicting intents (e.g., "what happened and what will happen?")
-        has_descriptive_cue = any(w in q_lower for w in ["what was", "what were", "historical", "past performance", "prior year", "last year", "previously"])
-        has_predictive_cue = any(w in q_lower for w in ["forecast", "predict", "next month", "future", "what will happen", "next year"])
-        if has_descriptive_cue and has_predictive_cue:
+        # Check for composite multi-stage analytical requests
+        has_diag_cue = any(w in q_lower for w in [
+            "why did", "why are", "what caused", "what drove", "drivers of", "root cause", "decompose",
+            "associated with", "contribute most", "contributed most", "contribute to", "contributes to"
+        ])
+        has_presc_cue = any(w in q_lower for w in [
+            "what should we do", "how should we", "how can we improve", "how can we reduce", "recommend",
+            "how to optimize", "how can we optimize", "optimize our", "optimize", "allocate our",
+            "actions should we take", "improve it", "resource allocation",
+            "allocation options", "budget be allocated", "how should the"
+        ])
+        has_desc_cue = any(w in q_lower for w in [
+            "what was", "what were", "what happened", "sales trends", "historical", "trend in",
+            "past performance", "last quarter's sales", "last quarter sales", "increasing demand",
+            "experiencing increasing", "daily trend"
+        ])
+        has_pred_cue = any(w in q_lower for w in [
+            "forecast", "predict", "project", "expected next", "what will happen", "next quarter",
+            "next month", "prepare for", "demand should we prepare", "trends should we expect", "maintenance trends"
+        ])
+
+        # Check if query has competing annual timeframes or is a disjunctive either/or ambiguity
+        is_annual_conflict = "last year" in q_lower and "next year" in q_lower
+        is_disjunctive_ambiguity = " or " in q_lower and any(w in q_lower for w in ["past", "historical"]) and any(w in q_lower for w in ["future", "forecast"])
+
+        if is_annual_conflict or is_disjunctive_ambiguity:
             is_ambiguous = True
             requires_clarification = True
             clarification_msg = (
-                "Your question asks about both historical figures and future forecasts. "
-                "Would you like historical descriptive analysis or a future predictive forecast?"
+                "Your question asks whether to evaluate historical figures or future forecasts. "
+                "Please specify whether you would like historical descriptive analysis or a future predictive forecast."
             )
+        else:
+            # Multi-stage composition detection
+            if has_diag_cue and has_pred_cue and has_presc_cue:
+                is_composite = True
+                composite_intents = [IntentCategory.DIAGNOSTIC, IntentCategory.PREDICTIVE, IntentCategory.PRESCRIPTIVE]
+                execution_sequence = ["diagnostic_driver_analysis", "predictive_forecasting", "prescriptive_recommendations"]
+            elif has_diag_cue and has_presc_cue:
+                is_composite = True
+                composite_intents = [IntentCategory.DIAGNOSTIC, IntentCategory.PRESCRIPTIVE]
+                execution_sequence = ["diagnostic_driver_analysis", "prescriptive_recommendations"]
+            elif has_desc_cue and has_pred_cue:
+                is_composite = True
+                composite_intents = [IntentCategory.DESCRIPTIVE, IntentCategory.PREDICTIVE]
+                execution_sequence = ["descriptive_trend_analysis", "predictive_forecasting"]
+            elif has_desc_cue and has_diag_cue:
+                is_composite = True
+                composite_intents = [IntentCategory.DESCRIPTIVE, IntentCategory.DIAGNOSTIC]
+                execution_sequence = ["descriptive_trend_analysis", "diagnostic_driver_analysis"]
+            elif has_pred_cue and has_presc_cue:
+                is_composite = True
+                composite_intents = [IntentCategory.PREDICTIVE, IntentCategory.PRESCRIPTIVE]
+                execution_sequence = ["predictive_forecasting", "prescriptive_recommendations"]
+
+            if is_composite:
+                final_intent = composite_intents[0]
+                final_complexity = ComplexityLevel.ADVANCED
+                confidence = max(confidence, 0.90)
 
         # Low confidence fallback check
-        if confidence < 0.28 and not rule_intent:
+        if confidence < 0.28 and not rule_intent and not is_composite:
             is_ambiguous = True
             final_intent = IntentCategory.SQL_LOOKUP
             final_complexity = ComplexityLevel.SIMPLE
@@ -327,6 +456,9 @@ class IntentComplexityClassifier:
             requires_clarification=requires_clarification,
             suggested_clarification=clarification_msg,
             recommended_methods=methods,
+            is_composite=is_composite,
+            composite_intents=composite_intents,
+            execution_sequence=execution_sequence,
         )
 
     def _map_methods(

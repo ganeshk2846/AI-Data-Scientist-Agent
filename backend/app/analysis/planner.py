@@ -57,11 +57,22 @@ class AnalyticalPlanner:
         if cat and cat.tables:
             tables_lower = {name.lower(): (name, model) for name, model in cat.tables.items()}
 
-            # Match table names from question tokens
+            # Match table names from question tokens (exact table or singular match)
             for tbl_l, (orig_name, tbl_model) in tables_lower.items():
-                if tbl_l in q_lower or orig_name.lower() in q_lower or tbl_l.rstrip("s") in q_lower:
+                if (
+                    tbl_l in q_lower
+                    or orig_name.lower() in q_lower
+                    or tbl_l.rstrip("s") in q_lower
+                ):
                     relevant_tables.append(orig_name)
                     required_cols[orig_name] = [c.name for c in tbl_model.columns]
+
+            # If no direct match, check component parts of compound table names
+            if not relevant_tables:
+                for tbl_l, (orig_name, tbl_model) in tables_lower.items():
+                    if any(part in q_lower for part in tbl_l.split("_") if len(part) >= 4):
+                        relevant_tables.append(orig_name)
+                        required_cols[orig_name] = [c.name for c in tbl_model.columns]
 
             # If only 1 table exists in catalog, ground on that single table
             if not relevant_tables and len(cat.tables) == 1:
@@ -86,6 +97,10 @@ class AnalyticalPlanner:
                     for c in tbl_model.columns:
                         col_lower = c.name.lower()
                         if col_lower.endswith("_id") or c.is_pk:
+                            continue
+                        if col_lower.endswith(("_hours", "_hrs", "_min", "_mins", "_minutes", "_sec", "_seconds", "_ms", "_duration")):
+                            continue
+                        if c.is_numeric_candidate and not any(t in col_lower for t in ["year", "month", "day", "date"]):
                             continue
                         type_upper = (c.sqlite_type or "").upper()
                         if any(t in col_lower for t in ["date", "time", "timestamp", "created_at", "updated_at", "day", "month", "year"]):

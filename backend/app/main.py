@@ -46,6 +46,11 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown lifespan events."""
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]")
 
+    # Ensure active database connection is ready
+    from backend.app.db.manager import db_manager
+    if not db_manager._active_adapter or not db_manager._active_adapter.is_connected:
+        db_manager._load_persisted_active_database()
+
     # Startup verification
     db_status = check_database_readiness()
     if db_status.connected and db_status.read_only_verified:
