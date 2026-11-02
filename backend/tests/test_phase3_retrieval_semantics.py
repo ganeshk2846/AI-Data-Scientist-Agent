@@ -187,9 +187,9 @@ def test_semantic_canonical_baseline_seeding(active_catalog):
     assert "net_revenue" in metric_keys
     assert "average_order_value" in metric_keys
 
-    # Verify provenance status is USER_APPROVED
+    # Verify provenance status is authoritative (SYSTEM_APPROVED or USER_APPROVED)
     for m in auth_metrics:
-        assert m.status == MetricStatus.USER_APPROVED
+        assert m.status in (MetricStatus.USER_APPROVED, MetricStatus.SYSTEM_APPROVED)
 
 
 def test_semantic_provenance_lifecycle_and_authoritative_isolation(tmp_path):
@@ -233,7 +233,7 @@ def test_semantic_provenance_lifecycle_and_authoritative_isolation(tmp_path):
     assert any(m.metric_key == "cart_abandonment_rate" for m in all_metrics)
 
     # Step 3: Approve candidate metric
-    approved = engine.approve_metric("cart_abandonment_rate", approved_by="senior_analyst")
+    approved = engine.approve_metric("cart_abandonment_rate", fingerprint=fp, approved_by="senior_analyst")
     assert approved is not None
     assert approved.status == MetricStatus.USER_APPROVED
     assert approved.verified_by == "senior_analyst"
@@ -294,15 +294,17 @@ def test_api_authoritative_metrics_endpoint(client):
     body = res.json()
     assert body["success"] is True
     metrics = body["data"]
-    assert len(metrics) >= 6
+    assert len(metrics) >= 3
     for m in metrics:
-        assert m["status"] == "USER_APPROVED"
+        assert m["status"] in ("USER_APPROVED", "SYSTEM_APPROVED")
 
 
 def test_api_approve_metric_endpoint(client):
     """Verifies POST /api/v1/retrieval/metrics/approve updates provenance."""
     # Ensure a metric exists to approve
-    dynamic_semantic_engine.seed_baseline_canonical_metrics()
+    catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
+    fp = catalog.fingerprint
+    dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp, catalog=catalog)
     res = client.post(
         "/api/v1/retrieval/metrics/approve",
         json={"metric_key": "gross_revenue", "approved_by": "qa_lead"},

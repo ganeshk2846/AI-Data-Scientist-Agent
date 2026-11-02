@@ -5,7 +5,8 @@ Provides dynamic derivation, AST validation, and strict 3-tier lifecycle managem
 for business definitions and SQL calculation formulas:
   1. AUTO_INFERRED: Derived by Ollama LLM analyzing active schema and column statistics.
   2. VALIDATED_CANDIDATE: AST-verified and syntactically sound.
-  3. USER_APPROVED: Human-verified authoritative ground truth.
+  3. SYSTEM_APPROVED: Domain-validated baseline canonical metric.
+  4. USER_APPROVED: Human-verified authoritative ground truth.
 Unapproved metrics are strictly excluded from query generation prompt contexts.
 """
 
@@ -91,18 +92,68 @@ CANONICAL_METRICS: Dict[str, BusinessMetric] = {
 }
 
 
+CANONICAL_METRIC_REQUIREMENTS: Dict[str, Dict[str, Any]] = {
+    "gross_revenue": {
+        "required_tables": ["orders"],
+        "required_columns": {"orders": ["total_amount"]},
+        "predicates": [],
+    },
+    "net_revenue": {
+        "required_tables": ["orders"],
+        "required_columns": {"orders": ["total_amount", "order_status"]},
+        "predicates": [("orders", "order_status", "delivered")],
+    },
+    "average_order_value": {
+        "required_tables": ["orders"],
+        "required_columns": {"orders": ["total_amount", "order_status"]},
+        "predicates": [("orders", "order_status", "delivered")],
+    },
+    "return_rate": {
+        "required_tables": ["orders", "returns"],
+        "required_columns": {"orders": ["order_id"], "returns": ["return_id"]},
+        "predicates": [],
+    },
+    "customer_csat": {
+        "required_tables": ["support_tickets"],
+        "required_columns": {"support_tickets": ["satisfaction_score"]},
+        "predicates": [],
+    },
+    "marketing_roas": {
+        "required_tables": ["orders", "marketing_spend", "marketing_channels"],
+        "required_columns": {"marketing_spend": ["spend_amount"]},
+        "predicates": [],
+    },
+}
+
+
 def is_ecommerce_compatible(catalog: Optional[DatabaseCatalog]) -> bool:
     """
     Checks if a database catalog is compatible with canonical e-commerce metrics.
-    Requires core entities ('orders') and critical attributes ('total_amount', 'order_status').
+    Requires multi-entity topology validation:
+    - Core transaction entity: 'orders'
+    - Core customer entity: 'customers'
+    - At least one supporting domain entity: 'order_items', 'products', or 'payments'
+    - Critical transaction attributes: 'total_amount' and 'order_status' on 'orders'
     """
     if not catalog or not catalog.tables:
         return False
-    if "orders" not in catalog.tables:
+
+    tables_lower = {k.lower(): v for k, v in catalog.tables.items()}
+
+    # 1. Multi-entity topology requirements
+    if "orders" not in tables_lower or "customers" not in tables_lower:
         return False
-    order_cols = {c.name.lower() for c in catalog.tables["orders"].columns}
+
+    supporting_entities = {"order_items", "products", "payments"}
+    if not any(e in tables_lower for e in supporting_entities):
+        return False
+
+    # 2. Critical orders columns
+    orders_table = tables_lower["orders"]
+    order_cols = {c.name.lower() for c in orders_table.columns}
     if not {"total_amount", "order_status"}.issubset(order_cols):
         return False
+
     return True
 
 
@@ -127,18 +178,26 @@ class DynamicSemanticEngine:
         catalog: Optional[DatabaseCatalog] = None,
     ) -> int:
         """
-        Seeds canonical baseline metrics into semantic_metrics table as USER_APPROVED
-        strictly for verified, compatible e-commerce database schemas.
-        Never seeds under 'default' and never seeds into unfamiliar domains.
+        Seeds canonical baseline metrics into semantic_metrics table as SYSTEM_APPROVED
+        strictly for verified, compatible e-commerce database schemas with per-metric validation.
+        Never seeds under 'default' and never seeds into unfamiliar or non-e-commerce domains.
         """
         with self._lock:
-            # 1. Verify schema compatibility if catalog provided
-            if catalog is not None and not is_ecommerce_compatible(catalog):
+            cat = catalog
+            if cat is None:
+                try:
+                    from backend.app.schema.service import schema_service
+                    cat = schema_service.get_cached_catalog()
+                except Exception:
+                    cat = None
+
+            # 1. Verify schema compatibility if catalog available
+            if cat is not None and not is_ecommerce_compatible(cat):
                 logger.info("Skipping canonical e-commerce metric seeding: schema is not e-commerce compatible.")
                 return 0
 
             # 2. Require valid specific fingerprint (never 'default')
-            fp = fingerprint or (getattr(catalog, "fingerprint", None) if catalog else None)
+            fp = fingerprint or (getattr(cat, "fingerprint", None) if cat else None)
             if not fp or fp == "default":
                 logger.warning("Refusing to seed canonical metrics under empty or 'default' fingerprint.")
                 return 0
@@ -148,11 +207,41 @@ class DynamicSemanticEngine:
             try:
                 with conn:
                     for key, metric in CANONICAL_METRICS.items():
-                        # If catalog is provided, verify this specific metric's target tables exist
-                        if catalog is not None:
-                            table_missing = any(t not in catalog.tables for t in metric.target_tables)
-                            if table_missing:
+                        # If catalog is available, perform strict per-metric validation
+                        if cat is not None:
+                            # Verify target tables exist
+                            tables_lower = {k.lower(): v for k, v in cat.tables.items()}
+                            if any(t.lower() not in tables_lower for t in metric.target_tables):
                                 continue
+
+                            # Verify required columns exist
+                            reqs = CANONICAL_METRIC_REQUIREMENTS.get(key)
+                            if reqs:
+                                col_missing = False
+                                for req_tbl, req_cols in reqs.get("required_columns", {}).items():
+                                    tbl_model = tables_lower.get(req_tbl.lower())
+                                    if not tbl_model:
+                                        col_missing = True
+                                        break
+                                    existing_cols = {c.name.lower() for c in tbl_model.columns}
+                                    if not set(req_cols).issubset(existing_cols):
+                                        col_missing = True
+                                        break
+                                if col_missing:
+                                    continue
+
+                                # Validate value predicates (e.g. order_status must include 'delivered')
+                                predicate_failed = False
+                                for pred_tbl, pred_col, expected_val in reqs.get("predicates", []):
+                                    tbl_model = tables_lower.get(pred_tbl.lower())
+                                    if tbl_model:
+                                        col_model = tbl_model.get_column(pred_col)
+                                        if col_model and col_model.sample_values:
+                                            if not any(expected_val.lower() == str(s).strip().lower() for s in col_model.sample_values):
+                                                predicate_failed = True
+                                                break
+                                if predicate_failed:
+                                    continue
 
                         cur = conn.cursor()
                         cur.execute(
@@ -172,7 +261,7 @@ class DynamicSemanticEngine:
                                 ON CONFLICT(fingerprint, metric_key) DO UPDATE SET
                                     display_name = excluded.display_name,
                                     formula_sql = excluded.formula_sql,
-                                    status = excluded.status,
+                                    status = CASE WHEN semantic_metrics.status = 'USER_APPROVED' THEN 'USER_APPROVED' ELSE excluded.status END,
                                     updated_at = CURRENT_TIMESTAMP;
                                 """,
                                 (
@@ -180,7 +269,7 @@ class DynamicSemanticEngine:
                                     key,
                                     metric.display_name,
                                     metric.formula,
-                                    MetricStatus.USER_APPROVED.value,
+                                    MetricStatus.SYSTEM_APPROVED.value,
                                     "CANONICAL",
                                     "system_baseline",
                                     metric.description,
@@ -369,49 +458,38 @@ Example format:
     def approve_metric(
         self,
         metric_key: str,
-        fingerprint: Optional[str] = None,
+        fingerprint: str,
         approved_by: str = "user",
     ) -> Optional[SemanticMetricDefinition]:
         """
-        Transitions candidate metric from AUTO_INFERRED / VALIDATED_CANDIDATE
+        Transitions candidate metric from AUTO_INFERRED / VALIDATED_CANDIDATE / SYSTEM_APPROVED
         to authoritative USER_APPROVED status strictly for the matching database fingerprint.
+        Fingerprint is required and cannot be empty or 'default'.
         """
+        if not fingerprint or fingerprint == "default":
+            logger.warning("approve_metric refused: valid specific fingerprint is required.")
+            return None
+
         with self._lock:
             conn = self._get_connection()
             try:
                 with conn:
                     cur = conn.cursor()
-                    if fingerprint:
-                        cur.execute(
-                            """
-                            UPDATE semantic_metrics
-                            SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
-                            WHERE metric_key = ? AND fingerprint = ?;
-                            """,
-                            (MetricStatus.USER_APPROVED.value, approved_by, metric_key, fingerprint),
-                        )
-                    else:
-                        cur.execute(
-                            """
-                            UPDATE semantic_metrics
-                            SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
-                            WHERE metric_key = ?;
-                            """,
-                            (MetricStatus.USER_APPROVED.value, approved_by, metric_key),
-                        )
+                    cur.execute(
+                        """
+                        UPDATE semantic_metrics
+                        SET status = ?, verified_by = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE metric_key = ? AND fingerprint = ?;
+                        """,
+                        (MetricStatus.USER_APPROVED.value, approved_by, metric_key, fingerprint),
+                    )
                     if cur.rowcount == 0:
                         return None
 
-                    if fingerprint:
-                        cur.execute(
-                            "SELECT * FROM semantic_metrics WHERE metric_key = ? AND fingerprint = ?;",
-                            (metric_key, fingerprint),
-                        )
-                    else:
-                        cur.execute(
-                            "SELECT * FROM semantic_metrics WHERE metric_key = ?;",
-                            (metric_key,),
-                        )
+                    cur.execute(
+                        "SELECT * FROM semantic_metrics WHERE metric_key = ? AND fingerprint = ?;",
+                        (metric_key, fingerprint),
+                    )
                     row = cur.fetchone()
                     if row:
                         return SemanticMetricDefinition(
@@ -430,9 +508,9 @@ Example format:
 
     def get_authoritative_metrics(self, fingerprint: Optional[str] = None) -> List[SemanticMetricDefinition]:
         """
-        Returns ONLY metrics with USER_APPROVED provenance matching the exact database fingerprint.
-        Unapproved metrics (AUTO_INFERRED, VALIDATED_CANDIDATE) and metrics from other databases
-        are strictly excluded.
+        Returns ONLY metrics with USER_APPROVED or SYSTEM_APPROVED provenance matching
+        the exact database fingerprint. Unapproved metrics (AUTO_INFERRED, VALIDATED_CANDIDATE)
+        and metrics from other databases are strictly excluded.
         """
         if not fingerprint:
             return []
@@ -445,10 +523,10 @@ Example format:
                 cur.execute(
                     """
                     SELECT * FROM semantic_metrics
-                    WHERE status = ? AND fingerprint = ?
+                    WHERE status IN (?, ?) AND fingerprint = ?
                     ORDER BY metric_key ASC;
                     """,
-                    (MetricStatus.USER_APPROVED.value, fingerprint),
+                    (MetricStatus.USER_APPROVED.value, MetricStatus.SYSTEM_APPROVED.value, fingerprint),
                 )
                 rows = cur.fetchall()
                 for r in rows:
@@ -514,7 +592,7 @@ Example format:
     ) -> str:
         """
         Formats authoritative business metric calculation formulas for LLM Text-to-SQL context.
-        Guarantees that only USER_APPROVED metrics for the matching fingerprint are injected.
+        Guarantees that only USER_APPROVED and SYSTEM_APPROVED metrics for the matching fingerprint are injected.
         """
         if not fingerprint:
             return ""

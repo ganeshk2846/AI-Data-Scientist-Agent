@@ -33,12 +33,16 @@ def analyze_customer_churn_risk(
     cur = conn.cursor()
 
     try:
-        # Verify required schema tables exist in the target database
-        required_tables = {"customer_segments", "customer_segment_history", "orders"}
+        # Verify required schema tables and columns exist in the target database
+        required_schema = {
+            "customer_segments": {"segment_id", "segment_name"},
+            "customer_segment_history": {"customer_id", "segment_id", "valid_to"},
+            "orders": {"customer_id", "total_amount", "order_id"},
+        }
         cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        existing_tables = {r[0] for r in cur.fetchall()}
-        missing = required_tables - existing_tables
-        if missing:
+        existing_tables = {r[0].lower() for r in cur.fetchall()}
+        missing_tables = set(required_schema.keys()) - existing_tables
+        if missing_tables:
             return AnalysisToolResult(
                 tool_name="analyze_customer_churn_risk",
                 analysis_type=AnalysisType.CHURN_RISK,
@@ -48,7 +52,28 @@ def analyze_customer_churn_risk(
                     computed_at=now_iso,
                     method_name="customer_segment_churn_analysis",
                 ),
-                abstain_reason=f"Target database does not support customer churn analysis: missing required tables ({', '.join(sorted(missing))}).",
+                abstain_reason=f"Target database does not support customer churn analysis: missing required tables ({', '.join(sorted(missing_tables))}).",
+            )
+
+        missing_columns_report = []
+        for tbl, expected_cols in required_schema.items():
+            cur.execute(f"PRAGMA table_info({tbl});")
+            existing_cols = {r[1].lower() for r in cur.fetchall()}
+            missing_cols = expected_cols - existing_cols
+            if missing_cols:
+                missing_columns_report.append(f"{tbl} missing columns: {', '.join(sorted(missing_cols))}")
+
+        if missing_columns_report:
+            return AnalysisToolResult(
+                tool_name="analyze_customer_churn_risk",
+                analysis_type=AnalysisType.CHURN_RISK,
+                success=False,
+                provenance=ProvenanceInfo(
+                    record_count=0,
+                    computed_at=now_iso,
+                    method_name="customer_segment_churn_analysis",
+                ),
+                abstain_reason=f"Target database does not support customer churn analysis: {'; '.join(missing_columns_report)}.",
             )
 
         # Query current active customer segments and total lifetime spend from orders
@@ -65,8 +90,21 @@ def analyze_customer_churn_risk(
             GROUP BY cs.segment_name
             ORDER BY total_spend DESC;
         """
-        cur.execute(query)
-        rows = cur.fetchall()
+        try:
+            cur.execute(query)
+            rows = cur.fetchall()
+        except sqlite3.Error as e:
+            return AnalysisToolResult(
+                tool_name="analyze_customer_churn_risk",
+                analysis_type=AnalysisType.CHURN_RISK,
+                success=False,
+                provenance=ProvenanceInfo(
+                    record_count=0,
+                    computed_at=now_iso,
+                    method_name="customer_segment_churn_analysis",
+                ),
+                abstain_reason=f"Execution error analyzing customer churn risk: {e}",
+            )
 
         if not rows:
             return AnalysisToolResult(

@@ -35,7 +35,8 @@ class MetricStatus(str, Enum):
     """Three-tier semantic metric lifecycle status."""
     AUTO_INFERRED = "AUTO_INFERRED"           # Tier 1: Draft/heuristic derivation
     VALIDATED_CANDIDATE = "VALIDATED_CANDIDATE" # Tier 2: AST-checked and execution-tested
-    USER_APPROVED = "USER_APPROVED"           # Tier 3: Human-verified authoritative ground truth
+    SYSTEM_APPROVED = "SYSTEM_APPROVED"         # Domain-validated baseline canonical metric
+    USER_APPROVED = "USER_APPROVED"             # Explicit human-verified authoritative ground truth
 
 
 # =====================================================================

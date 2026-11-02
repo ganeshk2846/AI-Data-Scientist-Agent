@@ -98,7 +98,8 @@ class ValueLinker:
 
         # 2. Specialized E-commerce Mappings: Only applied if schema has matching tables and columns
         if cat and cat.tables:
-            is_ecom = "orders" in cat.tables or "customer_segments" in cat.tables
+            from backend.app.retrieval.semantics import is_ecommerce_compatible
+            is_ecom = is_ecommerce_compatible(cat)
             if is_ecom:
                 for pattern, table, col, exact_val in ECOMMERCE_LITERAL_MAPPINGS:
                     # Verify table and column exist in active catalog

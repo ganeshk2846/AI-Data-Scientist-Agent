@@ -514,3 +514,83 @@ Created 11 comprehensive automated tests using isolated temporary test databases
 
 ### E. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+
+---
+
+## 5. Phase 3.2 — Final Architectural Hardening Before Phase 4
+
+- **Git Branch:** `v2/phase-3.2-final-hardening`
+- **Parent Commit:** `6a2743f`
+- **Date:** November 2026
+- **Status:** COMPLETED AND VERIFIED
+
+### A. Architectural Objectives & Resolutions
+
+1. **Objective 1 — Strengthened Multi-Entity E-Commerce Detection & Zero False Positives:**
+   - **Multi-Entity Topology:** Replaced weak single-table check (`orders` with `total_amount`, `order_status`) in `is_ecommerce_compatible()` in `backend/app/retrieval/semantics.py`.
+   - Now enforces multi-entity relational topology:
+     - Core transaction entity: `orders` (with required columns `total_amount`, `order_status`).
+     - Core customer entity: `customers`.
+     - At least one supporting domain entity: `order_items`, `products`, or `payments`.
+   - **Scenario D Elimination:** An unrelated manufacturing database with work orders (`orders`, `total_amount`, `order_status`, `machine_id`, `workshops`, `maintenance_logs`) strictly returns `is_ecommerce_compatible() == False` and seeds 0 metrics.
+   - **Per-Metric Required Columns & Predicates:** In `seed_baseline_canonical_metrics()`, added per-metric validation via `CANONICAL_METRIC_REQUIREMENTS`:
+     - Checks target tables and formula column dependencies before seeding each metric.
+     - Value predicate validation: for formulas filtering `LOWER(order_status) = 'delivered'`, validates that `'delivered'` exists in sample values when available.
+   - **Scenario E (Partial E-commerce):** A database with `orders`, `customers`, and `products` selectively seeds only the metrics whose required tables/columns exist (`gross_revenue`, `net_revenue`, `average_order_value`), while cleanly abstaining from missing-table metrics (`return_rate`, `customer_csat`, `marketing_roas`).
+   - **Value Linker Alignment:** In `backend/app/retrieval/value_linker.py`, gated domain-specific literal mappings strictly on `is_ecommerce_compatible(cat)`.
+
+2. **Objective 2 — Database-Scoped Approval API Security:**
+   - In `backend/app/api/v1/endpoints/retrieval.py` (`POST /api/v1/retrieval/metrics/approve`):
+     - Derives active database fingerprint server-side from `schema_service.get_cached_catalog()`.
+     - If no active database is connected or profiled, immediately returns `HTTP 400 Bad Request` (`"No active database connected."`).
+     - If the client supplies `body.fingerprint` and it does not match the server-derived active database fingerprint, immediately rejects with `HTTP 400 Bad Request` (`"Supplied fingerprint does not match active connected database."`).
+     - The server-verified active database fingerprint is the only fingerprint passed to downstream storage update.
+   - In `DynamicSemanticEngine.approve_metric(metric_key, fingerprint, approved_by)`:
+     - Requires non-empty, non-'default' `fingerprint`.
+     - Completely eliminated the unrestricted path updating by `metric_key` alone across all databases.
+
+3. **Objective 3 — Specialized Churn Pre-Execution Schema Validation:**
+   - In `backend/app/analysis/churn.py` (`analyze_customer_churn_risk`):
+     - Pre-validates required tables using `sqlite_master`: `customer_segments`, `customer_segment_history`, `orders`.
+     - Pre-validates required columns using `PRAGMA table_info`:
+       - `customer_segments`: `segment_id`, `segment_name`.
+       - `customer_segment_history`: `customer_id`, `segment_id`, `valid_to`.
+       - `orders`: `customer_id`, `total_amount`, `order_id`.
+     - Safely returns `AnalysisToolResult(success=False, abstain_reason=...)` if any table or column is missing.
+     - Enclosed query execution in controlled exception boundary (`try ... except sqlite3.Error`) to prevent unhandled database exceptions.
+
+4. **Objective 4 — Provenance & Authorization State Model Clarification:**
+   - Added `MetricStatus.SYSTEM_APPROVED = "SYSTEM_APPROVED"` in `backend/app/core/contracts.py`.
+   - Cleanly separated metric states:
+     - **Provenance:** `CANONICAL` (system baseline), `INFERRED` (LLM-generated), `CUSTOM_USER`.
+     - **Draft/Candidate:** `AUTO_INFERRED`, `VALIDATED_CANDIDATE` (strictly excluded from authoritative context).
+     - **Authoritative:** `SYSTEM_APPROVED` (system baseline canonical), `USER_APPROVED` (explicit human verification via `/metrics/approve`).
+   - Updated `seed_baseline_canonical_metrics()` to seed baseline metrics as `status=MetricStatus.SYSTEM_APPROVED.value` with `verified_by="system_baseline"`.
+   - In `get_authoritative_metrics(fingerprint)`: queries `WHERE status IN ('USER_APPROVED', 'SYSTEM_APPROVED') AND fingerprint = ?`.
+
+5. **Objective 5 — Targeted Regression Tests:**
+   - Added comprehensive test suite `backend/tests/test_phase3_2_hardening.py` with 12 new targeted tests covering all Objectives 1–4 and bitwise immutability.
+
+---
+
+### B. Empirical Test Execution & Timing Verification
+
+| Test Suite | Command | Collected | Passed | Failed | Skipped | Actual Duration | LLM Mode |
+|:---|:---|---:|---:|---:|---:|---:|:---:|
+| **Phase 3.2 Hardening Suite** | `pytest backend/tests/test_phase3_2_hardening.py` | 12 | 12 | 0 | 0 | **0.74s** | Offline / Mock |
+| **Phase 3.1 Domain Isolation Suite** | `pytest backend/tests/test_phase3_1_domain_isolation.py` | 11 | 11 | 0 | 0 | **65.28s** | Mixed (Unit + Live Ollama) |
+| **Phase 3 Retrieval & Semantics Suite** | `pytest backend/tests/test_phase3_retrieval_semantics.py` | 12 | 12 | 0 | 0 | **6.54s** | Offline / Mock |
+| **Phase 1 Adapters & Safety** | `pytest backend/tests/test_adapters.py backend/tests/test_read_only_safety.py` | 11 | 11 | 0 | 0 | **1.20s** | Offline / Mock |
+| **Phase 2 Vertical Slice Suite** | `pytest backend/tests/test_vertical_slice.py` | 8 | 8 | 0 | 0 | **218.46s** | Live local Ollama `qwen3:4b` |
+| **Active V2 Test Suite (Total)** | Phase 1 + Phase 2 + Phase 3 + Phase 3.1 + Phase 3.2 | 54 | 54 | 0 | 0 | **290.72s** | Complete Live Verification |
+
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before and after Phase 3.2: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E` (100% bitwise invariant; 0 writes).
+- **Tracked Legacy V1 Failures (17 items):**
+  - All 17 historical baseline test failures remain cleanly isolated and unchanged. Zero new regressions.
+
+---
+
+### C. Phase Completion Status
+**COMPLETED AND VERIFIED.**

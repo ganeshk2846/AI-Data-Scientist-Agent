@@ -77,6 +77,12 @@ def _create_synthetic_ecommerce_db(path: Path) -> Tuple[SQLiteAdapter, DatabaseC
     conn = sqlite3.connect(str(path))
     with conn:
         conn.execute("""
+            CREATE TABLE customers (
+                customer_id INTEGER PRIMARY KEY,
+                customer_name TEXT NOT NULL
+            );
+        """)
+        conn.execute("""
             CREATE TABLE orders (
                 order_id INTEGER PRIMARY KEY,
                 customer_id INTEGER NOT NULL,
@@ -103,6 +109,8 @@ def _create_synthetic_ecommerce_db(path: Path) -> Tuple[SQLiteAdapter, DatabaseC
                 FOREIGN KEY (order_id) REFERENCES orders(order_id)
             );
         """)
+        conn.execute("INSERT INTO customers VALUES (10, 'Alice');")
+        conn.execute("INSERT INTO customers VALUES (11, 'Bob');")
         conn.execute("INSERT INTO orders VALUES (1, 10, '2026-01-01', 'delivered', 150.0);")
         conn.execute("INSERT INTO orders VALUES (2, 11, '2026-01-02', 'cancelled', 80.0);")
         conn.execute("INSERT INTO order_items VALUES (1, 1, 1001, 2, 75.0);")

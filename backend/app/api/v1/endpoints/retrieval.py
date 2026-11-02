@@ -111,7 +111,21 @@ async def approve_metric(
 ) -> APIResponse[SemanticMetricDefinition]:
     request_id = getattr(request.state, "request_id", None)
     catalog = schema_service.get_cached_catalog()
-    active_fp = body.fingerprint or (getattr(catalog, "fingerprint", None) if catalog else None)
+    if not catalog:
+        try:
+            catalog = schema_service.profile_database(force_refresh=False)
+        except Exception:
+            catalog = None
+
+    active_fp = getattr(catalog, "fingerprint", None) if catalog else None
+    if not catalog or not active_fp:
+        raise HTTPException(status_code=400, detail="No active database connected.")
+
+    if body.fingerprint and body.fingerprint != active_fp:
+        raise HTTPException(
+            status_code=400,
+            detail="Supplied fingerprint does not match active connected database.",
+        )
     approved = dynamic_semantic_engine.approve_metric(body.metric_key, fingerprint=active_fp, approved_by=body.approved_by)
     if not approved:
         raise HTTPException(status_code=404, detail=f"Metric '{body.metric_key}' not found.")
