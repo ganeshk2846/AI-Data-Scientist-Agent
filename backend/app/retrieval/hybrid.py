@@ -38,11 +38,24 @@ class HybridSchemaRetriever:
 
     def __init__(self, catalog: Optional[DatabaseCatalog] = None):
         self.catalog = catalog or schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
-        self.corpus = SchemaCorpus(self.catalog)
-        self.bm25 = BM25Retriever(self.corpus)
-        self.embedding = LocalTFIDFEmbeddingRetriever(self.corpus)
+        self.corpus = SchemaCorpus(self.catalog) if self.catalog else None
+        self.bm25 = BM25Retriever(self.corpus) if self.corpus else None
+        self.embedding = LocalTFIDFEmbeddingRetriever(self.corpus) if self.corpus else None
 
-    def retrieve(self, query: str, top_k: int = 5, max_expanded: int = 7) -> HybridRetrievalResult:
+    def ensure_catalog(self, catalog: Optional[DatabaseCatalog] = None):
+        """Ensures retriever indexes the latest active database catalog."""
+        target = catalog or schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
+        if target is not None:
+            if self.catalog is None or self.catalog.source_fingerprint != target.source_fingerprint or not self.corpus or not self.corpus.documents:
+                self.catalog = target
+                self.corpus = SchemaCorpus(self.catalog)
+                self.bm25 = BM25Retriever(self.corpus)
+                self.embedding = LocalTFIDFEmbeddingRetriever(self.corpus)
+
+    def retrieve(self, query: str, top_k: int = 5, max_expanded: int = 7, catalog: Optional[DatabaseCatalog] = None) -> HybridRetrievalResult:
+        self.ensure_catalog(catalog)
+        if not self.corpus or not self.bm25 or not self.embedding:
+            raise RuntimeError("HybridSchemaRetriever catalog is not available.")
         # 1. BM25 Search
         bm25_results = self.bm25.search(query, top_k=20)
         bm25_ranks = {tbl: rank for rank, (tbl, _) in enumerate(bm25_results, start=1)}

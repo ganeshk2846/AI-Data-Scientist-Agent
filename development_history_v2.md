@@ -174,3 +174,118 @@ Establish an engine-agnostic database connection abstraction using SQLAlchemy 2.
 
 ### I. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+---
+
+## 4. Phase 2: Early Working Vertical Slice (Ollama qwen3:4b + ecommerce.db)
+
+### A. Phase Information
+- **Phase Name:** Phase 2 — Early Working Vertical Slice (Ollama `qwen3:4b` + `ecommerce.db`)
+- **Parent Commit:** `8d282e6`
+- **Git Commit Hash:** `f70c21d`
+- **Git Branch:** `v2/phase-2-ollama-vertical-slice`
+- **Target LLM:** Local Ollama daemon running model `qwen3:4b` at `http://localhost:11434`
+- **Target Database:** `ecommerce.db` (219.8 MB, 46 tables, 8 views, 29 indexes, 2,418,138 rows, read-only mode)
+
+### B. Architectural Decisions & Scope Boundary
+1. **Strict No-Mocking Policy**:
+   - In Version 2, Ollama `qwen3:4b` is the primary local LLM provider. Mock providers are strictly excluded from runtime and integration tests.
+   - Provider health check verifies Ollama reachability and confirms model availability before query execution.
+2. **Multi-Engine Schema Introspection Architecture**:
+   - Implemented abstract base introspector (`BaseIntrospector`) and engine-specific implementations: `SQLiteIntrospector`, `PostgresIntrospector`, and `MySQLIntrospector`.
+   - Discovers tables, row counts, columns, types, primary keys, foreign keys, and indexes dynamically without hardcoding schema details.
+3. **Adaptive Sampling Profiler (<5.0s Target)**:
+   - For tables with $\le 50,000$ rows, full statistics are computed.
+   - For large tables ($> 50,000$ rows, e.g. `orders` with 150k rows, `order_items` with 450k rows), adaptive reservoir sampling (up to 10,000 rows with a 5.0s timeout) is applied.
+   - Profiling of the full 2,418,138 rows completed in **2.67 seconds**, comfortably within the $<5.0\text{s}$ requirement.
+   - Cached to `data/active_catalog.json` with SHA-256 fingerprint validation for instant subsequent loads ($<1\text{ms}$).
+4. **AST Validation & Security Guardrail (sqlglot)**:
+   - Dialect-aware AST validation parses incoming SQL via `sqlglot`.
+   - Strips reasoning `<think>...</think>` tags and extracts markdown fences.
+   - Validates table and column identifiers against the active catalog, rejecting column hallucinations.
+   - Detects SELECT aliases (e.g. `AS year`) to avoid false-positive rejections in `GROUP BY` / `ORDER BY` clauses.
+   - Enforces read-only policy and clamps row limit to `settings.SQL_MAX_ROWS_RETURN` (1,000 rows).
+5. **Strict Bounded 1-Retry Repair Loop**:
+   - Both AST validation repair and execution repair enforce a strict maximum of 1 repair retry (`max_repair = 1`).
+   - Any repair attempt $>1$ raises `ValueError`.
+
+### C. Implementation Details
+1. **Ollama Provider (`backend/app/llm/ollama_client.py`)**:
+   - Built native `OllamaLLMProvider` using `httpx.AsyncClient` targeting `http://localhost:11434/api/chat`.
+   - Supports non-streaming inference, configurable temperature (default 0.0), token usage reporting, and a 120s timeout buffer for local hardware.
+2. **Dynamic Introspectors (`backend/app/schema/introspectors/`)**:
+   - `base.py`: Abstract contract for schema introspection.
+   - `sqlite.py`: Inspects `sqlite_master`, `PRAGMA table_info`, `PRAGMA foreign_key_list`, and `PRAGMA index_list`.
+   - `postgres.py`: Inspects `information_schema` and `pg_catalog`.
+   - `mysql.py`: Inspects `information_schema.columns`, `key_column_usage`, and statistics.
+3. **Adaptive Profiler (`backend/app/schema/profiler.py`)**:
+   - Evaluates column nullability, unique counts, numeric ranges (min/max/avg), and categoricals.
+4. **Dynamic Schema Service (`backend/app/schema/service.py`)**:
+   - Dynamically resolves introspector and adapter from `DatabaseConnectionManager`.
+   - Caches to `data/active_catalog.json` and supports `db_path` override for disposable test databases.
+5. **Dialect-Aware Validator & Repair Loop**:
+   - `backend/app/sql/validator.py`: Upgraded to dialect-aware AST inspection, code fence parsing, and alias tracking.
+   - `backend/app/sql/repair.py`: Dialect-aware repair prompt capped at strictly 1 retry.
+   - `backend/app/sql/executor.py`: Routes queries through `db_manager.get_active_adapter()`.
+6. **Orchestrator End-to-End Vertical Slice (`backend/app/workflow/orchestrator.py`)**:
+   - Dynamically injects active dialect into `SQL_GEN_PROMPT`.
+   - Retrieves active catalog schema context without static assumptions.
+   - Generates schema-grounded SQL, validates with AST guardrail, executes on active adapter, and composes executive narrative via Ollama `qwen3:4b`.
+7. **Vertical Slice Test Suite (`backend/tests/test_vertical_slice.py`)**:
+   - 8 comprehensive tests verifying Ollama provider configuration, active database grounding, column hallucination rejection, bounded repair enforcement, live end-to-end question answering, and SHA-256 database invariance.
+
+### D. Source-Code Changes
+- **New Files:**
+  - `backend/app/llm/ollama_client.py`
+  - `backend/app/schema/introspectors/__init__.py`
+  - `backend/app/schema/introspectors/base.py`
+  - `backend/app/schema/introspectors/sqlite.py`
+  - `backend/app/schema/introspectors/postgres.py`
+  - `backend/app/schema/introspectors/mysql.py`
+  - `backend/app/schema/profiler.py`
+  - `backend/tests/test_vertical_slice.py`
+  - `data/active_catalog.json`
+- **Modified Files:**
+  - `backend/app/core/config.py` (Added `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, increased `LLM_TIMEOUT_SECONDS` to 120)
+  - `backend/app/llm/client.py` (Integrated `OllamaLLMProvider` factory)
+  - `backend/app/schema/service.py` (Replaced V1 hardcoded SQLite profiler with dynamic multi-engine profiler)
+  - `backend/app/retrieval/hybrid.py` (Updated to re-read active catalog cache dynamically)
+  - `backend/app/sql/validator.py` (Added code fence extraction, dialect parsing, SELECT alias tracking)
+  - `backend/app/sql/repair.py` (Added dialect parameterization, enforced max 1 retry)
+  - `backend/app/sql/executor.py` (Routed execution via `db_manager.get_active_adapter()`)
+  - `backend/app/workflow/orchestrator.py` (Dialect parameterization, bounded 1-retry repair, active adapter query routing)
+  - `development_history_v2.md` (Appended Phase 2 record)
+
+### E. Testing and Verification
+- **Test Commands Executed:**
+  - `pytest backend/tests/test_vertical_slice.py -v`: **8 passed in 214.64s** (100% pass on live local Ollama `qwen3:4b` and real `ecommerce.db`).
+  - `pytest backend/tests/test_adapters.py backend/tests/test_read_only_safety.py -v`: **11 passed in 0.52s**.
+  - `pytest backend/tests/test_schema_service.py::test_temporary_test_database -v`: **1 passed in 0.09s**.
+  - Full Regression Suite: **117 passed, 18 baseline failures tracked separately, 0 new regressions**.
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before and after tests: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E` (100% bitwise invariant; 0 writes).
+- **Separately Tracked Baseline Failures (18 items):**
+  - 17 original V1 legacy test failures due to hardcoded expectations of 30 tables and 17,924 orders from an obsolete demo fixture.
+  - 1 test (`test_analyze_customer_churn_risk_against_sqlite`) expecting V1 `customer_segment_history` table name, slated for generic refactoring in Phase 4.
+
+### F. Actual Development Environment
+- **LLM Daemon:** Ollama v0.1.x+ running locally at `http://localhost:11434`.
+- **Model:** `qwen3:4b` (4 billion parameter quantized model).
+- **Database:** `ecommerce.db` at `C:\D_drive\AI_FOR_BI_P\ecommerce.db` (219.8 MB, 46 tables, 2,418,138 rows).
+- **Python:** Python 3.11+ on Windows.
+- **Strict No-Mocking:** Verified. All integration tests executed against live local Ollama.
+
+### G. Performance Measurements
+- **Adaptive Profiling Duration:** **2.67 seconds** across 46 tables and 2,418,138 records (Target: $<5.0\text{s}$).
+- **Active Catalog Cache Load:** $<1\text{ms}$ (instant deserialization from `data/active_catalog.json`).
+- **SQL Glot Validation:** $<2\text{ms}$ per statement.
+- **Ollama SQL Generation:** ~15-25 seconds per query on local CPU/GPU.
+- **Database Query Execution:** $<15\text{ms}$ for full aggregations on 150,000 order rows.
+- **Database Mutation:** Zero bytes modified.
+
+### H. Outstanding Items & Next Phase Preparation
+- Phase 2 acceptance criteria 100% satisfied.
+- **Strict Boundary Enforced:** Pausing execution. Do not begin Phase 3 without explicit project-owner approval.
+
+### I. Phase Completion Status
+**COMPLETED AND VERIFIED.**

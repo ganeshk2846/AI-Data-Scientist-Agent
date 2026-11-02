@@ -11,6 +11,7 @@ from backend.app.core.config import settings
 from backend.app.core.errors import ConfigurationError
 from backend.app.core.logging import logger
 from backend.app.llm.models import LLMMessage, LLMRequest, LLMResponse
+from backend.app.llm.ollama_client import OllamaLLMProvider
 
 
 class BaseLLMProvider(ABC):
@@ -216,19 +217,27 @@ def get_llm_provider() -> BaseLLMProvider:
     """Factory returning the active LLM provider based on application settings."""
     provider_type = settings.LLM_PROVIDER.lower()
 
+    if provider_type == "ollama":
+        return OllamaLLMProvider(
+            base_url=settings.OLLAMA_BASE_URL,
+            model=settings.OLLAMA_MODEL,
+        )
+
     if provider_type == "gemini" and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("your_"):
         try:
             return GeminiProvider(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
         except Exception as e:
-            logger.warning(f"Failed to instantiate Gemini provider: {e}. Falling back to Mock.")
-            return MockLLMProvider()
+            logger.warning(f"Failed to instantiate Gemini provider: {e}. Falling back to Ollama.")
+            return OllamaLLMProvider()
 
     if provider_type == "openai" and settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
         try:
             return OpenAIProvider(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL)
         except Exception as e:
-            logger.warning(f"Failed to instantiate OpenAI provider: {e}. Falling back to Mock.")
-            return MockLLMProvider()
+            logger.warning(f"Failed to instantiate OpenAI provider: {e}. Falling back to Ollama.")
+            return OllamaLLMProvider()
 
-    # Default to schema-grounded Mock provider for local development without credentials
-    return MockLLMProvider()
+    if provider_type == "mock":
+        return MockLLMProvider()
+
+    return OllamaLLMProvider()

@@ -62,8 +62,16 @@ class Settings(BaseSettings):
 
     # LLM Provider Configuration (Optional at startup)
     LLM_PROVIDER: str = Field(
-        default="mock",
-        description="LLM provider: openai, anthropic, gemini, or mock",
+        default="ollama",
+        description="LLM provider: ollama, openai, anthropic, gemini, or mock",
+    )
+    OLLAMA_BASE_URL: str = Field(
+        default="http://localhost:11434",
+        description="Base URL for local Ollama daemon",
+    )
+    OLLAMA_MODEL: str = Field(
+        default="qwen3:4b",
+        description="Local Ollama model identifier",
     )
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o-mini"
@@ -75,7 +83,7 @@ class Settings(BaseSettings):
     # Timeouts & safety limits
     SQL_QUERY_TIMEOUT_SECONDS: int = 30
     SQL_MAX_ROWS_RETURN: int = 1000
-    LLM_TIMEOUT_SECONDS: int = 45
+    LLM_TIMEOUT_SECONDS: int = 120
 
     @property
     def resolved_ecommerce_db_path(self) -> Path:
@@ -102,6 +110,8 @@ class Settings(BaseSettings):
             return bool(self.ANTHROPIC_API_KEY and self.ANTHROPIC_API_KEY.strip() and not self.ANTHROPIC_API_KEY.startswith("your_"))
         elif provider == "gemini":
             return bool(self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip() and not self.GEMINI_API_KEY.startswith("your_"))
+        elif provider == "ollama":
+            return True
         elif provider == "mock":
             return True
         return False

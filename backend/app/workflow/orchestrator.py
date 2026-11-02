@@ -25,6 +25,7 @@ from backend.app.analysis.contracts import AnalysisToolResult
 from backend.app.analysis.registry import analysis_registry
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
+from backend.app.db.manager import db_manager
 from backend.app.memory.service import memory_service
 from backend.app.observability.tracer import RunTraceRecord, observability_tracer
 from backend.app.security.guardrails import detect_prompt_injection, validate_sql_security
@@ -39,13 +40,13 @@ from backend.app.sql.repair import sql_repair_loop
 from backend.app.sql.validator import sql_validator
 from backend.app.workflow.models import StepTrace, VerificationResult, WorkflowProgressState
 
-SQL_GEN_PROMPT = """You are an expert Data Scientist and SQL Engineer specializing in SQLite.
-Write a single, safe, read-only SQLite SELECT query to answer the user's business question.
+SQL_GEN_PROMPT = """You are an expert Data Scientist and SQL Engineer specializing in {dialect}.
+Write a single, safe, read-only {dialect} SELECT query to answer the user's business question.
 
 STRICT CONSTRAINTS:
 1. Use ONLY the table and column identifiers provided in the schema context below.
 2. NEVER invent column names or table names.
-3. Use SQLite functions (e.g. strftime, ROUND, COUNT, SUM, AVG).
+3. Use {dialect} functions (e.g. for SQLite: strftime, ROUND, COUNT, SUM, AVG; for PostgreSQL: DATE_TRUNC, EXTRACT, ROUND; for MySQL: DATE_FORMAT, ROUND).
 4. For revenue or money values, ROUND(..., 2).
 5. Output ONLY the raw SQL inside a markdown ```sql code block. No extra conversation.
 
@@ -283,7 +284,7 @@ class MultiAgentOrchestrator:
         if progress_callback:
             progress_callback("retrieving_schema", "Running hybrid BM25 + embedding RRF retrieval and linking values...")
 
-        retrieval_res = hybrid_retriever.retrieve(effective_query, top_k=5)
+        retrieval_res = hybrid_retriever.retrieve(effective_query, top_k=5, catalog=catalog)
         selected_tables = retrieval_res.selected_table_names
         schema_prompt = retrieval_res.minimal_schema_prompt
 
@@ -323,11 +324,20 @@ class MultiAgentOrchestrator:
         s3_start = time.perf_counter()
         if progress_callback:
             progress_callback("generating_query", "Generating schema-grounded SQL query candidate...")
+
+        active_adapter = None
+        try:
+            active_adapter = db_manager.get_active_adapter()
+        except Exception:
+            pass
+        dialect_name = active_adapter.engine_type.value.capitalize() if active_adapter else settings.DATABASE_DIALECT.capitalize()
+
         gen_req = LLMRequest(
             messages=[
                 LLMMessage(
                     role="system",
                     content=SQL_GEN_PROMPT.format(
+                        dialect=dialect_name,
                         schema_context=schema_prompt,
                         linked_values_context=linked_str,
                         metrics_context=metrics_str,
@@ -347,15 +357,15 @@ class MultiAgentOrchestrator:
             message="Initial SQL candidate generated.",
         ))
 
-        # Step 6: SQL Validation & Bounded Repair Loop (Max 2 Attempts)
+        # Step 6: SQL Validation & Bounded Repair Loop (Max 1 Attempt)
         s4_start = time.perf_counter()
         if progress_callback:
             progress_callback("validating_query", "Validating query AST with sqlglot guardrail...")
         is_valid, sanitized_sql, val_errors = sql_validator.validate_and_format_sql(raw_sql, catalog)
 
-        # Repair loop if validation failed
+        # Repair loop if validation failed (strictly 1 attempt in Version 2)
         attempt = 1
-        while not is_valid and attempt <= 2:
+        while not is_valid and attempt <= 1:
             logger.warning(f"SQL validation failed: {val_errors}. Starting repair attempt {attempt}...")
             repair = await sql_repair_loop.attempt_repair(
                 query=query,
@@ -406,21 +416,21 @@ class MultiAgentOrchestrator:
             message=f"SQL validated successfully (repair attempts: {len(repair_attempts)}).",
         ))
 
-        # Step 7: Execution (with bounded execution repair up to 2 attempts)
+        # Step 7: Execution (with bounded execution repair strictly capped at 1 attempt)
         s5_start = time.perf_counter()
         if progress_callback:
-            progress_callback("running_query", "Executing read-only query on ecommerce.sqlite...")
+            progress_callback("running_query", f"Executing read-only query on {dialect_name}...")
         query_result: Optional[QueryExecutionResult] = None
         attempt_exec = 0
         last_exec_err: Optional[Exception] = None
-        while attempt_exec < 2:
+        while attempt_exec < 1:
             try:
                 query_result = sql_executor.execute_query(sanitized_sql)
                 break
             except Exception as exec_err:
                 last_exec_err = exec_err
                 attempt_exec += 1
-                if len(repair_attempts) < 2:
+                if len(repair_attempts) < 1:
                     logger.warning(f"Query execution error: {exec_err}. Attempting repair {attempt_exec}...")
                     try:
                         exec_repair = await sql_repair_loop.attempt_repair(
@@ -434,7 +444,11 @@ class MultiAgentOrchestrator:
                         repair_attempts.append(exec_repair)
                         if exec_repair.validation_passed and exec_repair.repaired_sql:
                             sanitized_sql = exec_repair.repaired_sql
-                            continue
+                            try:
+                                query_result = sql_executor.execute_query(sanitized_sql)
+                                break
+                            except Exception as re_err:
+                                last_exec_err = re_err
                     except Exception as rep_err:
                         logger.warning(f"Repair attempt failed: {rep_err}")
                 break
