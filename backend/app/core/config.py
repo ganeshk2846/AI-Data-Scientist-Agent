@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8001
     LOG_LEVEL: str = "INFO"
+    APP_SECRET_KEY: str = Field(
+        default="ai-for-bi-secret-key-32b-change-in-production",
+        description="Secret key for symmetric credential encryption",
+    )
 
     # CORS settings
     CORS_ORIGINS: List[str] = [

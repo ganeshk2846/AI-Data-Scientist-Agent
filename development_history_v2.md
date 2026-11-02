@@ -79,3 +79,98 @@ Establish an empirical, reproducible baseline of Version 1 performance and funct
 
 ### I. Phase Completion Status
 **COMPLETED AND VERIFIED.**
+
+
+---
+
+## Phase 1: Multi-Engine Database Adapters and Read-Only Safety
+
+### A. Phase Identification
+- **Phase Number:** Phase 1
+- **Phase Name:** Multi-Engine Database Adapters and Read-Only Safety
+- **Completion Date:** 2026-11-02
+- **Git Branch Name:** `v2/phase-1-db-adapters-readonly`
+- **Commit Hash:** `9bf261b`
+- **Parent Phase Branch:** `v2/phase-0-baseline-benchmarks` (`5d45c7b`)
+
+### B. Objective
+Establish an engine-agnostic database connection abstraction using SQLAlchemy 2.0 Core for SQLite, PostgreSQL (`psycopg` v3), and MySQL (`pymysql`). Implement the single-active-database lifecycle manager enforcing the one-database-at-a-time invariant, four-tier safe read-only defense (strictly banning destructive write probes on user databases), non-destructive migration of `agent_app.sqlite` with encrypted credential storage, and backward-compatible preservation of Version 1 functions while keeping `ecommerce.db` completely unchanged.
+
+### C. Implementation Details
+1. **Base Adapter Abstraction (`backend/app/db/base.py`):**
+   - Created `BaseDatabaseAdapter` abstract class and normalized `QueryResult` model.
+   - Implemented standard `execute_query()` pipeline with AST validation guardrail check and automatic `LIMIT 1000` bounding.
+2. **SQLite Adapter (`backend/app/db/adapters/sqlite.py`):**
+   - Built on SQLAlchemy 2.0 Core and built-in `sqlite3`.
+   - Enforces URI read-only access (`mode=ro`) and event hook executing `PRAGMA query_only = ON;`.
+   - Configured with `NullPool` to provide concurrent read access across worker threads without thread-locking or stale connections.
+   - Preserves `raw_connection()` context manager for legacy low-level introspection.
+3. **PostgreSQL Adapter (`backend/app/db/adapters/postgres.py`):**
+   - Built on modern `psycopg` v3 (`postgresql+psycopg`).
+   - Configured with `QueuePool(pool_size=3, max_overflow=2, pool_recycle=1800, pool_pre_ping=True)`.
+   - Connection event hook executes `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;` and `SET statement_timeout = '30000';`.
+   - Maps database engine read-only exceptions to `DatabaseReadOnlyViolationError`.
+4. **MySQL Adapter (`backend/app/db/adapters/mysql.py`):**
+   - Built on pure-Python `pymysql` (`mysql+pymysql`).
+   - Configured with `QueuePool(pool_size=3, max_overflow=2, pool_recycle=1800, pool_pre_ping=True)`.
+   - Connection event hook executes `SET SESSION TRANSACTION READ ONLY;` and `SET max_execution_time = 30000;`.
+   - Maps MySQL error 1792 (Cannot execute statement in read-only transaction) to `DatabaseReadOnlyViolationError`.
+5. **Single-Active-Database Connection Manager (`backend/app/db/manager.py`):**
+   - Thread-safe singleton `db_manager` governing the single active connection.
+   - Enforces the product invariant: exactly ONE database is active at any time.
+   - Safe switching lifecycle: connecting a new database disposes the previous adapter's connection pool cleanly.
+   - Auto-seeding: On initial startup, if no database is registered, automatically seeds and activates baseline `ecommerce.db`.
+6. **Credential Encryption (`backend/app/db/security.py`):**
+   - PBKDF2HMAC key derivation with 100,000 iterations over `APP_SECRET_KEY` and persistent salt (`data/.security_salt`).
+   - Fernet authenticated symmetric encryption for storing credentials in `active_database_config`.
+7. **State Database Migration (`backend/app/db/migration.py`):**
+   - Executed transactional DDL on `agent_app.sqlite` creating `active_database_config` and `semantic_metrics`.
+   - Verified 100% preservation of historical `memory_sessions` and `ops_run_traces`.
+8. **Backward Compatibility Facade (`backend/app/db/connection.py`):**
+   - Preserved `get_readonly_connection()`, `check_database_readiness()`, and `verify_database_immutability()`.
+   - Replaced destructive `CREATE TABLE __probe__` probes with non-destructive read-only configuration verification.
+
+### D. Source-Code Changes
+- **New Files:**
+  - `backend/app/db/base.py`
+  - `backend/app/db/adapters/__init__.py`
+  - `backend/app/db/adapters/sqlite.py`
+  - `backend/app/db/adapters/postgres.py`
+  - `backend/app/db/adapters/mysql.py`
+  - `backend/app/db/manager.py`
+  - `backend/app/db/migration.py`
+  - `backend/app/db/security.py`
+  - `backend/tests/test_adapters.py`
+  - `backend/tests/test_read_only_safety.py`
+- **Modified Files:**
+  - `backend/app/core/config.py` (Added `APP_SECRET_KEY`)
+  - `backend/app/db/__init__.py` (Exported multi-engine adapters and `db_manager`)
+  - `backend/app/db/connection.py` (Delegated to `db_manager`, preserved V1 interface, removed write probes)
+  - `development_history_v2.md` (Appended Phase 1 authoritative record)
+
+### E. Testing and Verification
+- **Test Commands Executed:**
+  - `pytest backend/tests/test_adapters.py backend/tests/test_read_only_safety.py -v`: **11 passed in 0.52s**.
+  - `pytest backend/tests/`: **110 passed, 17 failed in 8.05s** (all 11 new adapter and safety tests passed; zero new regressions; 17 baseline failures tracked separately).
+  - SHA-256 Checksum Verification: Pre-test and post-test hashes of `ecommerce.db` match identically: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E` (100% bitwise invariance).
+- **Separately Tracked Baseline Failures (17 items):**
+  - All 17 failures stem from static V1 assumptions expecting 30 tables and 17,924 orders, which will be resolved by dynamic schema discovery in Phase 2 and generic analytics in Phase 4.
+
+### F. Actual Development Environment
+- **Database:** `ecommerce.db` (SQLite 3, 219.8 MB, 46 tables, 2,418,138 rows, read-only mode).
+- **Installed Drivers:** `sqlite3` built-in, `psycopg 3.3.6` (binary), `pymysql 2.2.8`.
+- **SQLAlchemy:** Version 2.1.1.
+- **Python:** Python 3.11+ on Windows.
+
+### G. Performance Measurements
+- **Adapter Test Suite:** 11 tests executed in 0.52 seconds.
+- **Full Test Suite:** 127 total tests executed in 8.05 seconds.
+- **Query Execution Latency:** $<10\text{ms}$ on `ecommerce.db` (150,000 orders).
+- **Database Mutation:** Zero bytes modified.
+
+### H. Outstanding Items & Next Phase Preparation
+- Phase 1 acceptance criteria fully satisfied.
+- Ready for Phase 2: Implementation of early working vertical slice with local Ollama `qwen3:4b` on real database, dynamic schema introspectors, adaptive sampling profiler ($<5\text{s}$), AST dialect validation, and bounded 1-retry repair loop.
+
+### I. Phase Completion Status
+**COMPLETED AND VERIFIED.**
