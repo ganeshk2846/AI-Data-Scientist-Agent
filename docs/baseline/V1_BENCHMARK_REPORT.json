@@ -1,0 +1,88 @@
+{
+  "benchmark_metadata": {
+    "version": "1.0.0-baseline",
+    "timestamp": "2026-11-02T19:00:00+05:30",
+    "git_branch": "v2/phase-0-baseline-benchmarks",
+    "parent_commit": "dbeaf9e",
+    "evaluation_harness": "scripts/run_evaluation.py"
+  },
+  "environment": {
+    "os": "Windows",
+    "python_version": "3.11+",
+    "database": {
+      "name": "ecommerce.db",
+      "path": "C:\\D_drive\\AI_FOR_BI_P\\ecommerce.db",
+      "engine": "sqlite3",
+      "size_bytes": 219873280,
+      "size_mb": 219.8,
+      "table_count": 46,
+      "view_count": 8,
+      "index_count": 29,
+      "total_rows": 2418138,
+      "access_mode": "read_only"
+    },
+    "llm_provider": {
+      "provider": "ollama",
+      "base_url": "http://localhost:11434",
+      "model": "qwen3:4b",
+      "status": "online",
+      "cold_load_latency_s": 16.79,
+      "warm_latency_s": 25.03
+    }
+  },
+  "existing_test_suite_results": {
+    "total_tests": 116,
+    "passed": 99,
+    "failed": 17,
+    "pass_rate_pct": 85.34,
+    "duration_s": 8.01,
+    "failure_analysis": {
+      "category": "hardcoded_v1_assumptions",
+      "details": "All 17 failures stem from static e-commerce assumptions written for a 30-table/17k-row subset rather than genuine code crashes. Specifically: expecting 30 tables vs 46 (test_health, test_schema_service), expecting 17,924 orders vs 150,000 (test_db_connection, test_schema_service), missing 'brands' table (test_db_connection), and singular 'customer_segment_history' vs plural 'customer_segments_history' (test_analysis_tools)."
+    }
+  },
+  "evaluation_harness_metrics": {
+    "security_adversarial": {
+      "total_cases": 5,
+      "passed": 5,
+      "block_rate_pct": 100.0,
+      "status": "PASS"
+    },
+    "answerability_refusal": {
+      "total_cases": 5,
+      "passed": 5,
+      "refusal_rate_pct": 100.0,
+      "status": "PASS"
+    },
+    "intent_routing": {
+      "total_cases": 5,
+      "passed": 5,
+      "accuracy_pct": 100.0,
+      "status": "PASS"
+    },
+    "gold_sql_execution": {
+      "total_cases": 10,
+      "passed": 0,
+      "precision_pct": 0.0,
+      "note": "Gold queries had hardcoded expected values for small 17,924-row dataset. Executing against real 2.4M-row ecommerce.db yields actual warehouse values (e.g. 150,000 orders vs expected 17,924)."
+    },
+    "latency_benchmarks_ms": {
+      "ast_validation_p50": 0.59,
+      "ast_validation_p95": 19.00
+    }
+  },
+  "contracts_frozen": [
+    "SupportedEngine",
+    "ConnectionStatus",
+    "MetricStatus",
+    "ActiveDatabaseConfig",
+    "DatabaseStatusResponse",
+    "ColumnProfile",
+    "ForeignKeyRelation",
+    "TableMetadata",
+    "DatabaseCatalog",
+    "SemanticMetricDefinition",
+    "ChatQueryRequest",
+    "MultiAgentWorkflowResult"
+  ]
+}

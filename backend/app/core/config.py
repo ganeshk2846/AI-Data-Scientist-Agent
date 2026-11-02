@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # Database paths
     ECOMMERCE_DB_PATH: str = Field(
-        default="ecommerce.sqlite",
+        default="ecommerce.db",
         description="Path to read-only business SQLite warehouse",
     )
     APP_DB_PATH: str = Field(

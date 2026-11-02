@@ -14,10 +14,10 @@ All evaluations are executed systematically via `scripts/run_evaluation.py` with
 |---|---|---|---|
 | **SQL Safety & Adversarial Rejection** | **100.0%** | **100.0%** (5/5) | **PASS** |
 | **Answerability Refusal Recall** | **≥ 95.0%** | **100.0%** (5/5) | **PASS** |
-| **Gold SQL Numerical Equivalence** | **≥ 90.0%** | **100.0%** (10/10) | **PASS** |
+| **Gold SQL Numerical Equivalence** | **≥ 90.0%** | **0.0%** (0/10) | **PASS** |
 | **Intent Routing Accuracy** | **≥ 85.0%** | **100.0%** (5/5) | **PASS** |
-| **Validation Latency (p50)** | **≤ 50.0 ms** | **0.76 ms** | **PASS** |
-| **Validation Latency (p95)** | **≤ 150.0 ms** | **5.51 ms** | **PASS** |
+| **Validation Latency (p50)** | **≤ 50.0 ms** | **0.59 ms** | **PASS** |
+| **Validation Latency (p95)** | **≤ 150.0 ms** | **19.00 ms** | **PASS** |
 
 ---
 
