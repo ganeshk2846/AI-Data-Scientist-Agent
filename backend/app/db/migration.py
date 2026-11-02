@@ -48,10 +48,18 @@ def run_agent_store_migration(app_db_path: Optional[Path] = None) -> None:
                     verified_by TEXT,
                     description TEXT,
                     confidence_score REAL DEFAULT 0.5,
+                    fingerprint TEXT DEFAULT 'default',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            # Non-destructive check for fingerprint column
+            cur = conn.cursor()
+            cur.execute("PRAGMA table_info(semantic_metrics);")
+            cols = [r[1] for r in cur.fetchall()]
+            if "fingerprint" not in cols:
+                conn.execute("ALTER TABLE semantic_metrics ADD COLUMN fingerprint TEXT DEFAULT 'default';")
 
         logger.info(f"Verified agent_app.sqlite schema migration at {target_path}")
 

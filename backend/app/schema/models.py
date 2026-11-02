@@ -72,6 +72,10 @@ class DatabaseCatalog(BaseModel):
     tables: Dict[str, TableModel] = Field(default_factory=dict)
     foreign_key_graph: List[Dict[str, str]] = Field(default_factory=list)
 
+    @property
+    def fingerprint(self) -> str:
+        return self.source_fingerprint
+
     def to_minimal_prompt_schema(self, table_names: Optional[List[str]] = None) -> str:
         """
         Formats a compact, schema-grounded representation of selected tables

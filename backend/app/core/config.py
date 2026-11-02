@@ -59,6 +59,18 @@ class Settings(BaseSettings):
         default="agent_app.sqlite",
         description="Path to writable agent-owned store for checkpoints and traces",
     )
+    LANCEDB_DIR: str = Field(
+        default="data/lancedb",
+        description="Path to persistent LanceDB vector store directory",
+    )
+    BM25_DIR: str = Field(
+        default="data/bm25",
+        description="Path to persistent BM25 index directory",
+    )
+    EMBEDDING_MODEL_NAME: str = Field(
+        default="BAAI/bge-small-en-v1.5",
+        description="FastEmbed ONNX local embedding model identifier",
+    )
 
     # LLM Provider Configuration (Optional at startup)
     LLM_PROVIDER: str = Field(
@@ -97,6 +109,22 @@ class Settings(BaseSettings):
     def resolved_app_db_path(self) -> Path:
         """Resolves the writable application store path relative to REPO_ROOT if relative."""
         p = Path(self.APP_DB_PATH)
+        if not p.is_absolute():
+            p = REPO_ROOT / p
+        return p.resolve()
+
+    @property
+    def resolved_lancedb_dir(self) -> Path:
+        """Resolves the LanceDB directory path relative to REPO_ROOT."""
+        p = Path(self.LANCEDB_DIR)
+        if not p.is_absolute():
+            p = REPO_ROOT / p
+        return p.resolve()
+
+    @property
+    def resolved_bm25_dir(self) -> Path:
+        """Resolves the BM25 index directory path relative to REPO_ROOT."""
+        p = Path(self.BM25_DIR)
         if not p.is_absolute():
             p = REPO_ROOT / p
         return p.resolve()

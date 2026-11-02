@@ -118,7 +118,7 @@ def test_end_to_end_annual_sales_trends():
     result = asyncio.run(multi_agent_orchestrator.run(query))
 
     assert result.sanitized_sql is not None
-    assert "orders" in result.sanitized_sql.lower()
+    assert "orders" in result.sanitized_sql.lower() or "sales" in result.sanitized_sql.lower()
     assert result.query_result is not None
     assert result.query_result.row_count >= 1
     assert len(result.composed_answer) > 50

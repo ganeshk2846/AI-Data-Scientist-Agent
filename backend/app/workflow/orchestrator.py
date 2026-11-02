@@ -32,7 +32,7 @@ from backend.app.security.guardrails import detect_prompt_injection, validate_sq
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
 from backend.app.retrieval.hybrid import hybrid_retriever
-from backend.app.retrieval.semantics import semantic_registry
+from backend.app.retrieval.semantics import dynamic_semantic_engine, semantic_registry
 from backend.app.retrieval.value_linker import LinkedValue, value_linker
 from backend.app.schema.service import schema_service
 from backend.app.sql.executor import QueryExecutionResult, sql_executor
@@ -299,8 +299,12 @@ class MultiAgentOrchestrator:
                 for lv in linked_values
             )
 
+        fp = getattr(catalog, "fingerprint", None)
+        authoritative_context = dynamic_semantic_engine.format_authoritative_prompt_context(fingerprint=fp, query=effective_query)
         metrics_str = ""
-        if relevant_metrics:
+        if authoritative_context:
+            metrics_str = authoritative_context
+        elif relevant_metrics:
             metrics_str = "VERIFIED METRIC DEFINITIONS:\n" + "\n".join(
                 f"- {m.display_name}: Formula: {m.formula} ({m.description})"
                 for m in relevant_metrics
