@@ -1514,3 +1514,65 @@ Applied 4 targeted safeguards under Section 11 Fix Policy:
 - **Evaluation & Observability:** ACCEPTED (`agent_app.sqlite` & LanceDB)
 - **Business Demonstration Readiness:** **READY FOR EXECUTIVE DEMONSTRATION**
 - **Production Readiness:** **CONDITIONALLY READY FOR STAGING / ENTERPRISE PILOT**
+
+
+---
+
+## 15. PERFORMANCE INVESTIGATION & LATENCY OPTIMIZATION (November 3, 2026)
+
+### A. Problem Statement & Baseline Telemetry Audit
+The Observability Dashboard reported a severe bimodal latency tail:
+- **Total Evaluated Runs:** 723 (now 792)
+- **Reported Success Rate:** 84.4%
+- **Reported Latency p50:** 115.7 ms
+- **Reported Latency p95:** 69,539.0 ms (~69.5 seconds)
+- **Reported Latency p99:** 97,001.3 ms (~97.0 seconds)
+- **Reported Average Latency:** 8,500.1 ms (~8.5 seconds)
+
+### B. Root Cause Identification
+Through programmatic inspection of all 789 historical trace records in `agent_app.sqlite` (`scripts/investigate_traces.py`), two distinct execution distributions were uncovered:
+1. **Agentic Supervisor Runs (`exec_*`, 200 records):**
+   - Min: 1.0 ms | Median (p50): **35.0 ms** | p95: **2,585.6 ms** | p99: **6,143.3 ms** | Max: **7,941.8 ms** | Average: **361.7 ms**
+   - **Zero runs exceeded 8 seconds.**
+2. **Legacy Multi-Agent Orchestrator Runs (`UUID`, 592 records):**
+   - Min: 0.0 ms | Median (p50): **837.2 ms** | p95: **72,091.1 ms** | p99: **99,848.8 ms** | Max: **125,317.4 ms** | Average: **10,386.8 ms**
+   - **All 88 slow runs (>10s) originated exclusively from the legacy orchestrator during the local Ollama era.**
+   - Root cause: Sequential execution of 3 to 4 LLM calls (Router $\to$ SQL Gen $\to$ SQL Repair $\to$ Answer Composer) on local CPU Ollama ($4 \times 25\text{s} \approx 100\text{s}$), reaching the 120s timeout limit.
+3. **Dashboard Metric Pooling Flaw:**
+   - The telemetry dashboard computed unwindowed percentiles over all 789 records since inception.
+   - 115 fast security blocks (0.0 ms) and refusals (200 ms) artificially dragged p50 down to 115.7 ms, while legacy Ollama runs created the 70s–97s tail.
+
+### C. Technical Implementation & Fixes
+1. **Granular Stage Telemetry Store (`ops_stage_spans`):**
+   - Implemented `ops_stage_spans` table in `agent_app.sqlite` with `span_id`, `run_id`, `stage_name`, `duration_ms`, `start_time`, `end_time`, `status`, `metadata_json`.
+   - Instrumented monotonic timers (`time.perf_counter()`) across every specialist and pipeline stage.
+2. **Streaming SSE Telemetry Instrumentation:**
+   - Captured and persisted Time to First Event (`streaming_ttfe_ms`: 16.1 ms) and Time to First Output (`streaming_ttfo_ms`: 117.2 ms) in `/agentic/stream` and `/chat/stream`.
+3. **Deterministic Routing Fast-Path:**
+   - Implemented regex and prefix heuristics in `backend/app/agents/router.py`, routing lookup/fact queries to `descriptive` in **0.03 milliseconds** without LLM round-trips (saving 1.5s–2.0s per query).
+4. **Windowed & Truthful Observability API:**
+   - Enhanced `/api/v1/ops/metrics` to support window parameters (`active_groq`, `recent_100`, `all`) and orchestrator filters (`agentic_supervisor`, `workflow_orchestrator`).
+   - Added `verified_latency_p50_ms` to isolate actual business analytical queries from 0ms security guardrail blocks.
+5. **Observability Cockpit Redesign:**
+   - Added Engine Scope selector bar (`Active Groq Engine`, `Phase 5 Supervisor`, `Recent 100 Runs`, `All Historical`).
+   - Added Stage-Level Latency breakdown panel (p50/p95).
+   - Added Streaming SSE Timings card and `Supervisor` vs `Workflow` badges in trace list.
+
+### D. Empirical Benchmarks (9 Question Categories)
+| Category | Question | Success Rate | Median p50 | p95 Latency | Average |
+|---|---|:---:|---:|---:|---:|
+| Simple lookup | *What are our total orders?* | 100% | **32.8 ms** | **50.0 ms** | 38.6 ms |
+| Data discovery | *Which tables contain customer information?* | 100% | **31.6 ms** | **34.3 ms** | 32.3 ms |
+| Descriptive | *Show monthly revenue.* | 100% | **59.2 ms** | **62.1 ms** | 59.7 ms |
+| Diagnostic | *Why did revenue decline?* | 100% | **55.5 ms** | **57.2 ms** | 56.1 ms |
+| Impact | *Is this decline statistically significant?* | 0% (Abstained) | **31.7 ms** | **32.2 ms** | 31.7 ms |
+| Predictive | *Forecast revenue for the next three months.* | 100% | **302.9 ms** | **309.6 ms** | 304.4 ms |
+| Scenario | *What if prices increase by 5%?* | 100% | **45.0 ms** | **46.7 ms** | 43.3 ms |
+| Prescriptive | *Which customer segments should management prioritize?* | 100% | **26.5 ms** | **29.7 ms** | 27.6 ms |
+| Composite | *Explain decline, forecast next quarter, recommend actions.* | 100% | **307.2 ms** | **319.6 ms** | 305.0 ms |
+
+### E. Verification & Quality Gates
+- **Unit & Telemetry Tests:** `backend/tests/test_latency_instrumentation.py` (5 passed in 0.25s).
+- **Critical Regression Test Suite:** 26 passed, 0 failures across Agentic API, Safeguards, and Groq LLM client.
+- **Frontend Build:** `npm run build` compiled 100% cleanly with zero TypeScript or linting errors.
+- **Documentation:** Created comprehensive `PERFORMANCE_INVESTIGATION_AND_OPTIMIZATION_REPORT.md` in workspace root.
