@@ -86,6 +86,7 @@ class EntityExtractor:
         validates entities against schema, and flags ambiguities if slots are missing.
         """
         q_low = question.lower().strip()
+        q_clean = re.sub(r"[?!.,;]+$", "", q_low).strip()
 
         # If this is a follow-up turn to a prior state requiring clarification:
         if prior_state and prior_state.clarification_required:
@@ -205,7 +206,7 @@ class EntityExtractor:
         clarif_options: List[ClarificationOption] = []
 
         # Case A: Bare comparison query ("compare revenue", "compare sales", "comparison")
-        if q_low in ["compare revenue", "compare sales", "comparison", "compare performance"]:
+        if q_clean in ["compare revenue", "compare sales", "comparison", "compare performance", "compare"]:
             if turn_count < self.MAX_CLARIFICATION_TURNS:
                 clarification_needed = True
                 clarif_question = "How would you like to compare revenue?"
@@ -244,7 +245,7 @@ class EntityExtractor:
                 comp_period = "YoY"
 
         # Case B: Bare ranking query ("top customers", "best customers")
-        elif q_low in ["top customers", "best customers", "who are our best customers"]:
+        elif q_clean in ["top customers", "best customers", "who are our best customers"]:
             if turn_count < self.MAX_CLARIFICATION_TURNS:
                 clarification_needed = True
                 clarif_question = "Which ranking metric would you like to use for top customers?"
@@ -270,7 +271,7 @@ class EntityExtractor:
                 extracted_metrics.append("spend")
 
         # Case C: Vague performance inquiry with no metric or timeframe ("how are we doing", "show performance")
-        elif q_low in ["how are we doing", "show performance", "business status", "overview"]:
+        elif q_clean in ["how are we doing", "show performance", "business status", "overview"]:
             if turn_count < self.MAX_CLARIFICATION_TURNS:
                 clarification_needed = True
                 clarif_question = "Which business area would you like to focus on for this performance review?"
@@ -300,6 +301,97 @@ class EntityExtractor:
                 assumptions.append("Applied default performance overview: Total gross revenue and order count for 2025.")
                 extracted_metrics.append("revenue")
                 extracted_dimensions.append("month")
+
+        # Case D: Bare summarization without time range ("summarize revenue", "summarize sales")
+        elif q_clean in ["summarize revenue", "summarize sales", "revenue summary", "summary of revenue", "sales summary"]:
+            if turn_count < self.MAX_CLARIFICATION_TURNS:
+                clarification_needed = True
+                clarif_question = "What time range would you like to summarize revenue over?"
+                ambiguity_flags.append("missing_time_range")
+                missing_slots.append("time_range")
+                clarif_options = [
+                    ClarificationOption(
+                        option_id="opt_last_12m",
+                        label="Past 12 Months",
+                        description="Summarize gross revenue over trailing 12 completed months",
+                        inferred_query="Summarize revenue for the past 12 months",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_full_2025",
+                        label="Full Year 2025",
+                        description="Summarize full fiscal year 2025 revenue",
+                        inferred_query="Summarize revenue for 2025",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_all_time",
+                        label="All Historical Data",
+                        description="Summarize cumulative lifetime revenue across entire database",
+                        inferred_query="Summarize all-time total revenue",
+                    ),
+                ]
+            else:
+                assumptions.append("Applied default time range: Trailing 12 completed months in active database.")
+                date_range = {"start_date": "2025-01-01", "end_date": "2025-12-31"}
+
+        # Case E: Bare forecasting inquiry without horizon ("forecast revenue", "forecast sales")
+        elif q_clean in ["forecast revenue", "forecast sales", "project revenue", "predict sales"]:
+            if turn_count < self.MAX_CLARIFICATION_TURNS:
+                clarification_needed = True
+                clarif_question = "What forecast horizon would you like to project for revenue?"
+                ambiguity_flags.append("missing_forecast_horizon")
+                missing_slots.append("forecast_horizon")
+                clarif_options = [
+                    ClarificationOption(
+                        option_id="opt_1m",
+                        label="Next 1 Month (30 Days)",
+                        description="Generate 30-day daily point forecasts and prediction intervals",
+                        inferred_query="Forecast revenue for the next 1 month",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_1q",
+                        label="Next Quarter (3 Months)",
+                        description="Generate 3-month monthly projections with 80% and 95% intervals",
+                        inferred_query="Forecast revenue for the next quarter",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_1y",
+                        label="Next Full Year (12 Months)",
+                        description="Generate 12-month annual forward projections",
+                        inferred_query="Forecast revenue for the next 12 months",
+                    ),
+                ]
+            else:
+                assumptions.append("Applied default forecast horizon: Next 1 Quarter (3 months).")
+
+        # Case F: Bare price shock without product scope ("increase prices by 5%", "raise prices by 5%")
+        elif q_clean in ["increase prices by 5%", "increase price by 5%", "raise prices by 5%", "price increase 5%"]:
+            if turn_count < self.MAX_CLARIFICATION_TURNS and not product_val and not region_val:
+                clarification_needed = True
+                clarif_question = "Should the 5% price increase apply across the entire catalog or specific product categories?"
+                ambiguity_flags.append("missing_product_scope")
+                missing_slots.append("product_scope")
+                clarif_options = [
+                    ClarificationOption(
+                        option_id="opt_all_products",
+                        label="All Products (Entire Catalog)",
+                        description="Simulate a uniform +5% price change across all product lines",
+                        inferred_query="What if prices increase by 5% across all products?",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_electronics",
+                        label="Electronics Only",
+                        description="Simulate a +5% price shock restricted to Electronics category",
+                        inferred_query="What if prices increase by 5% for Electronics?",
+                    ),
+                    ClarificationOption(
+                        option_id="opt_apparel",
+                        label="Apparel & Clothing Only",
+                        description="Simulate a +5% price shock restricted to Apparel category",
+                        inferred_query="What if prices increase by 5% for Apparel?",
+                    ),
+                ]
+            else:
+                assumptions.append("Applied default scope: Uniform +5% price shock across entire product catalog.")
 
         return StructuredQuestionRepresentation(
             raw_question=question,
@@ -380,6 +472,15 @@ class EntityExtractor:
             updated.comparison_period = "YoY"
             updated.dimensions.append("year")
             updated.resolved_query = f"{prior_state.raw_question} Year-over-Year (2024 vs 2025)"
+        elif any(w in reply_low for w in ["12 months", "past 12 months", "last year"]):
+            updated.date_range = {"start_date": "2025-01-01", "end_date": "2025-12-31"}
+            updated.resolved_query = f"{prior_state.raw_question} for the past 12 months"
+        elif any(w in reply_low for w in ["quarter", "next quarter", "3 months"]):
+            updated.forecast_horizon = 3
+            updated.resolved_query = f"{prior_state.raw_question} for next quarter"
+        elif any(w in reply_low for w in ["all products", "entire catalog", "all"]):
+            updated.product = "All"
+            updated.resolved_query = f"{prior_state.raw_question} across all products"
         else:
             # Append reply directly as a contextual filter or query refinement
             updated.resolved_query = f"{prior_state.raw_question} ({user_reply})"

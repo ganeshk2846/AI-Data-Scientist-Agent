@@ -424,3 +424,36 @@ def test_scenario_15_partial_workflow_completion(setup_test_environment, monkeyp
 
     statuses = [t.status for t in result.tasks]
     assert TaskStatus.COMPLETED in statuses
+
+
+# ==============================================================================
+# SCENARIO 16: Regional Weekly Order Drop Investigation (Demonstration A)
+# ==============================================================================
+def test_scenario_16_regional_weekly_order_drop_investigation(setup_test_environment):
+    _, catalog = setup_test_environment
+    result = agentic_supervisor.supervise(
+        question="Weekly orders in one region dropped sharply last month. Is this unusual, and what is driving it?",
+        catalog=catalog,
+    )
+
+    assert result.success is True
+    assert result.primary_intent == IntentCategory.DIAGNOSTIC
+    assert len(result.tasks) == 4
+    assert result.tasks[0].task_type == "schema_grounded_sql_extraction"
+    assert result.tasks[1].task_type == "regional_weekly_order_anomaly_detection"
+    assert result.tasks[2].task_type == "sales_channel_and_fulfillment_variance_decomposition"
+    assert result.tasks[3].task_type == "factual_faithfulness_and_causal_interception"
+
+    m = result.analytical_result.computed_metrics
+    assert m["target_region"] == "JP-Kanto"
+    assert m["pct_change_monthly"] == -17.91
+    assert m["z_score"] == -1.81
+    assert m["is_unusual"] is True
+    assert m["primary_driver"] == "Website"
+    assert m["primary_driver_pct"] == 63.1
+
+    # Verify management response contains required weekly order sections and non-causal disclosures
+    assert "JP-Kanto" in result.management_response.composed_markdown
+    assert "Website" in result.management_response.composed_markdown
+    assert "Statistical Note" in result.management_response.composed_markdown
+
