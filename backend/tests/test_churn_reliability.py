@@ -57,6 +57,7 @@ def test_churn_temporal_ml_baseline_and_defensible_abstention():
     # Verify honest reporting: AUC ~ 0.50 - 0.53 (not fabricated 0.99)
     for model_name, metrics in models.items():
         assert 0.48 <= metrics["roc_auc"] <= 0.55
+        assert 0.14 <= metrics["pr_auc"] <= 0.20
         assert 0.12 <= metrics["brier_score"] <= 0.15
 
 

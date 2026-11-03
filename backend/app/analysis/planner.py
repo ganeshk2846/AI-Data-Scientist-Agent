@@ -353,13 +353,15 @@ class AnalyticalPlanner:
 
                             continue
 
-                        if any(t in col_lower for t in ["amount", "total", "cost", "price", "sales", "revenue", "count", "qty", "quantity", "value", "score", "rate"]):
-
-                            numeric_candidates.append(f"{tbl_name}.{c.name}")
-
-                        elif c.is_numeric_candidate:
-
-                            numeric_candidates.append(f"{tbl_name}.{c.name}")
+                        is_num_type = c.is_numeric_candidate or any(
+                            num_t in (c.sqlite_type or "").upper()
+                            for num_t in ["INT", "REAL", "FLOAT", "NUMERIC", "DECIMAL"]
+                        )
+                        if is_num_type:
+                            if any(t in col_lower for t in ["amount", "total", "cost", "price", "sales", "revenue", "count", "qty", "quantity", "value", "score", "rate"]):
+                                numeric_candidates.append(f"{tbl_name}.{c.name}")
+                            elif c.is_numeric_candidate:
+                                numeric_candidates.append(f"{tbl_name}.{c.name}")
 
                     if numeric_candidates:
 

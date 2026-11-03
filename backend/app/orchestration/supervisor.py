@@ -298,9 +298,9 @@ class AgenticSupervisor:
 
             if not is_composite:
                 detected_stages: List[IntentCategory] = []
-                if any(w in q_low for w in ["describe", "what was", "what were", "what happened", "sales trend", "performance", "overview", "analyse sales", "analyze sales"]):
+                if any(w in q_low for w in ["describe", "what was", "what were", "what happened", "sales trend", "order trend", "performance", "overview", "weekly orders", "analyse sales", "analyze sales"]):
                     detected_stages.append(IntentCategory.DESCRIPTIVE)
-                if any(w in q_low for w in ["why did", "why are", "why", "drivers", "factors", "anomalies", "variance", "cause", "contributed"]):
+                if any(w in q_low for w in ["why did", "why are", "why", "drivers", "driver", "driving", "factors", "anomalies", "anomaly", "unusual", "variance", "cause", "contributed"]):
                     detected_stages.append(IntentCategory.DIAGNOSTIC)
                 if any(w in q_low for w in ["forecast", "predict", "project", "what next", "what will happen", "next quarter", "next month", "future"]):
                     detected_stages.append(IntentCategory.PREDICTIVE)

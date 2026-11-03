@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import roc_auc_score, brier_score_loss
+from sklearn.metrics import roc_auc_score, brier_score_loss, average_precision_score
 from sklearn.model_selection import train_test_split
 
 from backend.app.analysis.contracts import (
@@ -355,6 +355,7 @@ class ChurnAnalyticsEngine:
             lr.fit(X_train_scaled, y_train)
             lr_proba = lr.predict_proba(X_test_scaled)[:, 1]
             lr_auc = float(roc_auc_score(y_test, lr_proba))
+            lr_pr_auc = float(average_precision_score(y_test, lr_proba))
             lr_brier = float(brier_score_loss(y_test, lr_proba))
 
             # Model 2: Random Forest
@@ -362,6 +363,7 @@ class ChurnAnalyticsEngine:
             rf.fit(X_train, y_train)
             rf_proba = rf.predict_proba(X_test)[:, 1]
             rf_auc = float(roc_auc_score(y_test, rf_proba))
+            rf_pr_auc = float(average_precision_score(y_test, rf_proba))
             rf_brier = float(brier_score_loss(y_test, rf_proba))
 
             # Model 3: Gradient Boosting
@@ -369,6 +371,7 @@ class ChurnAnalyticsEngine:
             gb.fit(X_train, y_train)
             gb_proba = gb.predict_proba(X_test)[:, 1]
             gb_auc = float(roc_auc_score(y_test, gb_proba))
+            gb_pr_auc = float(average_precision_score(y_test, gb_proba))
             gb_brier = float(brier_score_loss(y_test, gb_proba))
 
             # Naive baseline Brier score (always predicting base rate p)
@@ -384,16 +387,19 @@ class ChurnAnalyticsEngine:
                 "models": {
                     "logistic_regression": {
                         "roc_auc": round(lr_auc, 4),
+                        "pr_auc": round(lr_pr_auc, 4),
                         "brier_score": round(lr_brier, 4),
                         "calibrated_against_naive": round(abs(lr_brier - naive_brier), 4),
                     },
                     "random_forest": {
                         "roc_auc": round(rf_auc, 4),
+                        "pr_auc": round(rf_pr_auc, 4),
                         "brier_score": round(rf_brier, 4),
                         "calibrated_against_naive": round(abs(rf_brier - naive_brier), 4),
                     },
                     "gradient_boosting": {
                         "roc_auc": round(gb_auc, 4),
+                        "pr_auc": round(gb_pr_auc, 4),
                         "brier_score": round(gb_brier, 4),
                         "calibrated_against_naive": round(abs(gb_brier - naive_brier), 4),
                     },
