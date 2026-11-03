@@ -5,7 +5,8 @@ Phase 5: Agentic Orchestration Contracts and Data Models.
 Defines schemas for:
 1. Specialist roles and execution task statuses.
 2. Structured agent task specifications (DAG nodes).
-3. Executive management response divided into WHAT, WHY, WHAT NEXT, SO WHAT.
+3. Executive management response divided into WHAT, WHY, WHAT NEXT, SO WHAT,
+   SCENARIO / WHAT IF, and IMPACT / SO WHAT.
 4. Supervisor execution result with full task provenance, execution metrics, and database isolation.
 """
 
@@ -23,6 +24,8 @@ class SpecialistRole(str, Enum):
     DIAGNOSTIC = "DIAGNOSTIC"
     PREDICTIVE = "PREDICTIVE"
     PRESCRIPTIVE = "PRESCRIPTIVE"
+    SCENARIO = "SCENARIO"
+    IMPACT = "IMPACT"
     CRITIC = "CRITIC"
 
 
@@ -57,7 +60,7 @@ class ExecutiveSection(BaseModel):
     """Individual executive response section for business decision-makers."""
     model_config = ConfigDict(extra="ignore")
 
-    title: str = Field(..., description="Section title: WHAT, WHY, WHAT NEXT, or SO WHAT")
+    title: str = Field(..., description="Section title: WHAT, WHY, WHAT NEXT, SO WHAT, SCENARIO / WHAT IF, or IMPACT / SO WHAT")
     headline: str = Field(..., description="Single-sentence punchy executive summary of findings")
     content: str = Field(..., description="Detailed narrative explaining metrics and insights")
     kpis: Dict[str, Any] = Field(default_factory=dict, description="Key numerical metrics and values")
@@ -72,10 +75,12 @@ class ManagementResponse(BaseModel):
     """
     model_config = ConfigDict(extra="ignore")
 
-    what: Optional[ExecutiveSection] = None       # Descriptive: What happened? (KPIs, trends, historical changes)
-    why: Optional[ExecutiveSection] = None        # Diagnostic: Why did it happen? (Drivers, anomalies, non-causal correlation)
-    what_next: Optional[ExecutiveSection] = None  # Predictive: What might happen? (Forecasts, intervals, horizon)
-    so_what: Optional[ExecutiveSection] = None    # Prescriptive: What should management consider doing? (Optimization, advisory)
+    what: Optional[ExecutiveSection] = None             # Descriptive: What happened? (KPIs, trends, historical changes)
+    why: Optional[ExecutiveSection] = None              # Diagnostic: Why did it happen? (Drivers, anomalies, non-causal correlation)
+    what_next: Optional[ExecutiveSection] = None        # Predictive: What might happen? (Forecasts, intervals, horizon)
+    so_what: Optional[ExecutiveSection] = None          # Prescriptive: What should management consider doing? (Optimization, advisory)
+    scenario_section: Optional[ExecutiveSection] = None # Scenario: What if? (Parameter shocks, sensitivity matrices, elasticities)
+    impact_section: Optional[ExecutiveSection] = None   # Impact: So what? (Statistical hypothesis tests, Welch's t, 95% CIs, effect size)
     executive_summary: str = ""
     composed_markdown: str = ""
 
@@ -96,4 +101,7 @@ class SupervisorExecutionResult(BaseModel):
     metrics: Dict[str, Any] = Field(default_factory=dict)
     success: bool = True
     abstain_reason: Optional[str] = None
+    structured_question: Optional[Dict[str, Any]] = None
+    clarification_needed: bool = False
+    clarification_options: List[Dict[str, Any]] = Field(default_factory=list)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

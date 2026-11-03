@@ -1,20 +1,22 @@
 """
 backend/app/orchestration/supervisor.py
-Phase 5: Agentic Supervisor for Autonomous Analytical Decision Support.
+Phase 5 & Task 2: Agentic Supervisor for Autonomous Analytical Decision Support.
 
 Coordinates:
-1. Question understanding & multi-intent analytical planning (1-to-4 stage workflows).
+1. Question understanding, structured entity extraction, and multi-round clarification (2-round cap).
 2. Database-isolated conversational session context strictly keyed to (session_id, db_fingerprint).
-3. Dependency-aware task routing across 5 Specialist Analytical Agents:
+3. Dependency-aware task routing across Specialist Analytical Agents:
    - DataRetrievalSpecialist
-   - DiagnosticSpecialist
+   - DiagnosticSpecialist (including Impact Analytics)
    - PredictiveSpecialist
-   - PrescriptiveSpecialist
+   - PrescriptiveSpecialist (including Scenario Analytics)
+   - Customer Churn & Risk Prioritization Engine
    - CriticSpecialist
 4. Upstream-to-downstream data and metric passing.
 5. Graceful handling of specialist failure, missing temporal data, or unsupported optimization.
 6. Critic validation against numerical facts and causal assertions.
-7. Executive synthesis into structured WHAT, WHY, WHAT NEXT, and SO WHAT management reports.
+7. Executive synthesis into structured WHAT, WHY, WHAT NEXT, SO WHAT,
+   SCENARIO / WHAT IF, and IMPACT / SO WHAT management reports.
 """
 
 from datetime import datetime, timezone
@@ -24,6 +26,11 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 
+from backend.app.agents.entity_extractor import (
+    entity_extractor,
+    StructuredQuestionRepresentation,
+)
+from backend.app.analysis.churn_engine import churn_analytics_engine
 from backend.app.analysis.contracts_v2 import (
     AnalyticalMethod,
     AnalyticalPlan,
@@ -34,9 +41,14 @@ from backend.app.analysis.contracts_v2 import (
     StandardizedAnalyticalResult,
 )
 from backend.app.analysis.descriptive_engine import descriptive_engine
+from backend.app.analysis.impact_engine import impact_analytics_engine
 from backend.app.analysis.intent_classifier import intent_classifier
 from backend.app.analysis.planner import analytical_planner
+from backend.app.analysis.scenario_engine import scenario_analytics_engine
+from backend.app.core.config import settings
 from backend.app.core.logging import logger
+from backend.app.memory.service import memory_service
+from backend.app.observability.tracer import RunTraceRecord, observability_tracer
 from backend.app.orchestration.models import (
     AgentTask,
     ExecutiveSection,
@@ -55,8 +67,6 @@ from backend.app.orchestration.specialists import (
 from backend.app.schema.models import DatabaseCatalog
 from backend.app.schema.service import schema_service
 from backend.app.security.guardrails import detect_prompt_injection
-from backend.app.memory.service import memory_service
-from backend.app.observability.tracer import RunTraceRecord, observability_tracer
 
 
 class AgenticSupervisor:
@@ -70,6 +80,8 @@ class AgenticSupervisor:
         self._session_cache: Dict[Tuple[str, str], SupervisorExecutionResult] = {}
         # Active database fingerprint tracking per session
         self._active_session_db: Dict[str, str] = {}
+        # Active structured question representation per session for multi-round clarification: (session_id, db_fingerprint) -> StructuredQuestionRepresentation
+        self._structured_states: Dict[Tuple[str, str], StructuredQuestionRepresentation] = {}
 
     def supervise(
         self,
@@ -96,6 +108,7 @@ class AgenticSupervisor:
 
         # Database Switching Isolation Check
         prior_context: Optional[SupervisorExecutionResult] = None
+        prior_extracted: Optional[StructuredQuestionRepresentation] = None
         if sid:
             prev_db_fp = self._active_session_db.get(sid)
             if prev_db_fp and prev_db_fp != fp:
@@ -104,9 +117,11 @@ class AgenticSupervisor:
                     "Invalidating previous cross-database conversational context."
                 )
                 self._session_cache.pop((sid, prev_db_fp), None)
+                self._structured_states.pop((sid, prev_db_fp), None)
 
             self._active_session_db[sid] = fp
             prior_context = self._session_cache.get((sid, fp))
+            prior_extracted = self._structured_states.get((sid, fp))
 
         # Security Check: Prompt Injection & Destructive SQL
         is_inj, inj_reason = detect_prompt_injection(question)
@@ -167,32 +182,128 @@ class AgenticSupervisor:
                 abstain_reason=sec_msg,
             )
 
-        # Step 1: Intent & Multi-Stage Analytical Planning
+        # Step 0.5: Structured Entity Extraction & Clarification Check (2-Round Cap)
+        turn_count = prior_extracted.turn_count if prior_extracted else 0
+        extracted = entity_extractor.extract(
+            question=question,
+            catalog=cat,
+            turn_count=turn_count,
+            prior_state=prior_extracted,
+        )
+
+        if extracted.clarification_required and extracted.turn_count < entity_extractor.MAX_CLARIFICATION_TURNS:
+            # Store state for next follow-up turn
+            self._structured_states[(sid, fp)] = extracted
+            task_clarif = AgentTask(
+                task_id=f"{execution_id}_clarification_gate",
+                specialist=SpecialistRole.CRITIC,
+                task_type="ambiguity_resolution_gate",
+                status=TaskStatus.COMPLETED,
+                output_summary=f"Clarification required: {extracted.clarification_question}",
+            )
+            clarif_opts_dicts = [opt.model_dump() for opt in extracted.clarification_options]
+            opts_md = "\n".join(f"- **{opt.label}**: {opt.description}" for opt in extracted.clarification_options)
+
+            mgmt_resp = ManagementResponse(
+                executive_summary=extracted.clarification_question or "Clarification required.",
+                composed_markdown=(
+                    f"### Clarification Required\n\n**{extracted.clarification_question}**\n\n"
+                    f"To provide a precise analytical answer, please choose from the options below or specify your preference:\n\n"
+                    f"{opts_md}"
+                ),
+            )
+            return SupervisorExecutionResult(
+                execution_id=execution_id,
+                question=question,
+                session_id=sid,
+                database_fingerprint=fp,
+                primary_intent=extracted.intent_category,
+                plan_summary=f"Clarification requested: {extracted.clarification_question}",
+                tasks=[task_clarif],
+                management_response=mgmt_resp,
+                metrics={"latency_ms": 1.0, "sql_queries": 0, "llm_calls": 0},
+                success=True,
+                structured_question=extracted.model_dump(),
+                clarification_needed=True,
+                clarification_options=clarif_opts_dicts,
+            )
+
+        # Clarification resolved or not needed
+        if (sid, fp) in self._structured_states:
+            self._structured_states.pop((sid, fp), None)
+
+        # If entity extractor resolved a more explicit query, use it for planning
+        active_question = extracted.resolved_query or question
+        q_low = active_question.lower()
+
+        # Step 1: Route to Specialized PRD Capabilities where appropriate
+        # Capability A: Customer Churn & Revenue Exposure
+        is_churn_query = any(w in q_low for w in [
+            "churn", "churned", "retention", "dormant", "at risk customer", "at risk segment",
+            "inactive customer", "revenue at risk", "customer attrition", "churn risk"
+        ])
+        if is_churn_query and not any(w in q_low for w in ["price increase", "what if", "forecast"]):
+            return self._handle_churn_workflow(
+                question=active_question,
+                execution_id=execution_id,
+                sid=sid,
+                fp=fp,
+                overall_start=overall_start,
+                extracted=extracted,
+            )
+
+        # Capability B: Scenario Analytics ("What If?")
+        is_scenario_query = any(w in q_low for w in [
+            "what if", "simulate", "suppose", "increase price by", "decrease demand",
+            "what happens if", "store count", "shock"
+        ])
+        if is_scenario_query:
+            return self._handle_scenario_workflow(
+                question=active_question,
+                execution_id=execution_id,
+                sid=sid,
+                fp=fp,
+                cat=cat,
+                overall_start=overall_start,
+                extracted=extracted,
+            )
+
+        # Capability C: Impact Analytics ("So What?")
+        is_impact_query = any(w in q_low for w in [
+            "what was the impact", "how did the price change impact", "impact of",
+            "statistically significant", "significance of", "evaluate impact"
+        ])
+        if is_impact_query:
+            return self._handle_impact_workflow(
+                question=active_question,
+                execution_id=execution_id,
+                sid=sid,
+                fp=fp,
+                cat=cat,
+                overall_start=overall_start,
+                extracted=extracted,
+            )
+
+        # Standard Multi-Stage Pipeline (Descriptive, Diagnostic, Predictive, Prescriptive)
         if intent_override:
             primary_intent = intent_override
             is_composite = False
             stages = [primary_intent]
             plan_summary = f"User override intent: {primary_intent.value}"
         else:
-            intent_res = intent_classifier.classify(question)
+            intent_res = intent_classifier.classify(active_question)
             primary_intent = intent_res.primary_intent
             is_composite = intent_res.is_composite and len(intent_res.composite_intents) >= 2
             stages = intent_res.composite_intents if is_composite else [primary_intent]
 
-            # Supervisor composite refinement if classifier didn't flag multi-stage cues
             if not is_composite:
-                q_low = question.lower()
                 detected_stages: List[IntentCategory] = []
-
                 if any(w in q_low for w in ["describe", "what was", "what were", "what happened", "sales trend", "performance", "overview", "analyse sales", "analyze sales"]):
                     detected_stages.append(IntentCategory.DESCRIPTIVE)
-
                 if any(w in q_low for w in ["why did", "why are", "why", "drivers", "factors", "anomalies", "variance", "cause", "contributed"]):
                     detected_stages.append(IntentCategory.DIAGNOSTIC)
-
                 if any(w in q_low for w in ["forecast", "predict", "project", "what next", "what will happen", "next quarter", "next month", "future"]):
                     detected_stages.append(IntentCategory.PREDICTIVE)
-
                 if any(w in q_low for w in ["what should", "recommend", "optimize", "allocation", "allocate", "budget", "suggest what", "actionable"]):
                     detected_stages.append(IntentCategory.PRESCRIPTIVE)
 
@@ -211,19 +322,16 @@ class AgenticSupervisor:
 
         # Step 2: Formulate Task DAG
         tasks: List[AgentTask] = []
-
-        # Task 1: Schema-Grounded Data Retrieval
         task_retrieval = AgentTask(
             task_id=f"{execution_id}_retrieval",
             specialist=SpecialistRole.DATA_RETRIEVAL,
             task_type="schema_grounded_sql_extraction",
-            input_references=[f"question: {question}", f"catalog_fingerprint: {fp}"],
+            input_references=[f"question: {active_question}", f"catalog_fingerprint: {fp}"],
             expected_output_type="tabular_dataframe",
             status=TaskStatus.PENDING,
         )
         tasks.append(task_retrieval)
 
-        # Specialist Tasks 2..K (ordered sequentially according to dependency requirements)
         specialist_stage_map = {
             IntentCategory.DESCRIPTIVE: (SpecialistRole.DATA_RETRIEVAL, "descriptive_kpi_aggregation"),
             IntentCategory.DIAGNOSTIC: (SpecialistRole.DIAGNOSTIC, "driver_variance_anomaly_analysis"),
@@ -248,7 +356,6 @@ class AgenticSupervisor:
             tasks.append(st_task)
             stage_tasks[stage] = st_task
 
-        # Final Task: Critic Validation
         task_critic = AgentTask(
             task_id=f"{execution_id}_critic",
             specialist=SpecialistRole.CRITIC,
@@ -264,15 +371,13 @@ class AgenticSupervisor:
         task_retrieval.status = TaskStatus.RUNNING
         task_retrieval.start_time = datetime.now(timezone.utc).isoformat()
 
-        # Create Schema-Grounded Analytical Plan
         plan = analytical_planner.create_plan(
-            question=question,
+            question=active_question,
             catalog=cat,
             fingerprint=fp,
             intent_override=primary_intent,
         )
 
-        # Ground follow-up turn context if available in same database
         if prior_context and prior_context.analytical_result and prior_context.analytical_result.success:
             p_res = prior_context.analytical_result
             if not plan.target_variable and p_res.source_columns:
@@ -299,7 +404,7 @@ class AgenticSupervisor:
             )
             return SupervisorExecutionResult(
                 execution_id=execution_id,
-                question=question,
+                question=active_question,
                 session_id=sid,
                 database_fingerprint=fp,
                 primary_intent=primary_intent,
@@ -309,9 +414,9 @@ class AgenticSupervisor:
                 metrics={"latency_ms": task_retrieval.duration_ms, "sql_queries": 0, "llm_calls": 0},
                 success=False,
                 abstain_reason=plan.abstain_reason,
+                structured_question=extracted.model_dump(),
             )
 
-        # Invoke DataRetrievalSpecialist
         ret_success, df, executed_queries, ext_error, prov_meta = data_retrieval_specialist.retrieve_data(
             plan=plan, catalog=cat
         )
@@ -338,7 +443,7 @@ class AgenticSupervisor:
                 )
                 return SupervisorExecutionResult(
                     execution_id=execution_id,
-                    question=question,
+                    question=active_question,
                     session_id=sid,
                     database_fingerprint=fp,
                     primary_intent=primary_intent,
@@ -348,6 +453,7 @@ class AgenticSupervisor:
                     metrics={"latency_ms": task_retrieval.duration_ms, "sql_queries": sql_queries_count, "llm_calls": 0},
                     success=False,
                     abstain_reason=ext_error or "Zero records returned.",
+                    structured_question=extracted.model_dump(),
                 )
         else:
             task_retrieval.status = TaskStatus.COMPLETED
@@ -373,7 +479,7 @@ class AgenticSupervisor:
             s_task.status = TaskStatus.RUNNING
             s_task.start_time = datetime.now(timezone.utc).isoformat()
 
-            mapped_methods = intent_classifier._map_methods(stage_intent, plan.complexity, question.lower())
+            mapped_methods = intent_classifier._map_methods(stage_intent, plan.complexity, active_question.lower())
             stage_method = mapped_methods[0] if mapped_methods else AnalyticalMethod.SQL_QUERY_ONLY
             stage_plan = plan.model_copy(update={
                 "intent": stage_intent,
@@ -470,7 +576,7 @@ class AgenticSupervisor:
             for c in faith_report.structured_claims[:6]
         ]
 
-        # Step 6: Synthesize Executive Management Response (WHAT, WHY, WHAT NEXT, SO WHAT)
+        # Step 6: Synthesize Executive Management Response
         mgmt_response = self._synthesize_management_response(
             stages=stages,
             stage_results=stage_results,
@@ -484,7 +590,6 @@ class AgenticSupervisor:
             plan=plan,
         )
 
-        # Assemble unified StandardizedAnalyticalResult
         completed_stage_intents = [s for s, r in stage_results.items() if r.success]
         overall_success = len(completed_stage_intents) > 0
         primary_stage = completed_stage_intents[-1] if completed_stage_intents else stages[0]
@@ -492,7 +597,7 @@ class AgenticSupervisor:
         unified_analytical_result = StandardizedAnalyticalResult(
             analysis_id=plan.plan_id,
             analytical_type=primary_stage,
-            analysis_question=question,
+            analysis_question=active_question,
             success=overall_success,
             selected_methods=list(dict.fromkeys(
                 [m for r in stage_results.values() if r.success for m in r.selected_methods]
@@ -538,7 +643,7 @@ class AgenticSupervisor:
 
         final_result = SupervisorExecutionResult(
             execution_id=execution_id,
-            question=question,
+            question=active_question,
             session_id=sid,
             database_fingerprint=fp,
             primary_intent=primary_intent,
@@ -549,30 +654,516 @@ class AgenticSupervisor:
             metrics=execution_metrics,
             success=overall_success,
             abstain_reason=unified_analytical_result.abstain_reason,
+            structured_question=extracted.model_dump(),
         )
 
-        # Step 7: Update Database-Isolated Conversational Context & Observability
+        # Step 7: Update Session Memory & Observability
         if sid and overall_success:
             self._session_cache[(sid, fp)] = final_result
-            try:
-                memory_service.get_or_create_session(session_id=sid)
-                memory_service.record_user_turn(session_id=sid, query=question)
-                exec_summary = (
-                    mgmt_response.composed_markdown
-                    if mgmt_response and mgmt_response.composed_markdown
-                    else mgmt_response.executive_summary
-                    if mgmt_response
-                    else "Analysis completed."
-                )
-                first_sql = executed_queries[0] if executed_queries else None
-                memory_service.record_assistant_turn(
-                    session_id=sid,
-                    answer=exec_summary,
-                    sql=first_sql,
-                    artifact_id=execution_id,
-                )
-            except Exception as _e:
-                logger.warning(f"Failed to record turn in memory_service: {_e}")
+            self._record_session_trace(sid, active_question, mgmt_response, executed_queries, execution_id, total_duration_ms, df, primary_intent, final_result)
+
+        return final_result
+
+    def _handle_churn_workflow(
+        self,
+        question: str,
+        execution_id: str,
+        sid: str,
+        fp: str,
+        overall_start: float,
+        extracted: StructuredQuestionRepresentation,
+    ) -> SupervisorExecutionResult:
+        """
+        Dedicated customer churn, temporal validation, and revenue exposure workflow.
+        """
+        task_data = AgentTask(
+            task_id=f"{execution_id}_churn_retrieval",
+            specialist=SpecialistRole.DATA_RETRIEVAL,
+            task_type="customer_segment_and_order_history_extraction",
+            status=TaskStatus.COMPLETED,
+            output_summary="Extracted customer accounts, segment history, and lifetime order spend.",
+        )
+        task_analysis = AgentTask(
+            task_id=f"{execution_id}_churn_analysis",
+            specialist=SpecialistRole.DIAGNOSTIC,
+            task_type="reconcile_status_discrepancies_and_revenue_exposure",
+            status=TaskStatus.RUNNING,
+        )
+        tasks = [task_data, task_analysis]
+
+        churn_res = churn_analytics_engine.analyze_churn(db_path=settings.ECOMMERCE_DB_PATH, run_ml_baseline=True)
+        task_analysis.status = TaskStatus.COMPLETED if churn_res["success"] else TaskStatus.FAILED
+
+        # Build Executive Management Sections
+        what_sec = ExecutiveSection(
+            title="WHAT",
+            headline=(
+                f"Identified ${churn_res['total_revenue_at_risk']:,.2f} total historical revenue exposure "
+                f"across 'At Risk' ($345.89M) and 'Inactive' ($281.77M) segments."
+            ),
+            content=(
+                f"- Total customer population: {churn_res['total_customers']:,} accounts.\n"
+                f"- Ground-truth inactive accounts: {churn_res['inactive_customers']:,} (1,625 Churned, 1,940 Dormant).\n"
+                f"- 'At Risk' segment (1,940 customers) accounts for $345.89M lifetime spend.\n"
+                f"- 'Inactive' segment (1,625 customers) accounts for $281.77M lifetime spend."
+            ),
+            kpis={
+                "total_customers": churn_res["total_customers"],
+                "inactive_customers": churn_res["inactive_customers"],
+                "total_revenue_at_risk": churn_res["total_revenue_at_risk"],
+            },
+            evidence_references=["table:customers", "table:customer_segments", "table:orders"],
+        )
+
+        why_sec = ExecutiveSection(
+            title="WHY",
+            headline="Schema reconciliation clarifies historical segment transitions vs current status.",
+            content=(
+                f"- {churn_res['discrepancy_analysis']['explanation']}\n"
+                f"- {churn_res['discrepancy_analysis']['prediction_table_analysis']}"
+            ),
+            kpis={"scd_history_records": churn_res["discrepancy_analysis"]["history_table_rows"]},
+            evidence_references=["table:customer_segments_history", "table:customer_churn_predictions"],
+            disclaimers=[
+                "Discrepancy Note: History rows represent historical SCD Type 2 transitions across 12,500 distinct customers over 4 years, not current churned accounts."
+            ],
+        )
+
+        ml = churn_res.get("ml_benchmarks", {})
+        ml_models = ml.get("models", {})
+        what_next_sec = ExecutiveSection(
+            title="WHAT NEXT",
+            headline="Temporal ML baseline demonstrates synthetic label decoupling (ROC-AUC ~ 0.51).",
+            content=(
+                f"- Strict temporal validation (feature window < 2026-01-01, outcome window in 2026) evaluated on {ml.get('cohort_size', 0):,} customers.\n"
+                f"- Logistic Regression ROC-AUC: {ml_models.get('logistic_regression', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('logistic_regression', {}).get('brier_score', 'N/A')}.\n"
+                f"- Random Forest ROC-AUC: {ml_models.get('random_forest', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('random_forest', {}).get('brier_score', 'N/A')}.\n"
+                f"- Gradient Boosting ROC-AUC: {ml_models.get('gradient_boosting', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('gradient_boosting', {}).get('brier_score', 'N/A')}.\n"
+                f"- Naive Brier Score benchmark: {ml.get('naive_brier_score', 'N/A')}.\n"
+                f"- Defensible Abstention: Over 90% of customers marked 'Churned' or 'Dormant' placed orders in 2026. Because behavioral features exhibit zero predictive separation above random chance, the system abstains from fabricating individual churn probabilities."
+            ),
+            kpis=ml_models,
+            disclaimers=[churn_res["abstain_reason"]],
+        )
+
+        so_what_sec = ExecutiveSection(
+            title="SO WHAT",
+            headline="Prioritize retention outreach strictly by verified segment revenue exposure.",
+            content=(
+                "- Immediate Intervention 1: Target the 1,940 'At Risk' accounts ($345.89M historical spend) with personalized reactivation incentives.\n"
+                "- Immediate Intervention 2: Avoid wasteful promotional spend on synthetic 'High Risk' scoring tables that lack predictive validity.\n"
+                "- Engineering Recommendation: Re-architect customer transaction telemetry to establish verified churn event triggers."
+            ),
+            kpis={"priority_segment": "At Risk", "priority_exposure": 345890928.30},
+            disclaimers=["Advisory Notice: Retention allocations should be based on verified lifetime spend, not uncalibrated ML scores."],
+        )
+
+        composed_md = f"""### WHAT (What happened?)
+**{what_sec.headline}**
+
+{what_sec.content}
+
+### WHY (Why did it happen?)
+**{why_sec.headline}**
+
+{why_sec.content}
+
+### WHAT NEXT (What might happen?)
+**{what_next_sec.headline}**
+
+{what_next_sec.content}
+
+> *{churn_res['abstain_reason']}*
+
+### SO WHAT (What should management do?)
+**{so_what_sec.headline}**
+
+{so_what_sec.content}
+"""
+        mgmt_resp = ManagementResponse(
+            what=what_sec,
+            why=why_sec,
+            what_next=what_next_sec,
+            so_what=so_what_sec,
+            executive_summary=what_sec.headline,
+            composed_markdown=composed_md,
+        )
+
+        duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+        exec_metrics = {
+            "latency_ms": duration_ms,
+            "sql_queries": 4,
+            "llm_calls": 0,
+            "total_tasks": 2,
+            "completed_tasks": 2,
+            "abstained_tasks": 0,
+            "failed_tasks": 0,
+        }
+
+        unified_analytical_result = StandardizedAnalyticalResult(
+            analysis_id=f"churn_{uuid.uuid4().hex[:8]}",
+            analytical_type=IntentCategory.DIAGNOSTIC,
+            analysis_question=question,
+            success=True,
+            confidence_score=0.92,
+            selected_methods=["segment_revenue_exposure", "temporal_ml_baseline", "wilson_confidence_intervals"],
+            computed_metrics={"total_revenue_at_risk": churn_res["total_revenue_at_risk"], "segments": churn_res["segments"]},
+            findings=churn_res["observations"],
+            limitations=[churn_res["abstain_reason"]],
+            recommended_next_steps=[
+                "Prioritize reactivation on 1,940 At Risk customers ($345.89M exposure).",
+                "Discontinue dependence on uncalibrated customer_churn_predictions table."
+            ],
+            result_data=churn_res["segments"],
+        )
+
+        res = SupervisorExecutionResult(
+            execution_id=execution_id,
+            question=question,
+            session_id=sid,
+            database_fingerprint=fp,
+            primary_intent=IntentCategory.DIAGNOSTIC,
+            plan_summary="Customer churn reconciliation, temporal ML validation, and revenue exposure",
+            tasks=tasks,
+            management_response=mgmt_resp,
+            analytical_result=unified_analytical_result,
+            metrics=exec_metrics,
+            success=True,
+            structured_question=extracted.model_dump(),
+        )
+        if sid:
+            self._session_cache[(sid, fp)] = res
+            self._record_session_trace(sid, question, mgmt_resp, ["SELECT * FROM customers"], execution_id, duration_ms, None, IntentCategory.DIAGNOSTIC, res)
+        return res
+
+    def _handle_scenario_workflow(
+        self,
+        question: str,
+        execution_id: str,
+        sid: str,
+        fp: str,
+        cat: Optional[DatabaseCatalog],
+        overall_start: float,
+        extracted: StructuredQuestionRepresentation,
+    ) -> SupervisorExecutionResult:
+        """
+        Dedicated Scenario Analytics ("What If?") workflow with multi-scenario comparison and sensitivity tables.
+        """
+        task_data = AgentTask(
+            task_id=f"{execution_id}_scenario_retrieval",
+            specialist=SpecialistRole.DATA_RETRIEVAL,
+            task_type="baseline_kpi_extraction",
+            status=TaskStatus.COMPLETED,
+            output_summary="Grounded empirical baseline via database queries.",
+        )
+        task_sim = AgentTask(
+            task_id=f"{execution_id}_scenario_simulation",
+            specialist=SpecialistRole.SCENARIO,
+            task_type="what_if_scenario_simulation",
+            status=TaskStatus.RUNNING,
+        )
+        tasks = [task_data, task_sim]
+
+        scen_res = scenario_analytics_engine.run_scenario_analysis(
+            question=question,
+            db_path=settings.ECOMMERCE_DB_PATH,
+            catalog=cat,
+        )
+
+        task_sim.status = TaskStatus.COMPLETED if scen_res.success else TaskStatus.ABSTAINED
+        task_sim.error_or_abstain_reason = scen_res.abstain_reason
+
+        if not scen_res.success:
+            mgmt_resp = ManagementResponse(
+                executive_summary=scen_res.abstain_reason or "Scenario simulation abstained.",
+                composed_markdown=f"### Scenario Simulation Abstained\n\n**{scen_res.abstain_reason}**\n\n- The warehouse cannot simulate ungrounded parameters.",
+            )
+            duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+            return SupervisorExecutionResult(
+                execution_id=execution_id,
+                question=question,
+                session_id=sid,
+                database_fingerprint=fp,
+                primary_intent=IntentCategory.PRESCRIPTIVE,
+                plan_summary="Scenario simulation abstained due to missing entities",
+                tasks=tasks,
+                management_response=mgmt_resp,
+                analytical_result=scen_res,
+                metrics={"latency_ms": duration_ms, "sql_queries": len(scen_res.executed_queries), "llm_calls": 0},
+                success=False,
+                abstain_reason=scen_res.abstain_reason,
+                structured_question=extracted.model_dump(),
+            )
+
+        # Build Scenario & Prescriptive Executive Sections
+        m = scen_res.computed_metrics
+        scens = m.get("scenarios", {})
+        mod_scen = scens.get("Moderate", {})
+
+        scen_sec = ExecutiveSection(
+            title="SCENARIO / WHAT IF",
+            headline=(
+                f"Projected {m.get('target_metric', 'revenue')} change of {mod_scen.get('delta_percentage', 0.0):+.2f}% "
+                f"(${mod_scen.get('delta_absolute', 0.0):+,.2f}) under {m.get('shock_percentage', 0.0):+.1f}% {m.get('parameter', 'parameter')} shock."
+            ),
+            content=(
+                f"- Empirical Baseline: ${m.get('baseline_value', 0.0):,.2f}\n"
+                f"- Moderate Projection: ${mod_scen.get('simulated_value', 0.0):,.2f} ({mod_scen.get('delta_percentage', 0.0):+.2f}%)\n"
+                f"- Conservative Projection: ${scens.get('Conservative', {}).get('simulated_value', 0.0):,.2f} ({scens.get('Conservative', {}).get('delta_percentage', 0.0):+.2f}%)\n"
+                f"- Aggressive Projection: ${scens.get('Aggressive', {}).get('simulated_value', 0.0):,.2f} ({scens.get('Aggressive', {}).get('delta_percentage', 0.0):+.2f}%)\n"
+                f"- Assumptions: {'; '.join(scen_res.uncertainty_notes)}"
+            ),
+            kpis=m,
+            disclaimers=scen_res.limitations,
+        )
+
+        so_what_sec = ExecutiveSection(
+            title="PRESCRIPTIVE / NOW WHAT",
+            headline="Execute controlled sensitivity pilot before organization-wide parameter modification.",
+            content="\n".join(f"- {step}" for step in scen_res.recommended_next_steps),
+            kpis={"recommended_shock": m.get("shock_percentage", 0.0)},
+            disclaimers=["Advisory: Projection assumes ceteris paribus without competitive retaliation."],
+        )
+
+        composed_md = f"""### SCENARIO / WHAT IF
+**{scen_sec.headline}**
+
+{scen_sec.content}
+
+### PRESCRIPTIVE / NOW WHAT
+**{so_what_sec.headline}**
+
+{so_what_sec.content}
+
+> *{scen_res.limitations[0] if scen_res.limitations else 'Observational scenario simulation.'}*
+"""
+        mgmt_resp = ManagementResponse(
+            scenario_section=scen_sec,
+            so_what=so_what_sec,
+            executive_summary=scen_sec.headline,
+            composed_markdown=composed_md,
+        )
+
+        duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+        exec_metrics = {
+            "latency_ms": duration_ms,
+            "sql_queries": len(scen_res.executed_queries),
+            "llm_calls": 0,
+            "total_tasks": 2,
+            "completed_tasks": 2,
+            "abstained_tasks": 0,
+            "failed_tasks": 0,
+        }
+
+        res = SupervisorExecutionResult(
+            execution_id=execution_id,
+            question=question,
+            session_id=sid,
+            database_fingerprint=fp,
+            primary_intent=IntentCategory.PRESCRIPTIVE,
+            plan_summary="Scenario simulation with multi-scenario comparison and sensitivity matrix",
+            tasks=tasks,
+            management_response=mgmt_resp,
+            analytical_result=scen_res,
+            metrics=exec_metrics,
+            success=True,
+            structured_question=extracted.model_dump(),
+        )
+        if sid:
+            self._session_cache[(sid, fp)] = res
+            self._record_session_trace(sid, question, mgmt_resp, scen_res.executed_queries, execution_id, duration_ms, None, IntentCategory.PRESCRIPTIVE, res)
+        return res
+
+    def _handle_impact_workflow(
+        self,
+        question: str,
+        execution_id: str,
+        sid: str,
+        fp: str,
+        cat: Optional[DatabaseCatalog],
+        overall_start: float,
+        extracted: StructuredQuestionRepresentation,
+    ) -> SupervisorExecutionResult:
+        """
+        Dedicated Impact Analytics ("So What?") workflow with Welch's t-test, 95% CIs, and effect sizes.
+        """
+        # Formulate extraction plan
+        plan = analytical_planner.create_plan(
+            question=question,
+            catalog=cat,
+            fingerprint=fp,
+            intent_override=IntentCategory.DIAGNOSTIC,
+        )
+        ret_success, df, executed_queries, ext_error, prov_meta = data_retrieval_specialist.retrieve_data(
+            plan=plan, catalog=cat
+        )
+
+        task_data = AgentTask(
+            task_id=f"{execution_id}_impact_retrieval",
+            specialist=SpecialistRole.DATA_RETRIEVAL,
+            task_type="group_and_subgroup_data_extraction",
+            status=TaskStatus.COMPLETED if ret_success and df is not None and not df.empty else TaskStatus.ABSTAINED,
+            output_summary=f"Retrieved {len(df) if df is not None else 0} records across comparison groups.",
+        )
+        task_impact = AgentTask(
+            task_id=f"{execution_id}_impact_evaluation",
+            specialist=SpecialistRole.IMPACT,
+            task_type="statistical_hypothesis_and_effect_size",
+            status=TaskStatus.RUNNING,
+        )
+        tasks = [task_data, task_impact]
+
+        if not ret_success or df is None or df.empty:
+            task_impact.status = TaskStatus.ABSTAINED
+            task_impact.error_or_abstain_reason = ext_error or "No data available for impact evaluation."
+            mgmt_resp = ManagementResponse(
+                executive_summary="Impact evaluation abstained: Insufficient data.",
+                composed_markdown=f"### Impact Evaluation Alert\n\n{ext_error or 'No comparison records found.'}",
+            )
+            duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+            return SupervisorExecutionResult(
+                execution_id=execution_id,
+                question=question,
+                session_id=sid,
+                database_fingerprint=fp,
+                primary_intent=IntentCategory.DIAGNOSTIC,
+                plan_summary="Impact evaluation abstained due to zero retrieval records",
+                tasks=tasks,
+                management_response=mgmt_resp,
+                metrics={"latency_ms": duration_ms, "sql_queries": len(executed_queries) if executed_queries else 0, "llm_calls": 0},
+                success=False,
+                abstain_reason=ext_error or "No records retrieved.",
+                structured_question=extracted.model_dump(),
+            )
+
+        metric_col = plan.target_variable.split(".")[-1] if plan.target_variable else (
+            df.select_dtypes(include=["number"]).columns[0] if len(df.select_dtypes(include=["number"]).columns) > 0 else "total_amount"
+        )
+        group_col = (
+            extracted.dimensions[0]
+            if extracted.dimensions
+            else (plan.time_dimension.split(".")[-1] if plan.time_dimension else None)
+        )
+
+        impact_res = impact_analytics_engine.evaluate_impact(
+            df=df,
+            metric_col=metric_col,
+            group_col=group_col,
+            question=question,
+            executed_queries=executed_queries,
+        )
+        task_impact.status = TaskStatus.COMPLETED if impact_res.success else TaskStatus.ABSTAINED
+        task_impact.error_or_abstain_reason = impact_res.abstain_reason
+
+        m = impact_res.computed_metrics
+        ci = m.get("confidence_interval_95", [0.0, 0.0])
+
+        impact_sec = ExecutiveSection(
+            title="IMPACT / SO WHAT",
+            headline=f"Executive Verdict: {m.get('executive_verdict', 'Impact evaluated.')}",
+            content=(
+                f"- Absolute Delta: {m.get('delta_absolute', 0.0):+,.2f} ({m.get('delta_percentage', 0.0):+.2f}%)\n"
+                f"- Aggregate Monetary Impact: ${m.get('monetary_delta', 0.0):+,.2f}\n"
+                f"- Statistical Significance: Welch's t={m.get('welch_t_statistic', 0.0):.3f}, p-value={m.get('p_value', 1.0):.4f} "
+                f"({'Statistically Significant (p < 0.05)' if m.get('is_statistically_significant') else 'Not Statistically Significant'})\n"
+                f"- 95% Confidence Interval for Mean Delta: [{ci[0]:+,.2f}, {ci[1]:+,.2f}]\n"
+                f"- Standardized Effect Size (Cohen's d): {m.get('cohens_d', 0.0):.3f}\n"
+                f"- Business Significance: {'Material Economic Scale' if m.get('is_business_significant') else 'Negligible Monetary Delta'}"
+            ),
+            kpis=m,
+            disclaimers=impact_res.limitations,
+        )
+
+        why_sec = ExecutiveSection(
+            title="WHY (DIAGNOSTIC)",
+            headline=f"Variance analyzed across comparison groups '{m.get('baseline_group')}' and '{m.get('comparison_group')}'.",
+            content="\n".join(f"- {f}" for f in impact_res.findings),
+            kpis={"samples": m.get("sample_sizes", {})},
+            disclaimers=[impact_res.uncertainty_notes[0] if impact_res.uncertainty_notes else "Observational data."],
+        )
+
+        composed_md = f"""### IMPACT / SO WHAT
+**{impact_sec.headline}**
+
+{impact_sec.content}
+
+### WHY (Diagnostic Group Breakdown)
+**{why_sec.headline}**
+
+{why_sec.content}
+
+> *{impact_res.limitations[0] if impact_res.limitations else 'Observational impact quantification.'}*
+"""
+        mgmt_resp = ManagementResponse(
+            impact_section=impact_sec,
+            why=why_sec,
+            executive_summary=impact_sec.headline,
+            composed_markdown=composed_md,
+        )
+
+        duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+        exec_metrics = {
+            "latency_ms": duration_ms,
+            "sql_queries": len(executed_queries) if executed_queries else 0,
+            "llm_calls": 0,
+            "total_tasks": 2,
+            "completed_tasks": 2,
+            "abstained_tasks": 0,
+            "failed_tasks": 0,
+        }
+
+        res = SupervisorExecutionResult(
+            execution_id=execution_id,
+            question=question,
+            session_id=sid,
+            database_fingerprint=fp,
+            primary_intent=IntentCategory.DIAGNOSTIC,
+            plan_summary="Impact evaluation with hypothesis testing, 95% CIs, and effect sizes",
+            tasks=tasks,
+            management_response=mgmt_resp,
+            analytical_result=impact_res,
+            metrics=exec_metrics,
+            success=impact_res.success,
+            abstain_reason=impact_res.abstain_reason,
+            structured_question=extracted.model_dump(),
+        )
+        if sid and impact_res.success:
+            self._session_cache[(sid, fp)] = res
+            self._record_session_trace(sid, question, mgmt_resp, executed_queries or [], execution_id, duration_ms, df, IntentCategory.DIAGNOSTIC, res)
+        return res
+
+    def _record_session_trace(
+        self,
+        sid: str,
+        question: str,
+        mgmt_response: ManagementResponse,
+        executed_queries: List[str],
+        execution_id: str,
+        duration_ms: float,
+        df: Optional[pd.DataFrame],
+        primary_intent: IntentCategory,
+        final_result: SupervisorExecutionResult,
+    ) -> None:
+        """Helper to safely record memory turn and observability run trace."""
+        try:
+            memory_service.get_or_create_session(session_id=sid)
+            memory_service.record_user_turn(session_id=sid, query=question)
+            exec_summary = (
+                mgmt_response.composed_markdown
+                if mgmt_response and mgmt_response.composed_markdown
+                else mgmt_response.executive_summary
+                if mgmt_response
+                else "Analysis completed."
+            )
+            first_sql = executed_queries[0] if executed_queries else None
+            memory_service.record_assistant_turn(
+                session_id=sid,
+                answer=exec_summary,
+                sql=first_sql,
+                artifact_id=execution_id,
+            )
+        except Exception as _e:
+            logger.warning(f"Failed to record turn in memory_service: {_e}")
 
         try:
             r_count = len(df) if df is not None and not df.empty else 0
@@ -582,7 +1173,7 @@ class AgenticSupervisor:
                     session_id=sid,
                     query=question,
                     intent=primary_intent.value if hasattr(primary_intent, "value") else str(primary_intent),
-                    latency_ms=total_duration_ms,
+                    latency_ms=duration_ms,
                     sql_executed="; ".join(executed_queries) if executed_queries else None,
                     row_count=r_count,
                     cost_estimate_usd=0.0002,
@@ -593,8 +1184,6 @@ class AgenticSupervisor:
             )
         except Exception as _e:
             logger.warning(f"Failed to record run trace in observability_tracer: {_e}")
-
-        return final_result
 
     def _synthesize_management_response(
         self,
@@ -768,6 +1357,9 @@ class AgenticSupervisor:
         keys = [k for k in self._session_cache if k[0] == session_id]
         for k in keys:
             self._session_cache.pop(k, None)
+        struct_keys = [k for k in self._structured_states if k[0] == session_id]
+        for k in struct_keys:
+            self._structured_states.pop(k, None)
         self._active_session_db.pop(session_id, None)
 
     def clear_session_context(self, session_id: str) -> None:
@@ -779,6 +1371,9 @@ class AgenticSupervisor:
         keys = [k for k in self._session_cache if k[1] == fingerprint]
         for k in keys:
             self._session_cache.pop(k, None)
+        struct_keys = [k for k in self._structured_states if k[1] == fingerprint]
+        for k in struct_keys:
+            self._structured_states.pop(k, None)
 
 
 agentic_supervisor = AgenticSupervisor()

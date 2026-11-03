@@ -723,6 +723,8 @@ export const ManagementResponseSchema = z.object({
   why: ExecutiveSectionSchema.nullable().optional(),
   what_next: ExecutiveSectionSchema.nullable().optional(),
   so_what: ExecutiveSectionSchema.nullable().optional(),
+  scenario_section: ExecutiveSectionSchema.nullable().optional(),
+  impact_section: ExecutiveSectionSchema.nullable().optional(),
   executive_summary: z.string().default(""),
   composed_markdown: z.string().default(""),
 });
@@ -741,6 +743,9 @@ export const SupervisorExecutionResultSchema = z.object({
   metrics: z.record(z.any()).default({}),
   success: z.boolean().default(true),
   abstain_reason: z.string().nullable().optional(),
+  structured_question: z.record(z.any()).nullable().optional(),
+  clarification_needed: z.boolean().default(false),
+  clarification_options: z.array(ClarificationOptionSchema).default([]),
   created_at: z.string().optional(),
 });
 export type SupervisorExecutionResult = z.infer<typeof SupervisorExecutionResultSchema>;

@@ -1233,3 +1233,111 @@ Applied 4 targeted safeguards under Section 11 Fix Policy:
 
 ### D. Milestone Status
 **COMPLETED AND ACCEPTED. ARCHITECTURE CLEANUP AND STATE SYNCHRONIZATION FULLY OPERATIONAL.**
+
+
+---
+
+# TASK 2 RECORD: PRD ENHANCEMENTS — SCENARIO ANALYTICS, IMPACT ANALYTICS, CLARIFICATION & ENTITY EXTRACTION, RELIABLE CUSTOMER CHURN PREDICTION
+
+- **Execution Date:** November 3, 2026
+- **Git Branch:** `v2/task-2-prd-enhancements`
+- **Parent Commit:** `273c389`
+- **Author Roles:** Principal AI Architect, Senior Data Scientist, ML Engineer, AI Agent Engineer, Lead QA Engineer
+- **Scope:** Implementation of four priority PRD capabilities: Customer Churn Discrepancy Reconciliation & Temporal Leakage Elimination, Scenario Analytics ("What-If?"), Impact Analytics ("So What?"), and Structured Entity Extraction & Clarification with a strict 2-round cap.
+
+---
+
+### A. Architectural Context & Objectives
+
+1. **Customer Churn Discrepancy & Leakage Remediation:**
+   - Investigate ground-truth schema in `ecommerce.db` across `customers` (20,000 accounts), `customer_segments` (10 segments), `customer_segments_history` (50,000 SCD Type 2 transitions), `customer_churn_predictions` (20,000 synthetic rows), and `orders` (150,000 transactions).
+   - Reconcile the discrepancy between 3,565 ground-truth inactive accounts (1,625 Churned, 1,940 Dormant) and historical SCD transitions (~5,000 per segment, 12,500 distinct customers over 4 years).
+   - Audit stored predictions in `customer_churn_predictions`: empirical evaluation revealed that accounts predicted 'High' risk experienced an actual future churn rate of 17.8%, while 'Low' risk accounts experienced 17.3%, proving the pre-existing prediction table was an uncalibrated synthetic artifact.
+   - Enforce strict temporal validation ($t_0 = \text{2026-01-01}$) eliminating feature leakage. Train honest baselines (Logistic Regression, Random Forest, Gradient Boosting) on 15,629 cohort customers. Models achieved ROC-AUC ~ 0.511–0.520 and Brier score ~ 0.135 (matching the naive base rate variance $p(1-p) = 0.135$).
+   - Identify synthetic label-behavior decoupling (>90% of customers marked 'Churned' or 'Dormant' placed orders in 2026), and defensibly abstain from claiming individual ML predictive certainty while delivering verified segment revenue exposure prioritization with Wilson 95% confidence intervals (\$345.89M on 'At Risk', \$281.77M on 'Inactive').
+
+2. **Scenario Analytics ("What If?"):**
+   - Extract hypothetical parameters (`price`, `marketing_spend`, `demand`, `volume`, `cost`), magnitudes, and target metrics from user inquiries.
+   - Query empirical baselines directly via verified SQL queries on active databases ($3.168B order baseline).
+   - Compute multi-scenario projections (Conservative, Moderate, Aggressive) and sensitivity analysis matrices across parameter ranges (-10% to +15%).
+   - Model diminishing returns for marketing spend using logarithmic curves $\ln(1 + \Delta M)$.
+   - Defensively abstain when simulated parameters lack empirical support in the connected database (e.g. physical store count in digital e-commerce).
+
+3. **Impact Analytics ("So What?"):**
+   - Quantify absolute delta ($\Delta$), percentage change ($\Delta\%$), and aggregate monetary delta ($\$$).
+   - Perform subgroup breakdowns across business dimensions (regions, channels, categories, segments).
+   - Run two-sample Welch's t-tests (unequal variance), compute two-sided p-values, 95% confidence intervals, and Cohen's d effect sizes.
+   - Distinguish statistical significance ($p < 0.05$) from business materiality ($|\Delta\%| \ge 2.0\%$ or $|\Delta_{monetary}| \ge \$1,000$) with observational non-causal hedges.
+
+4. **Structured Entity Extraction & Clarification:**
+   - Define `StructuredQuestionRepresentation` capturing metrics, dimensions, filters, date ranges, comparison periods, ranking constraints, and scenario parameters.
+   - Cross-reference extracted entities against active `DatabaseCatalog` column and table names.
+   - Generate single targeted clarification questions with option pills for ambiguous queries (e.g. bare "compare revenue").
+   - Support contextual follow-up resolution without repeating questions or losing prior context.
+   - Enforce a strict 2-round clarification cap, applying transparent default assumptions if clarification limit is reached.
+
+5. **Agentic Orchestration & Frontend Delivery:**
+   - Wire all engines into `AgenticSupervisor` and extend `ManagementResponse` with dedicated `scenario_section` and `impact_section` models.
+   - Update `ManagementResponseView.tsx` with specialized visual cards for scenarios, impact metrics, and clarification pills.
+
+---
+
+### B. Implementation Details & File Modifications
+
+1. **`backend/app/analysis/churn_engine.py` (New):**
+   - Implemented `ChurnAnalyticsEngine.analyze_churn()` with dynamic schema discovery, ground-truth reconciliation, Wilson score 95% confidence intervals, and strict temporal ML benchmarking.
+   - Evaluated LogisticRegression, RandomForestClassifier, and GradientBoostingClassifier on 15,629 temporal cohort customers.
+   - Enforced defensible abstention regarding individual predictive ML claims due to empirical label decoupling.
+2. **`backend/app/analysis/churn.py` (Updated):**
+   - Integrated `analyze_customer_churn_risk()` with `churn_analytics_engine` while maintaining 100% backward compatibility for legacy schema fixtures.
+3. **`backend/app/analysis/scenario_engine.py` (New):**
+   - Implemented `ScenarioAnalyticsEngine.run_scenario_analysis()` with parameter parsing, SQL baseline extraction, Conservative/Moderate/Aggressive multi-scenario modeling, sensitivity matrices, and domain abstention.
+4. **`backend/app/analysis/impact_engine.py` (New):**
+   - Implemented `ImpactAnalyticsEngine.evaluate_impact()` with Welch's t-test, two-sided p-values, 95% confidence intervals, Cohen's d effect sizes, and significance matrix classification.
+5. **`backend/app/agents/entity_extractor.py` (New):**
+   - Implemented `EntityExtractor` and `StructuredQuestionRepresentation` contract with schema validation, single-question clarification, contextual follow-up merging, and 2-round cap.
+6. **`backend/app/orchestration/models.py` (Updated):**
+   - Extended `ManagementResponse` with `scenario_section: Optional[ExecutiveSection]` and `impact_section: Optional[ExecutiveSection]`.
+   - Extended `SupervisorExecutionResult` with `structured_question`, `clarification_needed`, and `clarification_options`.
+   - Extended `SpecialistRole` with `SCENARIO` and `IMPACT`.
+7. **`backend/app/orchestration/supervisor.py` (Updated):**
+   - Integrated `entity_extractor.extract()` with 2-round clarification interception.
+   - Integrated dedicated workflows: `_handle_scenario_workflow()`, `_handle_impact_workflow()`, and `_handle_churn_workflow()`.
+   - Synthesized verified outputs into `ManagementResponse` sections.
+8. **`frontend/src/types/api.ts` (Updated):**
+   - Added `scenario_section` and `impact_section` to `ManagementResponseSchema`.
+   - Added `clarification_needed`, `clarification_options`, and `structured_question` to `SupervisorExecutionResultSchema`.
+9. **`frontend/src/components/chat/ManagementResponseView.tsx` (Updated):**
+   - Rendered dedicated cards for `SCENARIO / WHAT IF` (with sensitivity KPIs and assumptions) and `IMPACT / SO WHAT` (with Welch t-test, 95% CI, effect size, and business significance badges).
+10. **Dedicated Automated Test Suites (New):**
+    - `backend/tests/test_scenario_analytics.py`: 4 tests (parsing, multi-scenario simulation, sensitivity matrix, store count abstention, supervisor orchestration).
+    - `backend/tests/test_impact_analytics.py`: 3 tests (Welch t-test, 95% CI, effect size, small-sample abstention, supervisor orchestration).
+    - `backend/tests/test_clarification_entities.py`: 5 tests (slot extraction, clarification prompt generation, follow-up resolution, 2-round cap, supervisor multi-turn execution).
+    - `backend/tests/test_churn_reliability.py`: 5 tests (discrepancy reconciliation, revenue exposure, temporal ML benchmark, legacy tool compatibility, supervisor orchestration).
+
+---
+
+### C. Empirical Test Execution & Timing Verification
+
+| Test Suite | Command | Collected | Passed | Failed | Duration | Status |
+|:---|:---|---:|---:|---:|---:|:---:|
+| **Scenario Analytics** (`test_scenario_analytics.py`) | `python -m pytest backend/tests/test_scenario_analytics.py` | 4 | 4 | 0 | 0.13s | **100% PASS** |
+| **Impact Analytics** (`test_impact_analytics.py`) | `python -m pytest backend/tests/test_impact_analytics.py` | 3 | 3 | 0 | 0.12s | **100% PASS** |
+| **Clarification & Entities** (`test_clarification_entities.py`) | `python -m pytest backend/tests/test_clarification_entities.py` | 5 | 5 | 0 | 0.14s | **100% PASS** |
+| **Churn Reliability & ML** (`test_churn_reliability.py`) | `python -m pytest backend/tests/test_churn_reliability.py` | 5 | 5 | 0 | 7.15s | **100% PASS** |
+| **Architecture Cleanup** (`test_architecture_cleanup.py`) | `python -m pytest backend/tests/test_architecture_cleanup.py` | 5 | 5 | 0 | 2.89s | **100% PASS** |
+| **Groq LLM Suite** (`test_groq_llm.py`) | `python -m pytest backend/tests/test_groq_llm.py` | 13 | 13 | 0 | 0.20s | **100% PASS** |
+| **Full Repository Regression** | `python -m pytest backend/tests/` | 307 | 290 | 17* | 116.57s | **Zero Regressions** |
+
+*\*Note: Exactly the 17 tracked legacy V1 baseline failures remain unchanged.*
+
+- **Next.js Production Build:** `npm --prefix frontend run build` compiled successfully (4/4 static pages, 0 errors, 149 kB First Load JS).
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before Task 2: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - `ecommerce.db` SHA-256 after Task 2:  `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - **Status:** Invariance confirmed (100% bitwise match, 0 writes).
+
+---
+
+### D. Milestone Status
+**COMPLETED AND ACCEPTED. PRD ENHANCEMENTS FULLY OPERATIONAL WITH ZERO CODE REGRESSIONS AND BITWISE DATABASE IMMUTABILITY.**

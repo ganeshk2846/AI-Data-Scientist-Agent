@@ -40,7 +40,7 @@ export function ManagementResponseView({ execution }: ManagementResponseViewProp
   const [showTasks, setShowTasks] = useState(true);
   const [showEvidence, setShowEvidence] = useState(false);
 
-  const { what, why, what_next, so_what, executive_summary } = management_response || {};
+  const { what, why, what_next, so_what, scenario_section, impact_section, executive_summary } = management_response || {};
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -314,6 +314,108 @@ export function ManagementResponseView({ execution }: ManagementResponseViewProp
             {so_what.disclaimers && so_what.disclaimers.length > 0 && (
               <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-[11px] text-emerald-600 dark:text-emerald-400 space-y-1">
                 {so_what.disclaimers.map((disc, idx) => (
+                  <p key={idx} className="italic leading-relaxed">
+                    {disc}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card 5: SCENARIO / WHAT IF */}
+        {scenario_section && (
+          <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-500 font-bold text-xs uppercase tracking-wider">
+                  SCENARIO / WHAT IF
+                </div>
+                <h3 className="text-sm font-bold text-foreground">What If Scenario Simulation</h3>
+              </div>
+              <Badge variant="mono" size="xs">
+                Sensitivity & Elasticity
+              </Badge>
+            </div>
+            <p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">
+              {scenario_section.headline}
+            </p>
+            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
+              {scenario_section.content}
+            </div>
+
+            {scenario_section.kpis && Object.keys(scenario_section.kpis).length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                {Object.entries(scenario_section.kpis)
+                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
+                  .slice(0, 4)
+                  .map(([k, v]) => (
+                    <div key={k} className="p-2.5 rounded-lg border border-cyan-500/20 bg-card/60">
+                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
+                        {k.replace(/_/g, " ")}
+                      </span>
+                      <p className="text-sm font-bold font-mono text-cyan-600 dark:text-cyan-400 truncate">
+                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {scenario_section.disclaimers && scenario_section.disclaimers.length > 0 && (
+              <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-[11px] text-cyan-600 dark:text-cyan-400 space-y-1">
+                {scenario_section.disclaimers.map((disc, idx) => (
+                  <p key={idx} className="italic leading-relaxed">
+                    {disc}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card 6: IMPACT / SO WHAT */}
+        {impact_section && (
+          <div className="p-5 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-500 font-bold text-xs uppercase tracking-wider">
+                  IMPACT / SO WHAT
+                </div>
+                <h3 className="text-sm font-bold text-foreground">Statistical Impact & Hypothesis Testing</h3>
+              </div>
+              <Badge variant="mono" size="xs">
+                Welch t-test & 95% CI
+              </Badge>
+            </div>
+            <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+              {impact_section.headline}
+            </p>
+            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
+              {impact_section.content}
+            </div>
+
+            {impact_section.kpis && Object.keys(impact_section.kpis).length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                {Object.entries(impact_section.kpis)
+                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
+                  .slice(0, 4)
+                  .map(([k, v]) => (
+                    <div key={k} className="p-2.5 rounded-lg border border-rose-500/20 bg-card/60">
+                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
+                        {k.replace(/_/g, " ")}
+                      </span>
+                      <p className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
+                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {impact_section.disclaimers && impact_section.disclaimers.length > 0 && (
+              <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10 text-[11px] text-rose-600 dark:text-rose-400 space-y-1">
+                {impact_section.disclaimers.map((disc, idx) => (
                   <p key={idx} className="italic leading-relaxed">
                     {disc}
                   </p>
