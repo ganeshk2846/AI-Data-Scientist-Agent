@@ -39,6 +39,7 @@ export function GroqConnectionForm({
   const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState("llama-3.3-70b-versatile");
   const [showKey, setShowKey] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Fetch current LLM status
@@ -70,6 +71,7 @@ export function GroqConnectionForm({
       queryClient.invalidateQueries({ queryKey: ["setupStatus"] });
       queryClient.invalidateQueries({ queryKey: ["readiness"] });
       setApiKey(""); // clear raw key immediately from local component state
+      setIsEditing(false);
       if (onSuccess) {
         onSuccess(data);
       }
@@ -144,15 +146,25 @@ export function GroqConnectionForm({
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>Groq API Connected</span>
             </div>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => disconnectMutation.mutate()}
-              isLoading={disconnectMutation.isPending}
-              className="text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40"
-            >
-              Disconnect
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-xs text-foreground hover:bg-muted"
+              >
+                {isEditing ? "Cancel" : "Change Key / Model"}
+              </Button>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => disconnectMutation.mutate()}
+                isLoading={disconnectMutation.isPending}
+                className="text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40"
+              >
+                Disconnect
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-background/60 p-2.5 rounded-lg border border-border/50">
@@ -166,7 +178,7 @@ export function GroqConnectionForm({
             </div>
           </div>
 
-          {showContinueButton && (
+          {showContinueButton && !isEditing && (
             <div className="pt-2 flex justify-end">
               <Button
                 variant="primary"
@@ -182,7 +194,7 @@ export function GroqConnectionForm({
       )}
 
       {/* Form Fields (Show if not connected or editing) */}
-      {!isConnected && (
+      {(!isConnected || isEditing) && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -298,7 +310,11 @@ export function GroqConnectionForm({
               disabled={!apiKey.trim()}
               icon={<Sparkles className="w-4 h-4" />}
             >
-              {connectMutation.isPending ? "Validating & Connecting..." : "Test & Connect Groq LLM"}
+              {connectMutation.isPending
+                ? "Validating & Connecting..."
+                : isConnected
+                ? "Update & Reconnect Groq LLM"
+                : "Test & Connect Groq LLM"}
             </Button>
           </div>
         </form>
@@ -306,3 +322,4 @@ export function GroqConnectionForm({
     </div>
   );
 }
+
