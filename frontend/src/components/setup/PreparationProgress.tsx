@@ -45,6 +45,7 @@ export function PreparationProgress({
   const [activeJobId, setActiveJobId] = useState<string | null>(initialJobId || null);
   const [startTime] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const hasNotifiedRef = React.useRef(false);
 
   // Timer ticker
   useEffect(() => {
@@ -108,7 +109,8 @@ export function PreparationProgress({
 
   // Automatically notify parent when completed
   useEffect(() => {
-    if (isSucceeded && onComplete) {
+    if (isSucceeded && onComplete && !hasNotifiedRef.current) {
+      hasNotifiedRef.current = true;
       const timer = setTimeout(() => {
         onComplete();
       }, 1500);

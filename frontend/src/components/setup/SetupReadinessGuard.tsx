@@ -212,11 +212,11 @@ export function SetupReadinessGuard({ children }: SetupReadinessGuardProps) {
           <GroqConnectionForm
             showContinueButton={true}
             onContinue={() => {
-              setActiveStepOverride(null);
+              setActiveStepOverride(2);
               queryClient.invalidateQueries({ queryKey: ["setupStatus"] });
             }}
             onSuccess={() => {
-              setActiveStepOverride(null);
+              setActiveStepOverride(2);
               queryClient.invalidateQueries({ queryKey: ["setupStatus"] });
             }}
           />
@@ -225,7 +225,7 @@ export function SetupReadinessGuard({ children }: SetupReadinessGuardProps) {
         {effectiveStep === 2 && (
           <DatabaseConnectionForm
             onSuccess={() => {
-              setActiveStepOverride(null);
+              setActiveStepOverride(3);
               queryClient.invalidateQueries({ queryKey: ["setupStatus"] });
             }}
             onNavigateToPreparation={() => {
