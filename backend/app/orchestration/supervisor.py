@@ -55,6 +55,8 @@ from backend.app.orchestration.specialists import (
 from backend.app.schema.models import DatabaseCatalog
 from backend.app.schema.service import schema_service
 from backend.app.security.guardrails import detect_prompt_injection
+from backend.app.memory.service import memory_service
+from backend.app.observability.tracer import RunTraceRecord, observability_tracer
 
 
 class AgenticSupervisor:
@@ -132,6 +134,22 @@ class AgenticSupervisor:
                 status=TaskStatus.FAILED,
                 error_or_abstain_reason=sec_msg,
             )
+            try:
+                observability_tracer.record_run_trace(
+                    RunTraceRecord(
+                        run_id=execution_id,
+                        session_id=sid,
+                        query=question,
+                        intent="security_blocked",
+                        latency_ms=1.0,
+                        error_class="prompt_injection_block" if is_inj else "destructive_sql_block",
+                        verification_status="blocked",
+                        created_at=datetime.now(timezone.utc).isoformat(),
+                    )
+                )
+            except Exception as _e:
+                logger.debug(f"Failed to record security block trace: {_e}")
+
             return SupervisorExecutionResult(
                 execution_id=execution_id,
                 question=question,
@@ -533,9 +551,48 @@ class AgenticSupervisor:
             abstain_reason=unified_analytical_result.abstain_reason,
         )
 
-        # Step 7: Update Database-Isolated Conversational Context
+        # Step 7: Update Database-Isolated Conversational Context & Observability
         if sid and overall_success:
             self._session_cache[(sid, fp)] = final_result
+            try:
+                memory_service.get_or_create_session(session_id=sid)
+                memory_service.record_user_turn(session_id=sid, query=question)
+                exec_summary = (
+                    mgmt_response.composed_markdown
+                    if mgmt_response and mgmt_response.composed_markdown
+                    else mgmt_response.executive_summary
+                    if mgmt_response
+                    else "Analysis completed."
+                )
+                first_sql = executed_queries[0] if executed_queries else None
+                memory_service.record_assistant_turn(
+                    session_id=sid,
+                    answer=exec_summary,
+                    sql=first_sql,
+                    artifact_id=execution_id,
+                )
+            except Exception as _e:
+                logger.warning(f"Failed to record turn in memory_service: {_e}")
+
+        try:
+            r_count = len(df) if df is not None and not df.empty else 0
+            observability_tracer.record_run_trace(
+                RunTraceRecord(
+                    run_id=execution_id,
+                    session_id=sid,
+                    query=question,
+                    intent=primary_intent.value if hasattr(primary_intent, "value") else str(primary_intent),
+                    latency_ms=total_duration_ms,
+                    sql_executed="; ".join(executed_queries) if executed_queries else None,
+                    row_count=r_count,
+                    cost_estimate_usd=0.0002,
+                    error_class=final_result.abstain_reason if not final_result.success else None,
+                    verification_status="verified" if final_result.success else "abstained",
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                )
+            )
+        except Exception as _e:
+            logger.warning(f"Failed to record run trace in observability_tracer: {_e}")
 
         return final_result
 
@@ -712,6 +769,10 @@ class AgenticSupervisor:
         for k in keys:
             self._session_cache.pop(k, None)
         self._active_session_db.pop(session_id, None)
+
+    def clear_session_context(self, session_id: str) -> None:
+        """Alias for clear_session for backward-compatible interface clarity."""
+        self.clear_session(session_id)
 
     def clear_database_cache(self, fingerprint: str) -> None:
         """Clears all session context associated with a database fingerprint."""

@@ -1174,3 +1174,62 @@ Applied 4 targeted safeguards under Section 11 Fix Policy:
 
 ### E. Milestone Status
 **COMPLETED AND ACCEPTED. GROQ IS NOW THE EXCLUSIVE SINGLE LLM PROVIDER ACROSS THE APPLICATION.**
+
+---
+
+# TASK 1.1 RECORD: SAFE ARCHITECTURE CLEANUP AND DUPLICATION REMOVAL
+
+- **Execution Date:** November 3, 2026
+- **Git Branch:** `v2/task-1.1-safe-architecture-cleanup`
+- **Parent Commit:** `925f5c0`
+- **Author Roles:** Principal AI Architect, Senior Backend Engineer, Database Systems Engineer, Lead QA Engineer
+- **Scope:** Orchestration layer audit, conversation state responsibility clarification, unified session clearing, supervisor observability instrumentation, descriptive engine direct execution confirmation, and zero-regression verification.
+
+---
+
+### A. Architectural Context & Objectives
+1. **Orchestration Layer Mapping:** Clarified boundaries between `QueryWorkflowService` (Phase 2 legacy adapter), `MultiAgentOrchestrator` (Phase 3/3.1 conversational text-to-SQL), `AnalyticalOrchestrator` (Phase 4 single/composite engine), and `AgenticSupervisor` (Phase 5 master autonomous Data Scientist agent).
+2. **Preserve API Compatibility:** Maintained 100% schema compatibility for `/api/v1/chat/query`, `/api/v1/chat/stream`, `/api/v1/analytics/query`, and `/api/v1/agentic/supervise` to avoid breaking frontend UI components or historical test harnesses.
+3. **Clarify Conversation Memory Responsibilities:** Formalized distinction between durable persistent conversation history in `MemoryService` (`agent_app.sqlite`) and ephemeral runtime analytical artifact caching in `AgenticSupervisor._session_cache` (`(session_id, db_fingerprint)`).
+4. **State Synchronization & Telemetry:** Connected `AgenticSupervisor.supervise()` to persist turns into `MemoryService` and execution traces into `ObservabilityTracer`. Connected session reset and database switching hooks to invalidate in-memory caches synchronously.
+5. **Direct Descriptive Analytics Execution:** Verified that `AgenticSupervisor` invokes `descriptive_engine.run_descriptive_analysis()` directly with zero duplicate specialist wrapper classes.
+
+---
+
+### B. Implementation Details & File Modifications
+
+1. **`backend/app/orchestration/supervisor.py`:**
+   - Connected `AgenticSupervisor.supervise()` to record user and assistant turns in `MemoryService` (`get_or_create_session`, `record_user_turn`, `record_assistant_turn`).
+   - Connected `AgenticSupervisor.supervise()` to record `RunTraceRecord` in `ObservabilityTracer` for both successful executions and security blocks.
+   - Added `clear_session_context(session_id)` alias for backward-compatible interface clarity.
+2. **`backend/app/api/v1/endpoints/memory.py`:**
+   - Updated `clear_session` and `delete_session` endpoints to synchronously purge in-memory caches in `agentic_supervisor` and `analytical_orchestrator`.
+3. **`backend/app/db/manager.py`:**
+   - Updated `activate_database(...)` to clear previous database fingerprint caches from `agentic_supervisor` and `analytical_orchestrator` on database switching.
+4. **`backend/tests/test_architecture_cleanup.py`:**
+   - Implemented 5 dedicated tests verifying turn recording in SQLite, trace recording in `ops_run_traces`, unified session clearing, direct descriptive engine delegation, and chat query endpoint backward-compatibility.
+
+---
+
+### C. Empirical Test Execution & Timing Verification
+
+| Test Suite | Command | Collected | Passed | Failed | Duration | Status |
+|:---|:---|---:|---:|---:|---:|:---:|
+| **Cleanup Verification** (`test_architecture_cleanup.py`) | `python -m pytest backend/tests/test_architecture_cleanup.py` | 5 | 5 | 0 | 2.89s | **100% PASS** |
+| **Phase 5 Agentic Suites** | `python -m pytest backend/tests/test_phase5_agentic_*.py` | 17 | 17 | 0 | 1.30s | **100% PASS** |
+| **Groq LLM Suite** (`test_groq_llm.py`) | `python -m pytest backend/tests/test_groq_llm.py` | 13 | 13 | 0 | 0.20s | **100% PASS** |
+| **Config Suite** (`test_config.py`) | `python -m pytest backend/tests/test_config.py` | 4 | 4 | 0 | 0.12s | **100% PASS** |
+| **Full Repository Regression** | `python -m pytest backend/tests/` | 277 | 260 | 17* | 120.5s | **Zero Regressions** |
+
+*\*Note: Exactly the 17 tracked legacy V1 baseline failures remain unchanged.*
+
+- **Next.js Production Build:** `npm --prefix frontend run build` compiled successfully (4/4 static pages, 0 errors, 149 kB First Load JS).
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before Task 1.1: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - `ecommerce.db` SHA-256 after Task 1.1:  `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - **Status:** Invariance confirmed (100% bitwise match, 0 writes).
+
+---
+
+### D. Milestone Status
+**COMPLETED AND ACCEPTED. ARCHITECTURE CLEANUP AND STATE SYNCHRONIZATION FULLY OPERATIONAL.**

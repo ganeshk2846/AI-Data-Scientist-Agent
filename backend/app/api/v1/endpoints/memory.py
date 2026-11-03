@@ -59,6 +59,13 @@ async def get_session(session_id: str, request: Request) -> APIResponse[SessionD
 async def clear_session(session_id: str, request: Request) -> APIResponse[Dict[str, Any]]:
     request_id = getattr(request.state, "request_id", None)
     cleared = memory_service.clear_session(session_id)
+    try:
+        from backend.app.orchestration.supervisor import agentic_supervisor
+        agentic_supervisor.clear_session(session_id)
+        from backend.app.analysis.orchestrator import analytical_orchestrator
+        analytical_orchestrator.clear_session(session_id)
+    except Exception as _e:
+        pass
     return APIResponse(
         success=cleared,
         data={"session_id": session_id, "cleared": cleared},
@@ -74,6 +81,13 @@ async def clear_session(session_id: str, request: Request) -> APIResponse[Dict[s
 async def delete_session(session_id: str, request: Request) -> APIResponse[Dict[str, Any]]:
     request_id = getattr(request.state, "request_id", None)
     deleted = memory_service.delete_session(session_id)
+    try:
+        from backend.app.orchestration.supervisor import agentic_supervisor
+        agentic_supervisor.clear_session(session_id)
+        from backend.app.analysis.orchestrator import analytical_orchestrator
+        analytical_orchestrator.clear_session(session_id)
+    except Exception as _e:
+        pass
     return APIResponse(
         success=deleted,
         data={"session_id": session_id, "deleted": deleted},

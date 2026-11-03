@@ -236,10 +236,11 @@ class DatabaseConnectionManager:
             )
 
             # 5. Persist to agent store
+            prev_fp = self._active_config.fingerprint if self._active_config else None
             self._persist_config(updated_config, params)
             self._active_config = updated_config
 
-            # 6. Invalidate previous schema and retrieval caches
+            # 6. Invalidate previous schema, retrieval, and supervisor caches
             try:
                 from backend.app.retrieval.hybrid import hybrid_retriever
                 hybrid_retriever.catalog = None
@@ -248,8 +249,13 @@ class DatabaseConnectionManager:
                 hybrid_retriever.vector_store = None
                 from backend.app.schema.service import schema_service
                 schema_service.clear_cache()
+                if prev_fp and prev_fp != fp:
+                    from backend.app.orchestration.supervisor import agentic_supervisor
+                    agentic_supervisor.clear_database_cache(prev_fp)
+                    from backend.app.analysis.orchestrator import analytical_orchestrator
+                    analytical_orchestrator.clear_database_cache(prev_fp)
             except Exception as e:
-                logger.debug(f"Retrieval cache reset on activation: {e}")
+                logger.debug(f"Retrieval and supervisor cache reset on activation: {e}")
 
             # 7. Check e-commerce compatibility for canonical metric seeding
             try:
