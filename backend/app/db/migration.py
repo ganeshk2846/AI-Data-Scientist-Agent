@@ -36,7 +36,34 @@ def run_agent_store_migration(app_db_path: Optional[Path] = None) -> None:
                 );
             """)
 
-            # 2. Check semantic_metrics table
+            # 2. Create Active LLM Configuration Table (Groq only)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS active_llm_config (
+                    id TEXT PRIMARY KEY DEFAULT 'active_llm',
+                    provider TEXT NOT NULL DEFAULT 'groq',
+                    model TEXT NOT NULL,
+                    api_key_enc TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # 3. Create Saved Databases Table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS saved_databases (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    engine TEXT NOT NULL,
+                    connection_params_enc TEXT NOT NULL,
+                    fingerprint TEXT,
+                    is_active INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # 4. Check semantic_metrics table
             cur = conn.cursor()
             cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='semantic_metrics';")
             table_row = cur.fetchone()

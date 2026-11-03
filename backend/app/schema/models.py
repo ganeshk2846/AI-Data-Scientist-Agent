@@ -105,6 +105,22 @@ class JobStatusEnum(str, Enum):
     FAILED = "failed"
 
 
+class StageStatusEnum(str, Enum):
+    WAITING = "waiting"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class PreparationStageInfo(BaseModel):
+    """Information and progress for an individual schema preparation stage."""
+    id: int
+    name: str
+    status: StageStatusEnum = StageStatusEnum.WAITING
+    details: Optional[str] = None
+    elapsed_ms: Optional[float] = None
+
+
 class PreparationJobState(BaseModel):
     """Current state of a preparation job."""
     job_id: str
@@ -118,4 +134,5 @@ class PreparationJobState(BaseModel):
     tables_processed: int = 0
     total_tables: int = 0
     source_fingerprint: Optional[str] = None
+    stages: List[PreparationStageInfo] = Field(default_factory=list)
 

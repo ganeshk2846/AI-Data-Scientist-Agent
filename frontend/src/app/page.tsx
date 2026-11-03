@@ -8,6 +8,7 @@ import { HealthReadinessCard } from "@/components/HealthReadinessCard";
 import { SchemaReadinessSection } from "@/components/SchemaReadinessSection";
 import { ChatInterface } from "@/components/ChatInterface";
 import { ObservabilityDashboard } from "@/components/ObservabilityDashboard";
+import { SetupReadinessGuard } from "@/components/setup/SetupReadinessGuard";
 import {
   Activity,
   Database,
@@ -99,8 +100,9 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
       <Header isReady={data?.ready} version={data?.version} />
 
-      {/* Modern Sticky Navigation Bar */}
-      <div className="border-b border-border/80 bg-card/60 backdrop-blur-md sticky top-[61px] z-30 shadow-sm">
+      <SetupReadinessGuard>
+        {/* Modern Sticky Navigation Bar */}
+        <div className="border-b border-border/80 bg-card/60 backdrop-blur-md sticky top-[61px] z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-6">
           <nav className="flex items-center space-x-1.5 sm:space-x-2 py-2.5 overflow-x-auto scrollbar-none">
             {TABS.map((tab) => {
@@ -206,6 +208,7 @@ export default function HomePage() {
           </div>
         )}
       </main>
+      </SetupReadinessGuard>
 
       {/* Footer */}
       <footer className="border-t border-border/80 py-4 px-6 text-center text-xs text-muted-foreground bg-card/40 backdrop-blur">

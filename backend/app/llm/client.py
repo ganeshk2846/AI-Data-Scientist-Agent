@@ -340,6 +340,123 @@ class MockLLMProvider(BaseLLMProvider):
             return "SELECT order_status, COUNT(*) AS order_count, ROUND(SUM(total_amount), 2) AS total_amount FROM orders GROUP BY order_status;"
 
 
+SUPPORTED_GROQ_MODELS = [
+    {
+        "id": "llama-3.3-70b-versatile",
+        "name": "Llama 3.3 70B Versatile",
+        "context_window": 128000,
+        "is_recommended": True,
+        "description": "High performance, excellent reasoning and SQL synthesis capabilities (Recommended)",
+    },
+    {
+        "id": "openai/gpt-oss-120b",
+        "name": "GPT-OSS 120B",
+        "context_window": 8192,
+        "is_recommended": False,
+        "description": "High parameter open weights model with strong structured outputs",
+    },
+    {
+        "id": "llama-3.1-8b-instant",
+        "name": "Llama 3.1 8B Instant",
+        "context_window": 128000,
+        "is_recommended": False,
+        "description": "Ultra low latency inference optimized for high-throughput descriptive exploration",
+    },
+    {
+        "id": "llama3-70b-8192",
+        "name": "Llama 3 70B",
+        "context_window": 8192,
+        "is_recommended": False,
+        "description": "Versatile reasoning model with 8k context window",
+    },
+    {
+        "id": "mixtral-8x7b-32768",
+        "name": "Mixtral 8x7B 32k",
+        "context_window": 32768,
+        "is_recommended": False,
+        "description": "MoE architecture with fast token decoding and 32k context window",
+    },
+]
+
+
+def mask_api_key(key: Optional[str]) -> Optional[str]:
+    """Returns safe masked representation: e.g. gsk_...4a9f without exposing raw key."""
+    if not key:
+        return None
+    clean = key.strip()
+    if len(clean) <= 8:
+        return "gsk_...****"
+    return f"{clean[:4]}...{clean[-4:]}"
+
+
+def save_active_llm_credentials(api_key: str, model: str) -> None:
+    """Persists encrypted active Groq credentials in agent_app.sqlite."""
+    import sqlite3
+    from backend.app.db.security import encrypt_connection_params
+    conn = sqlite3.connect(str(settings.resolved_app_db_path))
+    try:
+        enc_payload = encrypt_connection_params({"api_key": api_key})
+        with conn:
+            conn.execute(
+                """
+                INSERT INTO active_llm_config (id, provider, model, api_key_enc, status, updated_at)
+                VALUES ('active_llm', 'groq', ?, ?, 'CONNECTED', CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    provider = 'groq',
+                    model = excluded.model,
+                    api_key_enc = excluded.api_key_enc,
+                    status = 'CONNECTED',
+                    updated_at = CURRENT_TIMESTAMP;
+                """,
+                (model, enc_payload),
+            )
+    finally:
+        conn.close()
+
+
+def load_persisted_llm_credentials() -> Optional[Dict[str, str]]:
+    """Loads active Groq credentials from agent_app.sqlite if available."""
+    import sqlite3
+    from backend.app.db.security import decrypt_connection_params
+    if not settings.resolved_app_db_path.exists():
+        return None
+    conn = sqlite3.connect(str(settings.resolved_app_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM active_llm_config WHERE id = 'active_llm';")
+        row = cur.fetchone()
+        if row and row["status"] == "CONNECTED":
+            params = decrypt_connection_params(row["api_key_enc"])
+            api_key = params.get("api_key")
+            if api_key:
+                return {"api_key": api_key, "model": row["model"]}
+        return None
+    except Exception as e:
+        logger.debug(f"Could not load persisted LLM config: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def clear_persisted_llm_credentials() -> None:
+    """Marks LLM as disconnected in agent_app.sqlite."""
+    import sqlite3
+    if not settings.resolved_app_db_path.exists():
+        return
+    conn = sqlite3.connect(str(settings.resolved_app_db_path))
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE active_llm_config SET status = 'DISCONNECTED', updated_at = CURRENT_TIMESTAMP WHERE id = 'active_llm';"
+            )
+    finally:
+        conn.close()
+
+
+_active_groq_provider: Optional[GroqLLMProvider] = None
+
+
 def get_llm_provider() -> BaseLLMProvider:
     """
     Factory returning the active LLM provider.
@@ -347,6 +464,34 @@ def get_llm_provider() -> BaseLLMProvider:
     In automated test environments (APP_ENV='testing') without a real Groq API key,
     returns deterministic MockLLMProvider to prevent external network calls.
     """
+    global _active_groq_provider
     if settings.APP_ENV == "testing" and not settings.is_llm_configured():
         return MockLLMProvider()
-    return GroqLLMProvider()
+
+    if _active_groq_provider is None:
+        if not settings.is_llm_configured():
+            persisted = load_persisted_llm_credentials()
+            if persisted:
+                settings.GROQ_API_KEY = persisted["api_key"]
+                settings.GROQ_MODEL = persisted["model"]
+        _active_groq_provider = GroqLLMProvider()
+    return _active_groq_provider
+
+
+def set_active_groq_credentials(api_key: str, model: Optional[str] = None) -> GroqLLMProvider:
+    """Updates active Groq credentials in memory and persists encrypted config."""
+    global _active_groq_provider
+    settings.GROQ_API_KEY = api_key
+    if model:
+        settings.GROQ_MODEL = model
+    save_active_llm_credentials(api_key, settings.GROQ_MODEL)
+    _active_groq_provider = GroqLLMProvider(api_key=api_key, model=settings.GROQ_MODEL)
+    return _active_groq_provider
+
+
+def disconnect_groq_credentials() -> None:
+    """Clears in-memory credentials and marks LLM as disconnected in store."""
+    global _active_groq_provider
+    settings.GROQ_API_KEY = None
+    clear_persisted_llm_credentials()
+    _active_groq_provider = None

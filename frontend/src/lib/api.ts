@@ -26,6 +26,16 @@ import {
   SessionDetailResponseSchema,
   SupervisorExecutionResult,
   SupervisorExecutionResponseSchema,
+  LLMStatusData,
+  LLMStatusResponseSchema,
+  LLMModelInfo,
+  LLMModelListResponseSchema,
+  DatabaseStatusInfo,
+  DatabaseStatusResponseSchema,
+  SavedDatabaseInfo,
+  SavedDatabaseListResponseSchema,
+  SetupStatusResponse,
+  SetupStatusAPIResponseSchema,
 } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
@@ -450,3 +460,198 @@ export async function streamAgenticQuery(
     }
   }
 }
+
+// ==========================================
+// Setup, LLM & Database Connection Client APIs
+// ==========================================
+
+export async function fetchSetupStatus(): Promise<SetupStatusResponse> {
+  const url = `${API_BASE_URL}/api/v1/setup/status`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = SetupStatusAPIResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch setup readiness status");
+  }
+  return parsed.data.data;
+}
+
+export async function fetchLLMStatus(): Promise<LLMStatusData> {
+  const url = `${API_BASE_URL}/api/v1/llm/status`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = LLMStatusResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch LLM status");
+  }
+  return parsed.data.data;
+}
+
+export async function fetchSupportedModels(): Promise<LLMModelInfo[]> {
+  const url = `${API_BASE_URL}/api/v1/llm/models`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = LLMModelListResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch supported Groq models");
+  }
+  return parsed.data.data;
+}
+
+export async function connectGroqLLM(apiKey: string, model: string): Promise<LLMStatusData> {
+  const url = `${API_BASE_URL}/api/v1/llm/connect`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ api_key: apiKey, model }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || "Failed to connect to Groq API");
+  }
+  const parsed = LLMStatusResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Invalid response connecting to Groq");
+  }
+  return parsed.data.data;
+}
+
+export async function disconnectGroqLLM(): Promise<void> {
+  const url = `${API_BASE_URL}/api/v1/llm/disconnect`;
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.detail || "Failed to disconnect Groq LLM");
+  }
+}
+
+export async function fetchDatabaseStatus(): Promise<DatabaseStatusInfo> {
+  const url = `${API_BASE_URL}/api/v1/db/status`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = DatabaseStatusResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch active database status");
+  }
+  return parsed.data.data;
+}
+
+export async function fetchSavedDatabases(): Promise<SavedDatabaseInfo[]> {
+  const url = `${API_BASE_URL}/api/v1/db/saved`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = SavedDatabaseListResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to fetch saved databases");
+  }
+  return parsed.data.data;
+}
+
+export async function testDatabaseConnection(params: {
+  engine: string;
+  name?: string;
+  file_path?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  ssl?: boolean;
+}): Promise<{ engine: string; table_count: number; message: string }> {
+  const url = `${API_BASE_URL}/api/v1/db/test`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(params),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || "Failed to verify database connection");
+  }
+  return json.data;
+}
+
+export async function uploadSQLiteFile(file: File): Promise<{ file_path: string; filename: string; size_bytes: number }> {
+  const url = `${API_BASE_URL}/api/v1/db/upload-sqlite`;
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body: formData,
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || "Failed to upload SQLite file");
+  }
+  return json.data;
+}
+
+export async function connectDatabase(params: {
+  engine: string;
+  name: string;
+  file_path?: string;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  password?: string;
+  ssl?: boolean;
+}): Promise<{ database: any; preparation_job: PreparationJobState }> {
+  const url = `${API_BASE_URL}/api/v1/db/connect`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(params),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || "Failed to connect database");
+  }
+  return json.data;
+}
+
+export async function activateSavedDatabase(databaseId: string): Promise<{ database: any; preparation_job: PreparationJobState }> {
+  const url = `${API_BASE_URL}/api/v1/db/activate/${encodeURIComponent(databaseId)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || "Failed to activate saved database");
+  }
+  return json.data;
+}
+
+export async function disconnectDatabase(): Promise<void> {
+  const url = `${API_BASE_URL}/api/v1/db/disconnect`;
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    const json = await res.json();
+    throw new Error(json.detail || "Failed to disconnect database");
+  }
+}
+
+export async function fetchPreparationJob(jobId: string): Promise<PreparationJobState> {
+  const url = `${API_BASE_URL}/api/v1/schema/jobs/${encodeURIComponent(jobId)}`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  const parsed = PreparationJobResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || `Failed to fetch preparation job ${jobId}`);
+  }
+  return parsed.data.data;
+}
+
+export async function retryPreparationJob(): Promise<PreparationJobState> {
+  const url = `${API_BASE_URL}/api/v1/setup/retry-preparation`;
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  const json = await res.json();
+  const parsed = PreparationJobResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to retry preparation job");
+  }
+  return parsed.data.data;
+}
+

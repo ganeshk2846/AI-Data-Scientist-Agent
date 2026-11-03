@@ -1514,3 +1514,48 @@ Applied 4 targeted safeguards under Section 11 Fix Policy:
 - **Evaluation & Observability:** ACCEPTED (`agent_app.sqlite` & LanceDB)
 - **Business Demonstration Readiness:** **READY FOR EXECUTIVE DEMONSTRATION**
 - **Production Readiness:** **CONDITIONALLY READY FOR STAGING / ENTERPRISE PILOT**
+
+
+---
+
+## Self-Service LLM & Database Connection Workflow
+
+### A. Task Identification
+- **Task Name:** Self-Service LLM & Database Connection Workflow
+- **Completion Date:** 2026-11-03
+- **Git Branch Name:** 2/task-self-service-setup
+- **Parent Branch:** 2/task-2-prd-enhancements (1b6bf67)
+
+### B. Objective
+Transform the platform from requiring manual backend .env configuration and CLI preparation into an end-to-end self-service conversational application. Users can connect their Groq LLM API key, select from supported Groq models, configure database connections (SQLite upload/managed, PostgreSQL, MySQL) in strict read-only mode (mode=ro), monitor an automated 7-stage asynchronous schema preparation pipeline, and unlock the chat workspace only after verification succeeds.
+
+### C. Implementation Highlights
+1. **Groq LLM Connection & Masked Encrypted Credential Management:**
+   - Single-provider Groq architecture with validated models: llama-3.3-70b-versatile, openai/gpt-oss-120b, llama-3.1-8b-instant, mixtral-8x7b-32768, and llama3-70b-8192.
+   - Credentials encrypted at rest using Fernet in gent_app.sqlite (ctive_llm_config table).
+   - Zero raw key leakage: Keys returned as masked signatures (gsk_...4a9f).
+   - Dynamic runtime re-instantiation: Changing Groq key or model instantly resets singleton instances of GroqLLMClient and all dependent specialists without restarting FastAPI.
+2. **Multi-Engine Database Connection Manager:**
+   - Dedicated connection testing and activation endpoints for SQLite (safe file upload with 50MB limit and magic byte verification, or baseline path), PostgreSQL, and MySQL.
+   - Enforced strict read-only mode (mode=ro / READ ONLY transaction flags).
+3. **Automated 7-Stage Asynchronous Schema Preparation:**
+   - Stage 1: Database connection verified
+   - Stage 2: Schema discovery (tables and views)
+   - Stage 3: Table profiling (row counts and column stats)
+   - Stage 4: Semantic metadata construction
+   - Stage 5: Dense vector indexing (LanceDB + FastEmbed BAAI/bge-small-en-v1.5)
+   - Stage 6: Lexical indexing (Persistent BM25)
+   - Stage 7: Final preparation verification
+   - Instant artifact reuse: If the database fingerprint already has indexes on disk, preparation completes immediately in ~300ms without redundant embedding calculation.
+4. **Setup Readiness Gating & Resilient App Router Frontend:**
+   - Unified readiness endpoint GET /api/v1/setup/status reports boolean flags llm_connected, database_connected, preparation_completed, and chat_ready.
+   - Frontend SetupReadinessGuard wraps the conversational workspace, auto-detects unconfigured states, and guides the user through the 3-step setup wizard. State survives browser reloads and tab navigations.
+   - Dedicated routes: /connect/llm, /connect/database, /setup/preparing, and /settings/connections.
+   - Header connection pills display the active Groq model, connected database, and a direct link to connection settings.
+
+### D. Verification and Testing
+- **New Unit & Integration Tests:** 18 dedicated tests in ackend/tests/test_self_service_setup.py covering masked key storage, model listing, live Groq validation, SQLite/PostgreSQL/MySQL testing, corrupted database rejection, 7-stage job progress tracking, instant artifact reuse, and page-refresh state restoration. **18/18 passed (100%)**.
+- **Frontend Build:** 
+pm run build compiled all 8 static pages with zero errors (Suspense boundary wrapped for Next.js App Router query params).
+- **Regression Tests:** Scenario analytics, impact analytics, and churn reliability tests verified (12/12 passed).
+- **Database Immutability:** ecommerce.db SHA-256 hash 366080c92e8dc7024a15b95730a35e63ac16765f748142f51cc40f92b63f3d9e strictly maintained.

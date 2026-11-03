@@ -103,6 +103,15 @@ export const DatabaseCatalogSchema = z.object({
   foreign_key_graph: z.array(z.record(z.string())),
 });
 
+export const PreparationStageInfoSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  status: z.enum(["waiting", "running", "completed", "failed"]),
+  details: z.string().nullable().optional(),
+  elapsed_ms: z.number().nullable().optional(),
+});
+export type PreparationStageInfo = z.infer<typeof PreparationStageInfoSchema>;
+
 export const PreparationJobStateSchema = z.object({
   job_id: z.string(),
   status: z.enum(["pending", "running", "succeeded", "failed"]),
@@ -115,6 +124,7 @@ export const PreparationJobStateSchema = z.object({
   tables_processed: z.number().default(0),
   total_tables: z.number().default(0),
   source_fingerprint: z.string().nullable().optional(),
+  stages: z.array(PreparationStageInfoSchema).default([]),
 });
 
 export const SchemaStatusSchema = z.object({
@@ -793,3 +803,66 @@ export const SupervisorExecutionResultSchema = z.object({
 });
 export type SupervisorExecutionResult = z.infer<typeof SupervisorExecutionResultSchema>;
 export const SupervisorExecutionResponseSchema = createAPIResponseSchema(SupervisorExecutionResultSchema);
+
+// Setup, LLM and Database Connection Models
+export const LLMStatusDataSchema = z.object({
+  connected: z.boolean(),
+  provider: z.literal("groq"),
+  model: z.string(),
+  masked_key: z.string().nullable().optional(),
+  status: z.string(),
+});
+export type LLMStatusData = z.infer<typeof LLMStatusDataSchema>;
+export const LLMStatusResponseSchema = createAPIResponseSchema(LLMStatusDataSchema);
+
+export const LLMModelInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  context_window: z.number(),
+  is_recommended: z.boolean(),
+  description: z.string(),
+});
+export type LLMModelInfo = z.infer<typeof LLMModelInfoSchema>;
+export const LLMModelListResponseSchema = createAPIResponseSchema(z.array(LLMModelInfoSchema));
+
+export const DatabaseStatusInfoSchema = z.object({
+  name: z.string(),
+  engine: z.string(),
+  status: z.string(),
+  fingerprint: z.string().nullable().optional(),
+  read_only: z.boolean(),
+  table_count: z.number().default(0),
+  row_count: z.number().default(0),
+  connected: z.boolean(),
+});
+export type DatabaseStatusInfo = z.infer<typeof DatabaseStatusInfoSchema>;
+export const DatabaseStatusResponseSchema = createAPIResponseSchema(DatabaseStatusInfoSchema);
+
+export const SavedDatabaseInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  engine: z.string(),
+  fingerprint: z.string().nullable().optional(),
+  is_active: z.boolean(),
+  created_at: z.string().nullable().optional(),
+});
+export type SavedDatabaseInfo = z.infer<typeof SavedDatabaseInfoSchema>;
+export const SavedDatabaseListResponseSchema = createAPIResponseSchema(z.array(SavedDatabaseInfoSchema));
+
+export const SetupStatusResponseSchema = z.object({
+  llm_status: z.string(),
+  database_status: z.string(),
+  preparation_status: z.string(),
+  chat_ready: z.boolean(),
+  llm: z.object({
+    provider: z.string(),
+    model: z.string(),
+    masked_key: z.string().nullable().optional(),
+    connected: z.boolean(),
+  }),
+  database: DatabaseStatusInfoSchema.nullable().optional(),
+  preparation: z.any().nullable().optional(),
+});
+export type SetupStatusResponse = z.infer<typeof SetupStatusResponseSchema>;
+export const SetupStatusAPIResponseSchema = createAPIResponseSchema(SetupStatusResponseSchema);
+

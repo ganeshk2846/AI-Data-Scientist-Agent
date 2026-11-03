@@ -37,7 +37,7 @@ export function ObservabilityDashboard() {
     refetch: refetchMetrics,
   } = useQuery({
     queryKey: ["observabilityMetrics"],
-    queryFn: fetchObservabilityMetrics,
+    queryFn: () => fetchObservabilityMetrics(),
     refetchInterval: 10000,
   });
 
