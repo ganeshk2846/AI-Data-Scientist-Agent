@@ -826,14 +826,15 @@ export type LLMModelInfo = z.infer<typeof LLMModelInfoSchema>;
 export const LLMModelListResponseSchema = createAPIResponseSchema(z.array(LLMModelInfoSchema));
 
 export const DatabaseStatusInfoSchema = z.object({
-  name: z.string(),
-  engine: z.string(),
-  status: z.string(),
+  id: z.string().optional(),
+  name: z.string().default("ecommerce.db"),
+  engine: z.string().default("sqlite"),
+  status: z.string().default("READY"),
   fingerprint: z.string().nullable().optional(),
-  read_only: z.boolean(),
+  read_only: z.boolean().default(true),
   table_count: z.number().default(0),
   row_count: z.number().default(0),
-  connected: z.boolean(),
+  connected: z.boolean().default(false),
 });
 export type DatabaseStatusInfo = z.infer<typeof DatabaseStatusInfoSchema>;
 export const DatabaseStatusResponseSchema = createAPIResponseSchema(DatabaseStatusInfoSchema);

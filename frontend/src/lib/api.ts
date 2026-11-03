@@ -471,6 +471,7 @@ export async function fetchSetupStatus(): Promise<SetupStatusResponse> {
   const json = await res.json();
   const parsed = SetupStatusAPIResponseSchema.safeParse(json);
   if (!parsed.success || !parsed.data.data) {
+    console.error("fetchSetupStatus Zod validation issue:", parsed.error, json);
     throw new Error(parsed.data?.error?.message || "Failed to fetch setup readiness status");
   }
   return parsed.data.data;

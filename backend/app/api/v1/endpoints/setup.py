@@ -30,8 +30,10 @@ class SetupLLMInfo(BaseModel):
 class SetupDatabaseInfo(BaseModel):
     name: str
     engine: str
+    status: str = "READY"
     read_only: bool = True
     table_count: int = 0
+    row_count: int = 0
     fingerprint: Optional[str] = None
     connected: bool = False
 
@@ -96,8 +98,10 @@ async def get_setup_status(request: Request) -> APIResponse[SetupStatusResponse]
             db_info = SetupDatabaseInfo(
                 name=db_config.name,
                 engine=db_config.engine.value,
+                status="READY" if is_db_connected else "DISCONNECTED",
                 read_only=db_config.read_only,
                 table_count=table_count,
+                row_count=0,
                 fingerprint=active_fp,
                 connected=is_db_connected,
             )
@@ -107,8 +111,10 @@ async def get_setup_status(request: Request) -> APIResponse[SetupStatusResponse]
             db_info = SetupDatabaseInfo(
                 name=db_config.name,
                 engine=db_config.engine.value,
+                status="DISCONNECTED",
                 read_only=db_config.read_only,
                 table_count=0,
+                row_count=0,
                 fingerprint=active_fp,
                 connected=False,
             )
