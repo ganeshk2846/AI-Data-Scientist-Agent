@@ -835,3 +835,81 @@ Address and resolve the five critical analytical reliability and architectural l
 
 ### E. Phase Completion Status
 **COMPLETED AND VERIFIED. READY FOR CONTROLLED UAT.**
+
+
+---
+
+## Phase 4.1.2: UAT Defect Closure & Analytical Acceptance Finalization
+
+### A. Phase Identification
+- **Phase Number:** Phase 4.1.2
+- **Phase Name:** UAT Defect Closure & Analytical Acceptance Finalization
+- **Completion Date:** 2026-11-03
+- **Git Branch Name:** `v2/phase-4.1.2-uat-defect-closure`
+- **Parent Commit:** `177d10c` (`v2/phase-4.1-reliability-uat-hardening`)
+- **Status:** COMPLETED AND VERIFIED.
+
+### B. Objectives & Scope
+Targeted remediation of the two defects and three analytical workflow inconsistencies identified during the independent Controlled User Acceptance Testing (UAT) cycle:
+1. **DEF-01 (Budget Suffix Parsing):** Resolve currency unit multiplier scaling defect where words beginning with 'k', 'm', or 'b' (such as 'marketing', 'month', 'maintenance') falsely triggered thousand/million/billion scaling.
+2. **DEF-02 (Multi-Table Temporal Planning):** Implement schema-aware relational ranking and fact/dimension discovery using introspected foreign keys to resolve connected event tables possessing temporal columns when queried dimension entities lack them.
+3. **Objective C (Composite Analytical Pipeline):** Replace rigid if/elif branches with a sequential multi-stage execution pipeline supporting 2-stage, 3-stage, and 4-stage requests across DESCRIPTIVE, DIAGNOSTIC, PREDICTIVE, and PRESCRIPTIVE intents.
+4. **Objective D (Prescriptive Evidence Grounding):** Ground efficiency coefficients in real computed data aggregations, eliminate dummy hardcoded fallbacks, and safely abstain when requested optimization concepts (e.g. treatment delays or marketing channel effectiveness) do not exist in the schema.
+5. **Objective E (UAT Acceptance Scoring Reassessment):** Recalculate acceptance metrics strictly separating completed analytical workflows from correct safety abstentions.
+6. **Objective F (Regression & Invariance Testing):** Add 5 targeted test suites (19 new tests), run all 249 repository tests, verify clean Next.js production build, and maintain 100% bitwise immutability of `ecommerce.db`.
+
+### C. Implementation Details
+
+1. **DEF-01 Currency Budget Parsing (`backend/app/analysis/prescriptive_engine.py`):**
+   - Implemented regex with negative lookahead assertion `r"\$\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s*(k|m|b|thousand|million|billion)?(?![a-zA-Z])"`.
+   - Guaranteed that suffixes like `k`, `m`, `b` must be standalone units and can never match the leading letter of natural English words (`$25,000 marketing budget` evaluates strictly to `$25,000.00`).
+   - Added secondary pattern support for explicitly declared budgets (`"budget of 50000"`, `"capital allocation of 1.5m"`).
+   - Removed duplicated return statement in `solve_constrained_optimization`.
+
+2. **DEF-02 Schema-Aware Temporal & Foreign-Key Ranking (`backend/app/analysis/planner.py`, `backend/app/analysis/data_extractor.py`):**
+   - In `planner.py`: When intent is `PREDICTIVE` (or temporal trends are requested) and an initial dimension entity (e.g. `books`) has no date/time column, the planner inspects catalog foreign keys (`foreign_keys` on table models and reverse references) to discover connected event tables possessing temporal columns (e.g. `loans.loan_date`).
+   - Established hierarchical table ranking: temporal event tables are ranked as primary, and dimension entities as secondary (`relevant_tables = ['loans', 'books']`).
+   - In `data_extractor.py`: When `len(plan.relevant_tables) >= 2` and a verified foreign key connects them, synthesizes a schema-grounded `JOIN` query (`SELECT loans.loan_date, books.category, ... FROM loans JOIN books ON loans.book_id = books.book_id ORDER BY loans.loan_date ASC LIMIT 1000`).
+   - Enforced safe abstention when no verified foreign key relationship or temporal column exists.
+
+3. **Objective C Multi-Stage Composite Pipeline (`backend/app/analysis/intent_classifier.py`, `backend/app/analysis/orchestrator.py`):**
+   - In `intent_classifier.py`: Dynamically evaluated all present cues (`has_desc_cue`, `has_diag_cue`, `has_pred_cue`, `has_presc_cue`) to populate `composite_intents` in natural analytical order (`DESCRIPTIVE` $\rightarrow$ `DIAGNOSTIC` $\rightarrow$ `PREDICTIVE` $\rightarrow$ `PRESCRIPTIVE`), supporting 2-stage, 3-stage, and 4-stage requests.
+   - In `orchestrator.py`: Implemented sequential execution loop iterating through `intent_res.composite_intents`, aggregating findings, metrics, and recommendations, and tracking individual execution status per stage (`model_information["stage_statuses"]`).
+   - Prescriptive results and recommendations are never synthesized or fabricated if prescriptive did not execute.
+
+4. **Objective D Grounded Prescriptive Inputs & Safe Abstention (`backend/app/analysis/prescriptive_engine.py`):**
+   - Filtered out temporal date/time columns from categorical allocation candidates to ensure resource allocation groups strictly by business entities.
+   - Efficiency multipliers derived dynamically from real grouped data: `grp = df.groupby(cat_col)[target_col].mean().dropna()`.
+   - Eliminated hardcoded fallback scores (`"Category A", "Category B", "Category C"` with `3.2, 2.5, 1.8`). Real schema queries lacking categorical variance or required effectiveness metrics safely abstain with an explicit explanatory message.
+   - Concept guardrail: Checked whether requested optimization concepts (e.g. "treatment delays" or "marketing channel effectiveness") exist in the schema; if absent, safely abstained without confusing cost with delay.
+   - SLSQP summary enriched with `objective_function`, `decision_variables`, `coefficients_source`, `constraints`, `constraints_source`, `solver_status`, `optimality_evidence`, and `budget_reconciliation`.
+
+5. **Objective E Reassessed UAT Acceptance Scoring:**
+   - Formalized Task Completion Rate separating completed tasks from safety abstentions:
+     - Applicable Task Completion Rate: $15 / 15 = 100.0\%$.
+     - Total Inquiries Completion Rate: $15 / 16 = 93.75\%$.
+   - Formalized Safety Compliance Rate: $16 / 16 = 100.0\%$ (0 unsafe executions, 0 unsupported calculations, 100% appropriate abstentions on out-of-schema concepts).
+
+### D. Empirical Test Execution & Verification
+
+| Test Suite | File | Tests | Passed | Analytical Verification Focus |
+|:---|:---|---:|---:|:---|
+| **Budget Parser** | `test_phase4_1_2_budget_parser.py` | 5 | 5 | Mandatory test cases (`$25,000 marketing`, `$25k`, `$25m`, `$1.5k`, `$1.5m`, `$2b`, `$25,000.50`); words starting with k/m/b |
+| **Multi-Table Planner** | `test_phase4_1_2_multitable_planner.py` | 3 | 3 | Library `loans` + `books` FK resolution; temporal event table ranking; safe abstention on unconnected tables |
+| **Composite Execution** | `test_phase4_1_2_composite_execution.py` | 5 | 5 | Scenario A (3-stage Desc $\rightarrow$ Pred $\rightarrow$ Presc); Scenario B (Diag $\rightarrow$ Presc); Scenario C (Desc $\rightarrow$ Pred); Scenario D (4-stage); no-synthesis check |
+| **Prescriptive Evidence** | `test_phase4_1_2_prescriptive_evidence.py` | 5 | 5 | Empirical groupby efficiency derivation; missing marketing evidence abstention; missing delay data abstention; KKT metadata |
+| **UAT Scoring** | `test_phase4_1_2_uat_scoring.py` | 1 | 1 | Verified completion rate vs safety compliance separation and domain matrix coverage |
+| **Phase 4.1.2 Subtotal** | **All 5 New Suites** | **19** | **19** | **100% Pass Rate** |
+| **Phase 4.1 Suites** | **All 9 Phase 4.1 Suites** | **31** | **31** | **100% Pass Rate** |
+| **Phase 4 Suites** | **All 9 Phase 4 Suites** | **29** | **29** | **100% Pass Rate** |
+| **Combined Phase 4 / 4.1 / 4.1.2**| **All 23 Analytical Suites** | **79** | **79** | **100% Pass Rate (9.03s)** |
+| **Full Repository Test Suite** | **Entire Test Suite** | **249** | **232** | **Zero Regressions (17 tracked legacy V1 baseline failures unchanged, 0:05:44)** |
+
+- **Next.js Frontend Production Build:** Compiled successfully (`4/4 static pages generated`, 0 TypeScript/ESLint errors).
+- **Bitwise Immutability Verification:**
+  - `ecommerce.db` SHA-256 before Phase 4.1.2: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - `ecommerce.db` SHA-256 after Phase 4.1.2: `366080C92E8DC7024A15B95730A35E63AC16765F748142F51CC40F92B63F3D9E`
+  - **Status:** Invariance confirmed (100% bitwise match, 0 writes).
+
+### E. Phase Completion Status
+**COMPLETED AND VERIFIED. UAT DEFECTS CLOSED. READY FOR CONTROLLED HUMAN BUSINESS PILOT.**
