@@ -14,12 +14,18 @@ import {
   BarChart2,
 } from "lucide-react";
 import { Badge } from "../ui/Badge";
+import { ManagementResponseView } from "./ManagementResponseView";
 
 export interface AnalysisArtifactsProps {
   analysis: any;
 }
 
 export function AnalysisArtifacts({ analysis }: AnalysisArtifactsProps) {
+  // Check if this is a Phase 5 SupervisorExecutionResult
+  if (analysis.management_response && analysis.tasks) {
+    return <ManagementResponseView execution={analysis} />;
+  }
+
   // Check if this is a Phase 4 StandardizedAnalyticalResult
   if (analysis.analytical_type && analysis.selected_methods) {
     const {

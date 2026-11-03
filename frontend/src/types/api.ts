@@ -668,3 +668,80 @@ export const AnalyticalPlanSchema = z.object({
   abstain_reason: z.string().nullable().optional(),
 });
 export type AnalyticalPlan = z.infer<typeof AnalyticalPlanSchema>;
+
+
+// =====================================================================
+// Phase 5: Agentic Orchestration & Management Decision Support
+// =====================================================================
+
+export const SpecialistRoleSchema = z.enum([
+  "DATA_RETRIEVAL",
+  "DIAGNOSTIC",
+  "PREDICTIVE",
+  "PRESCRIPTIVE",
+  "CRITIC",
+]);
+export type SpecialistRole = z.infer<typeof SpecialistRoleSchema>;
+
+export const TaskStatusSchema = z.enum([
+  "PENDING",
+  "RUNNING",
+  "COMPLETED",
+  "FAILED",
+  "ABSTAINED",
+]);
+export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+
+export const AgentTaskSchema = z.object({
+  task_id: z.string(),
+  specialist: SpecialistRoleSchema,
+  task_type: z.string(),
+  input_references: z.array(z.string()).default([]),
+  expected_output_type: z.string().default("result"),
+  status: TaskStatusSchema.default("PENDING"),
+  start_time: z.string().nullable().optional(),
+  end_time: z.string().nullable().optional(),
+  duration_ms: z.number().default(0.0),
+  error_or_abstain_reason: z.string().nullable().optional(),
+  evidence_references: z.array(z.string()).default([]),
+  output_summary: z.string().nullable().optional(),
+});
+export type AgentTask = z.infer<typeof AgentTaskSchema>;
+
+export const ExecutiveSectionSchema = z.object({
+  title: z.string(),
+  headline: z.string(),
+  content: z.string(),
+  kpis: z.record(z.any()).default({}),
+  evidence_references: z.array(z.string()).default([]),
+  disclaimers: z.array(z.string()).default([]),
+});
+export type ExecutiveSection = z.infer<typeof ExecutiveSectionSchema>;
+
+export const ManagementResponseSchema = z.object({
+  what: ExecutiveSectionSchema.nullable().optional(),
+  why: ExecutiveSectionSchema.nullable().optional(),
+  what_next: ExecutiveSectionSchema.nullable().optional(),
+  so_what: ExecutiveSectionSchema.nullable().optional(),
+  executive_summary: z.string().default(""),
+  composed_markdown: z.string().default(""),
+});
+export type ManagementResponse = z.infer<typeof ManagementResponseSchema>;
+
+export const SupervisorExecutionResultSchema = z.object({
+  execution_id: z.string(),
+  question: z.string(),
+  session_id: z.string().default("default_session"),
+  database_fingerprint: z.string().default("default_fp"),
+  primary_intent: IntentCategorySchema.default("DESCRIPTIVE"),
+  plan_summary: z.string().default(""),
+  tasks: z.array(AgentTaskSchema).default([]),
+  management_response: ManagementResponseSchema.default({}),
+  analytical_result: StandardizedAnalyticalResultSchema.nullable().optional(),
+  metrics: z.record(z.any()).default({}),
+  success: z.boolean().default(true),
+  abstain_reason: z.string().nullable().optional(),
+  created_at: z.string().optional(),
+});
+export type SupervisorExecutionResult = z.infer<typeof SupervisorExecutionResultSchema>;
+export const SupervisorExecutionResponseSchema = createAPIResponseSchema(SupervisorExecutionResultSchema);

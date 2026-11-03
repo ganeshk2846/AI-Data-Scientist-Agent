@@ -48,7 +48,7 @@ export function ArtifactCard({
       ? [{ key: "chart", label: `Chart (${result.chart_spec.chart_type})`, icon: BarChart2 }]
       : []),
     ...(result.analysis_result
-      ? [{ key: "analysis", label: `Analysis (${result.analysis_result.tool_name})`, icon: Sparkles }]
+      ? [{ key: "analysis", label: `Analysis (${(result.analysis_result as any).tool_name || (result.analysis_result as any).analytical_type || "Decision Support"})`, icon: Sparkles }]
       : []),
     { key: "plan", label: `DAG (${result.plan?.steps.length ?? 0})`, icon: GitBranch },
     { key: "sql", label: "SQL", icon: Code2 },

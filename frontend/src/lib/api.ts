@@ -23,6 +23,8 @@ import {
   SessionListResponseSchema,
   TurnModel,
   SessionDetailResponseSchema,
+  SupervisorExecutionResult,
+  SupervisorExecutionResponseSchema,
 } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
@@ -348,4 +350,87 @@ export async function evaluateAnalyticsClassifier() {
     throw new Error(json.error?.message || "Failed to evaluate classifier");
   }
   return json.data;
+}
+
+
+// =====================================================================
+// Phase 5: Agentic Supervisor & Multi-Agent Decision Support APIs
+// =====================================================================
+
+export async function superviseAnalysis(
+  question: string,
+  sessionId?: string,
+  intentOverride?: string
+): Promise<SupervisorExecutionResult> {
+  const url = `${API_BASE_URL}/api/v1/agentic/supervise`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ question, session_id: sessionId, intent_override: intentOverride }),
+  });
+  const json = await res.json();
+  const parsed = SupervisorExecutionResponseSchema.safeParse(json);
+  if (!parsed.success || !parsed.data.data) {
+    throw new Error(parsed.data?.error?.message || "Failed to execute agentic supervision");
+  }
+  return parsed.data.data;
+}
+
+export async function streamAgenticQuery(
+  question: string,
+  sessionId?: string,
+  intentOverride?: string,
+  onTaskProgress?: (task: any) => void,
+  onResult?: (result: any) => void,
+  onError?: (errorMsg: string) => void
+): Promise<void> {
+  const url = `${API_BASE_URL}/api/v1/agentic/stream`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ question, session_id: sessionId, intent_override: intentOverride }),
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`SSE stream connection failed with HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n\n");
+    buffer = lines.pop() || "";
+
+    for (const block of lines) {
+      if (!block.trim()) continue;
+      let eventType = "message";
+      let eventData = "";
+
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) {
+          eventType = line.replace("event:", "").trim();
+        } else if (line.startsWith("data:")) {
+          eventData = line.replace("data:", "").trim();
+        }
+      }
+
+      if (eventData) {
+        try {
+          const parsedData = JSON.parse(eventData);
+          if (eventType === "task_progress" && onTaskProgress) {
+            onTaskProgress(parsedData);
+          } else if (eventType === "result" && onResult) {
+            onResult(parsedData);
+          } else if (eventType === "error" && onError) {
+            onError(parsedData.message || "Execution error in stream");
+          }
+        } catch (e) {
+          console.warn("Failed to parse SSE payload:", e);
+        }
+      }
+    }
+  }
 }
