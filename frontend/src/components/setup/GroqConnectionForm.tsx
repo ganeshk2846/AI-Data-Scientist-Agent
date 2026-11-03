@@ -37,7 +37,7 @@ export function GroqConnectionForm({
 }: GroqConnectionFormProps) {
   const queryClient = useQueryClient();
   const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("llama-3.3-70b-versatile");
+  const [selectedModel, setSelectedModel] = useState("openai/gpt-oss-120b");
   const [showKey, setShowKey] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,25 +96,25 @@ export function GroqConnectionForm({
   const isConnected = statusData?.connected && statusData?.status === "CONNECTED";
   const models = modelsData || [
     {
-      id: "llama-3.3-70b-versatile",
-      name: "Llama 3.3 70B Versatile",
-      context_window: 128000,
-      is_recommended: true,
-      description: "State-of-the-art multilingual model with 128k context and analytical reasoning",
-    },
-    {
       id: "openai/gpt-oss-120b",
       name: "GPT-OSS 120B",
       context_window: 8192,
-      is_recommended: false,
-      description: "High parameter open weights model with strong structured outputs",
+      is_recommended: true,
+      description: "High parameter open weights model with strong structured outputs (Recommended)",
     },
     {
-      id: "llama-3.1-8b-instant",
-      name: "Llama 3.1 8B Instant",
+      id: "qwen/qwen3.8-27b",
+      name: "Qwen 3.8 27B",
+      context_window: 32768,
+      is_recommended: false,
+      description: "Ultra low latency 27B model optimized for fast query synthesis",
+    },
+    {
+      id: "llama-3.3-70b-versatile",
+      name: "Llama 3.3 70B Versatile",
       context_window: 128000,
       is_recommended: false,
-      description: "Ultra low latency inference optimized for high-throughput exploration",
+      description: "State-of-the-art multilingual model with 128k context and analytical reasoning",
     },
   ];
 

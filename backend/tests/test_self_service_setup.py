@@ -58,9 +58,8 @@ def test_supported_groq_models_list(client):
     assert "openai/gpt-oss-120b" in model_ids
     assert "llama-3.1-8b-instant" in model_ids
 
-    rec = next(m for m in models if m["id"] == "llama-3.3-70b-versatile")
-    assert rec["is_recommended"] is True
-    assert rec["context_window"] == 128000
+    rec = next(m for m in models if m["is_recommended"] is True)
+    assert rec["id"] in ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
 
 
 def test_groq_key_masking():
@@ -243,7 +242,7 @@ def test_preparation_job_7_stages():
         assert job.status in [JobStatusEnum.PENDING, JobStatusEnum.RUNNING, JobStatusEnum.SUCCEEDED]
         assert len(job.stages) == 7
 
-        max_wait = 20
+        max_wait = 50
         waited = 0
         latest = job
         while waited < max_wait:

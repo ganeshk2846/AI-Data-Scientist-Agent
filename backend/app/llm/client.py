@@ -342,18 +342,25 @@ class MockLLMProvider(BaseLLMProvider):
 
 SUPPORTED_GROQ_MODELS = [
     {
-        "id": "llama-3.3-70b-versatile",
-        "name": "Llama 3.3 70B Versatile",
-        "context_window": 128000,
-        "is_recommended": True,
-        "description": "High performance, excellent reasoning and SQL synthesis capabilities (Recommended)",
-    },
-    {
         "id": "openai/gpt-oss-120b",
         "name": "GPT-OSS 120B",
         "context_window": 8192,
+        "is_recommended": True,
+        "description": "High parameter open weights model with strong structured outputs (Recommended)",
+    },
+    {
+        "id": "qwen/qwen3.8-27b",
+        "name": "Qwen 3.8 27B",
+        "context_window": 32768,
         "is_recommended": False,
-        "description": "High parameter open weights model with strong structured outputs",
+        "description": "Ultra low latency 27B model optimized for fast query synthesis",
+    },
+    {
+        "id": "llama-3.3-70b-versatile",
+        "name": "Llama 3.3 70B Versatile",
+        "context_window": 128000,
+        "is_recommended": False,
+        "description": "High performance, excellent reasoning and SQL synthesis capabilities",
     },
     {
         "id": "llama-3.1-8b-instant",
