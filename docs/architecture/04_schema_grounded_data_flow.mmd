@@ -1,0 +1,152 @@
+flowchart TB
+    %% =========================================================================
+    %% DIAGRAM 4: DATA FLOW AND SCHEMA-GROUNDED SQL ARCHITECTURE
+    %% AI for BI — Domain-Independent AI Data Scientist Agent
+    %% Draw.io Compatible Mermaid Definition (flowchart TB)
+    %% =========================================================================
+
+    subgraph INPUT_STAGE ["1. Business Inquiry"]
+        QUERY["Natural Language Business Question\ne.g., 'What was our monthly metric volume and trend over the past year?'"]
+    end
+
+    subgraph SCHEMA_DISCOVERY ["2. Dynamic Schema Discovery & Adaptive Profiling"]
+        INTROS_DB["Active Database Engine (SQLite / PostgreSQL / MySQL)"]
+        ENGINE_INTRO["BaseIntrospector (SQLite / Postgres / MySQL Introspectors)"]
+        PROFILER["AdaptiveSamplingProfiler\nTables > 50,000 rows sampled to 10,000 rows (<5s bounded)"]
+        CATALOG["DatabaseCatalog Model\nTables, Columns, Types, Foreign Keys, Indexes, Fingerprint"]
+        CACHE_CATALOG[("data/active_catalog.json\nFingerprint-Validated Catalog Cache")]
+    end
+
+    subgraph HYBRID_RAG ["3. Persistent Hybrid Schema Retrieval (RRF k=60)"]
+        subgraph LEXICAL_PATH ["Lexical Retrieval Pipeline"]
+            TOKENIZE["SchemaCorpus Tokenizer"]
+            BM25_STORE[("data/bm25/\nPersistent BM25 Index")]
+            BM25_SEARCH["PersistentBM25Retriever.search()\nBM25 Term Frequency & Inverse Doc Scores"]
+        end
+
+        subgraph DENSE_PATH ["Dense Vector Retrieval Pipeline"]
+            FASTEMBED_ONNX["FastEmbedProvider (embeddings.py)\nBAAI/bge-small-en-v1.5 ONNX Local Embedder"]
+            LANCEDB_DIR[("data/lancedb/{fingerprint}/\nLanceDB Table Embeddings")]
+            VECTOR_SEARCH["LanceDBVectorStore.search()\nDense Cosine Vector Similarity"]
+        end
+
+        RRF_FUSION["Reciprocal Rank Fusion (RRF)\nScore = 1/(60 + BM25_Rank) + 1/(60 + Dense_Rank)"]
+        TOP_TABLES["Top-K Candidate Tables Identified"]
+        FK_GRAPH["1-Hop Foreign Key Graph Expansion\nTraverse verified relationships for JOIN targets"]
+        FINAL_TABLES["Retrieved Table Set & Minimal Prompt Schema"]
+    end
+
+    subgraph SEMANTIC_LINKING ["4. Value Linking & Entity Resolution"]
+        VALUE_LINKER["ValueLinker (value_linker.py)"]
+        DYNAMIC_CAT["Scan Low-Cardinality Catalog Categories\n(distinct_count <= 50 or sample_values <= 20)"]
+        DYNAMIC_MAPS["Dynamic Categorical Literal Mapping\nMap Natural Language Tokens to Exact Database Values"]
+        LINKED_ENTITIES["Structured LinkedValue List\nExact Database Column & Literal Value Matches"]
+    end
+
+    subgraph SQL_GENERATION ["5. Schema-Grounded SQL Synthesis"]
+        PLANNER["AnalyticalPlanner.create_plan()\nFact / Dimension Ranking & Temporal Column Resolution"]
+        SYNTHESIZE_SQL["AnalyticalDataExtractor._synthesize_extraction_sql()\nBuilds minimal read-only SELECT or Multi-Table JOIN"]
+        RAW_SQL["Raw Dialect SQL Candidate"]
+    end
+
+    subgraph AST_VALIDATION ["6. SQL AST Security Guardrail (sqlglot)"]
+        PARSER["sqlglot AST Parser (Target Dialect: SQLite / Postgres / MySQL)"]
+        
+        subgraph CHECKS ["Guardrail Enforcement Rules"]
+            CHECK_STMTS["Block Multiple Statements (Single-Query Enforcement)"]
+            CHECK_KEYWORDS["Block Forbidden Keywords (PRAGMA, DROP, ATTACH, COPY, VACUUM)"]
+            CHECK_NODES["Block Non-SELECT Nodes (exp.Insert, exp.Update, exp.Delete, exp.Alter)"]
+            CHECK_IDENTIFIERS["Catalog Schema Identifier Allowlist (Verified Tables & Columns)"]
+            CHECK_LIMIT["Row Bounding Injection (Inject or Cap to LIMIT 1000)"]
+        end
+
+        AST_DECISION{"AST Validation Status"}
+        AST_FAIL["Validation Rejection Notice (Block Query Execution)"]
+        SANITIZED_SQL["Sanitized, Verified Read-Only SQL Query"]
+    end
+
+    subgraph DATABASE_EXECUTION ["7. 4-Tier Read-Only Database Execution"]
+        subgraph DEFENSE_TIERS ["4-Tier Read-Only Safety Fortress"]
+            TIER1["Tier 1: Connection URI Mode (mode=ro / transaction read-only)"]
+            TIER2["Tier 2: Engine Session Hook (PRAGMA query_only=ON / SESSION READ ONLY)"]
+            TIER3["Tier 3: AST & Keyword Guardrail (Pre-execution validation)"]
+            TIER4["Tier 4: Automatic LIMIT 1000 & 30s Timeout Enforcement"]
+        end
+
+        DB_RUNNER["SQLExecutor (executor.py)"]
+        WAREHOUSE[("Active Relational Database Warehouse (SQLite / PostgreSQL / MySQL)")]
+        QUERY_RESULT["QueryExecutionResult\nColumns, Rows, Row Count, Execution Time (ms), Truncated Flag"]
+    end
+
+    subgraph ANALYTICAL_PROCESSING ["8. Analytical Computation & Evidence Grounding"]
+        DATAFRAME["Construct Structured pandas DataFrame"]
+        ENGINES_EXEC["Execute Analytical Specialist Engines\n(Descriptive / Diagnostic / Predictive / Prescriptive)"]
+        GROUND_TRUTH_METRICS["Computed Ground-Truth Metrics\n(Deltas, Anomaly Scores, Forecast Arrays, KKT Points)"]
+        FAITH_CHECK["FaithfulnessValidator.validate_narrative()\nCross-examine claims against Ground-Truth Metrics"]
+        CRITIC_VERDICT["Verified Evidence Report & Confidence Discount"]
+    end
+
+    subgraph OUTPUT_STAGE ["9. Executive Management Intelligence"]
+        MANAGEMENT_RESPONSE["ManagementResponse Synthesizer\nPopulates WHAT / WHY / WHAT NEXT / SO WHAT Cards"]
+        FINAL_UI["Rendered in ManagementResponseView & Plotly.js"]
+    end
+
+    %% Data Flow Connections
+    QUERY --> SCHEMA_DISCOVERY
+    INTROS_DB --> ENGINE_INTRO
+    ENGINE_INTRO --> PROFILER
+    PROFILER --> CATALOG
+    CATALOG <--> CACHE_CATALOG
+
+    QUERY --> HYBRID_RAG
+    CATALOG --> HYBRID_RAG
+
+    QUERY --> TOKENIZE
+    TOKENIZE --> BM25_SEARCH
+    BM25_STORE <--> BM25_SEARCH
+
+    QUERY --> FASTEMBED_ONNX
+    FASTEMBED_ONNX --> VECTOR_SEARCH
+    LANCEDB_DIR <--> VECTOR_SEARCH
+
+    BM25_SEARCH --> RRF_FUSION
+    VECTOR_SEARCH --> RRF_FUSION
+    RRF_FUSION --> TOP_TABLES
+    TOP_TABLES --> FK_GRAPH
+    FK_GRAPH --> FINAL_TABLES
+
+    QUERY --> SEMANTIC_LINKING
+    CATALOG --> DYNAMIC_CAT
+    DYNAMIC_CAT --> VALUE_LINKER
+    DYNAMIC_MAPS --> VALUE_LINKER
+    VALUE_LINKER --> LINKED_ENTITIES
+
+    FINAL_TABLES --> PLANNER
+    LINKED_ENTITIES --> PLANNER
+    PLANNER --> SYNTHESIZE_SQL
+    SYNTHESIZE_SQL --> RAW_SQL
+
+    RAW_SQL --> PARSER
+    PARSER --> CHECK_STMTS
+    CHECK_STMTS --> CHECK_KEYWORDS
+    CHECK_KEYWORDS --> CHECK_NODES
+    CHECK_NODES --> CHECK_IDENTIFIERS
+    CHECK_IDENTIFIERS --> CHECK_LIMIT
+    CHECK_LIMIT --> AST_DECISION
+
+    AST_DECISION -- "Rejected" --> AST_FAIL
+    AST_DECISION -- "Approved" --> SANITIZED_SQL
+
+    SANITIZED_SQL --> DEFENSE_TIERS
+    DEFENSE_TIERS --> DB_RUNNER
+    DB_RUNNER --> WAREHOUSE
+    WAREHOUSE --> QUERY_RESULT
+
+    QUERY_RESULT --> DATAFRAME
+    DATAFRAME --> ENGINES_EXEC
+    ENGINES_EXEC --> GROUND_TRUTH_METRICS
+    GROUND_TRUTH_METRICS --> FAITH_CHECK
+    FAITH_CHECK --> CRITIC_VERDICT
+
+    CRITIC_VERDICT --> MANAGEMENT_RESPONSE
+    MANAGEMENT_RESPONSE --> FINAL_UI

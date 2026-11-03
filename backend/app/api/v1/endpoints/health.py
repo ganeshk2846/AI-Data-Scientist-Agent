@@ -41,18 +41,17 @@ async def get_readiness(request: Request) -> JSONResponse:
 
     llm_configured = settings.is_llm_configured()
     if llm_configured:
-        llm_msg = f"Provider '{settings.LLM_PROVIDER}' is configured and ready."
+        llm_msg = f"Groq provider is configured with model '{settings.GROQ_MODEL}' and ready."
     else:
         llm_msg = (
-            f"Provider '{settings.LLM_PROVIDER}' API key is not configured. "
-            "Natural language SQL synthesis requires configuring API credentials in .env, "
-            "or running in mock mode."
+            "GROQ_API_KEY is not configured. Natural language SQL synthesis and explanations "
+            "require setting GROQ_API_KEY in the backend .env file."
         )
 
     llm_status = LLMReadiness(
-        provider=settings.LLM_PROVIDER,
+        provider="groq",
         configured=llm_configured,
-        model=getattr(settings, f"{settings.LLM_PROVIDER.upper()}_MODEL", "default") if settings.LLM_PROVIDER != "mock" else "mock-v1",
+        model=settings.GROQ_MODEL,
         message=llm_msg,
     )
 
@@ -92,7 +91,8 @@ async def get_system_status(request: Request) -> APIResponse[dict]:
         },
         "database": check_database_readiness().model_dump(),
         "llm_provider": {
-            "provider": settings.LLM_PROVIDER,
+            "provider": "groq",
+            "model": settings.GROQ_MODEL,
             "configured": settings.is_llm_configured(),
         },
         "limits": {

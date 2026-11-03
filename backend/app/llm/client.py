@@ -1,17 +1,31 @@
 """
-Provider-agnostic LLM interface supporting OpenAI, Anthropic, Gemini, and Mock.
+Dedicated single-provider LLM interface supporting Groq Cloud API.
+Groq uses an OpenAI-compatible Chat Completions API with ultra-fast inference.
+Deterministic mock implementation is strictly reserved for automated testing.
 """
 
 from abc import ABC, abstractmethod
 import asyncio
 import os
 import re
-from typing import Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
+import openai
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    NotFoundError,
+    RateLimitError,
+)
+
 from backend.app.core.config import settings
 from backend.app.core.errors import ConfigurationError
 from backend.app.core.logging import logger
 from backend.app.llm.models import LLMMessage, LLMRequest, LLMResponse
-from backend.app.llm.ollama_client import OllamaLLMProvider
+
+_UNSET = object()
 
 
 class BaseLLMProvider(ABC):
@@ -22,11 +36,225 @@ class BaseLLMProvider(ABC):
         """Generates a text completion for the provided messages."""
         pass
 
+    async def stream_generate(self, request: LLMRequest) -> AsyncIterator[str]:
+        """Streams text chunks for the provided messages."""
+        response = await self.generate(request)
+        yield response.content
+
+
+class GroqLLMProvider(BaseLLMProvider):
+    """
+    Production single-provider client for Groq API using OpenAI-compatible endpoints.
+    Base URL: https://api.groq.com/openai/v1
+    Strictly zero fallback to mock or other cloud providers in production runtime.
+    """
+
+    def __init__(
+        self,
+        api_key: Any = _UNSET,
+        model: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout_seconds: Optional[int] = None,
+        max_retries: int = 2,
+    ):
+        if api_key is _UNSET:
+            self.api_key = settings.GROQ_API_KEY
+        else:
+            self.api_key = api_key
+
+        self.model = model or settings.GROQ_MODEL
+        self.base_url = (base_url or settings.GROQ_BASE_URL).rstrip("/")
+        self.timeout_seconds = timeout_seconds or settings.LLM_TIMEOUT_SECONDS
+        self.max_retries = max_retries
+
+        self._client: Optional[AsyncOpenAI] = None
+        if self._is_valid_key(self.api_key):
+            self._client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=float(self.timeout_seconds),
+            )
+
+    @staticmethod
+    def _is_valid_key(key: Optional[str]) -> bool:
+        if not key:
+            return False
+        clean = key.strip()
+        return bool(clean and not clean.startswith("your_") and clean != "gsk_test_placeholder")
+
+    @property
+    def client(self) -> AsyncOpenAI:
+        if self._client is None:
+            if not self._is_valid_key(self.api_key):
+                raise ConfigurationError(
+                    "GROQ_API_KEY is not configured or contains placeholder value. "
+                    "Set a valid Groq API key in the backend .env file to enable Groq LLM inference."
+                )
+            self._client = AsyncOpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=float(self.timeout_seconds),
+            )
+        return self._client
+
+    async def generate(self, request: LLMRequest) -> LLMResponse:
+        """
+        Executes asynchronous chat completion with Groq API.
+        Includes bounded retry handling for transient rate-limit (429) and server (503) errors.
+        """
+        active_client = self.client  # raises ConfigurationError if key is missing
+
+        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+            "timeout": float(request.timeout_seconds or self.timeout_seconds),
+        }
+        if request.response_format:
+            kwargs["response_format"] = request.response_format
+        if request.tools:
+            kwargs["tools"] = request.tools
+        if request.tool_choice:
+            kwargs["tool_choice"] = request.tool_choice
+
+        retries = 0
+        backoff = 1.0
+        while True:
+            try:
+                res = await active_client.chat.completions.create(**kwargs)
+                choice = res.choices[0]
+                message = choice.message
+                content = message.content or ""
+                finish_reason = choice.finish_reason
+
+                tool_calls = None
+                if getattr(message, "tool_calls", None):
+                    tool_calls = [
+                        tc.model_dump() if hasattr(tc, "model_dump") else dict(tc)
+                        for tc in message.tool_calls
+                    ]
+
+                tokens_used = res.usage.total_tokens if res.usage else None
+                prompt_tokens = res.usage.prompt_tokens if res.usage else None
+                completion_tokens = res.usage.completion_tokens if res.usage else None
+
+                return LLMResponse(
+                    content=content,
+                    model=self.model,
+                    provider="groq",
+                    tokens_used=tokens_used,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    finish_reason=finish_reason,
+                    tool_calls=tool_calls,
+                )
+            except AuthenticationError as e:
+                logger.error(f"Groq API authentication failed: {e}")
+                raise ConfigurationError(
+                    f"Groq authentication failed (HTTP 401). Please verify your GROQ_API_KEY in .env."
+                ) from e
+            except NotFoundError as e:
+                logger.error(f"Groq model or resource not found: {e}")
+                raise ConfigurationError(
+                    f"Groq model '{self.model}' not found (HTTP 404). Please verify GROQ_MODEL in .env."
+                ) from e
+            except RateLimitError as e:
+                if retries < self.max_retries:
+                    retries += 1
+                    logger.warning(
+                        f"Groq rate limit (429) encountered. Retrying in {backoff}s (attempt {retries}/{self.max_retries})..."
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff *= 2.0
+                    continue
+                logger.error(f"Groq rate limit exceeded after {self.max_retries} retries: {e}")
+                raise ConfigurationError(
+                    f"Groq API rate limit exceeded after {self.max_retries} retries. Please retry later or upgrade tier."
+                ) from e
+            except APITimeoutError as e:
+                logger.error(f"Groq API request timed out: {e}")
+                raise ConfigurationError(
+                    f"Groq API request timed out after {request.timeout_seconds or self.timeout_seconds}s."
+                ) from e
+            except APIConnectionError as e:
+                logger.error(f"Failed to connect to Groq API at {self.base_url}: {e}")
+                raise ConfigurationError(
+                    f"Failed to connect to Groq API endpoint '{self.base_url}'. Check network connectivity."
+                ) from e
+            except APIStatusError as e:
+                if e.status_code == 503 and retries < self.max_retries:
+                    retries += 1
+                    logger.warning(
+                        f"Groq service unavailable (503). Retrying in {backoff}s (attempt {retries}/{self.max_retries})..."
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff *= 2.0
+                    continue
+                logger.error(f"Groq API error HTTP {e.status_code}: {e.message}")
+                raise ConfigurationError(
+                    f"Groq API request failed with HTTP {e.status_code}: {e.message}"
+                ) from e
+            except Exception as e:
+                if isinstance(e, ConfigurationError):
+                    raise
+                logger.error(f"Unexpected error communicating with Groq: {e}")
+                raise ConfigurationError(f"Unexpected Groq inference error: {e}") from e
+
+    async def stream_generate(self, request: LLMRequest) -> AsyncIterator[str]:
+        """
+        Streams completions token-by-token from Groq API.
+        """
+        active_client = self.client  # raises ConfigurationError if key is missing
+
+        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+            "stream": True,
+            "timeout": float(request.timeout_seconds or self.timeout_seconds),
+        }
+        if request.response_format:
+            kwargs["response_format"] = request.response_format
+
+        try:
+            stream = await active_client.chat.completions.create(**kwargs)
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except AuthenticationError as e:
+            logger.error(f"Groq streaming authentication failed: {e}")
+            raise ConfigurationError(
+                "Groq authentication failed (HTTP 401). Please verify your GROQ_API_KEY in .env."
+            ) from e
+        except NotFoundError as e:
+            logger.error(f"Groq model not found for streaming: {e}")
+            raise ConfigurationError(
+                f"Groq model '{self.model}' not found (HTTP 404). Please verify GROQ_MODEL in .env."
+            ) from e
+        except RateLimitError as e:
+            logger.error(f"Groq streaming rate limit hit: {e}")
+            raise ConfigurationError("Groq API rate limit exceeded during streaming.") from e
+        except APITimeoutError as e:
+            logger.error(f"Groq streaming timed out: {e}")
+            raise ConfigurationError("Groq streaming request timed out.") from e
+        except APIConnectionError as e:
+            logger.error(f"Groq streaming connection error: {e}")
+            raise ConfigurationError(f"Failed to connect to Groq API endpoint '{self.base_url}'.") from e
+        except Exception as e:
+            if isinstance(e, ConfigurationError):
+                raise
+            logger.error(f"Groq streaming error: {e}")
+            raise ConfigurationError(f"Groq streaming error: {e}") from e
+
 
 class MockLLMProvider(BaseLLMProvider):
     """
-    Deterministic, schema-grounded Mock LLM for offline development,
-    demonstration, and automated testing without external API dependencies.
+    Deterministic, schema-grounded Mock LLM strictly for offline automated testing.
+    Never used as a silent fallback for production Groq inference.
     """
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
@@ -68,17 +296,23 @@ class MockLLMProvider(BaseLLMProvider):
             tokens_used=50,
         )
 
+    async def stream_generate(self, request: LLMRequest) -> AsyncIterator[str]:
+        response = await self.generate(request)
+        for word in response.content.split(" "):
+            yield word + " "
+
     def _classify_intent(self, prompt: str) -> str:
-        if any(w in prompt for w in ["trend", "over time", "monthly", "daily", "growth"]):
-            return "trend"
-        elif any(w in prompt for w in ["compare", "versus", "vs", "difference"]):
-            return "comparative"
-        elif any(w in prompt for w in ["why", "driver", "cause", "drop", "spike"]):
-            return "diagnostic"
-        elif any(w in prompt for w in ["forecast", "predict", "next month", "future"]):
-            return "predictive"
-        elif any(w in prompt for w in ["should", "recommend", "optimize"]):
+        prompt_lower = prompt.lower()
+        if any(w in prompt_lower for w in ["should", "recommend", "optimize", "prescriptive"]):
             return "prescriptive"
+        elif any(w in prompt_lower for w in ["forecast", "predict", "next month", "future", "predictive"]):
+            return "predictive"
+        elif any(w in prompt_lower for w in ["why", "driver", "cause", "drop", "spike", "diagnostic"]):
+            return "diagnostic"
+        elif any(w in prompt_lower for w in ["compare", "versus", "vs", "difference", "comparative"]):
+            return "comparative"
+        elif any(w in prompt_lower for w in ["trend", "over time", "monthly", "daily", "growth"]):
+            return "trend"
         return "descriptive"
 
     def _generate_grounded_sql(self, prompt: str) -> str:
@@ -106,138 +340,13 @@ class MockLLMProvider(BaseLLMProvider):
             return "SELECT order_status, COUNT(*) AS order_count, ROUND(SUM(total_amount), 2) AS total_amount FROM orders GROUP BY order_status;"
 
 
-class GeminiProvider(BaseLLMProvider):
-    """Google Gemini API Provider using the official google-genai SDK."""
-
-    def __init__(self, api_key: str, model: str = "gemini-3.5-flash-lite"):
-        from google import genai
-        self.client = genai.Client(api_key=api_key)
-        self.model = model
-
-    async def generate(self, request: LLMRequest) -> LLMResponse:
-        from google.genai import types
-
-        system_instruction: Optional[str] = None
-        contents = []
-
-        for m in request.messages:
-            if m.role == "system":
-                if system_instruction:
-                    system_instruction += "\n\n" + m.content
-                else:
-                    system_instruction = m.content
-            else:
-                role = "user" if m.role == "user" else "model"
-                contents.append(
-                    types.Content(
-                        role=role,
-                        parts=[types.Part.from_text(text=m.content)],
-                    )
-                )
-
-        if not contents and system_instruction:
-            contents.append(
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=system_instruction)],
-                )
-            )
-            system_instruction = None
-
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=request.temperature,
-            max_output_tokens=request.max_tokens or 2048,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        )
-
-        try:
-            res = await asyncio.wait_for(
-                self.client.aio.models.generate_content(
-                    model=self.model,
-                    contents=contents,
-                    config=config,
-                ),
-                timeout=float(request.timeout_seconds),
-            )
-            content = res.text or ""
-            tokens_used = (
-                res.usage_metadata.total_token_count
-                if res.usage_metadata and hasattr(res.usage_metadata, "total_token_count")
-                else None
-            )
-            finish_reason = (
-                res.candidates[0].finish_reason.name
-                if res.candidates and hasattr(res.candidates[0], "finish_reason") and res.candidates[0].finish_reason
-                else None
-            )
-            return LLMResponse(
-                content=content,
-                model=self.model,
-                provider="gemini",
-                tokens_used=tokens_used,
-                finish_reason=str(finish_reason) if finish_reason else None,
-            )
-        except Exception as e:
-            logger.error(f"Gemini API generation error: {e}. Falling back to grounded mock response.")
-            mock_res = await MockLLMProvider().generate(request)
-            mock_res.provider = "gemini-fallback"
-            return mock_res
-
-
-class OpenAIProvider(BaseLLMProvider):
-    """OpenAI API Provider."""
-
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        from openai import AsyncOpenAI
-        self.client = AsyncOpenAI(api_key=api_key)
-        self.model = model
-
-    async def generate(self, request: LLMRequest) -> LLMResponse:
-        openai_messages = [{"role": m.role, "content": m.content} for m in request.messages]
-        res = await self.client.chat.completions.create(
-            model=self.model,
-            messages=openai_messages,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-            timeout=request.timeout_seconds,
-        )
-        content = res.choices[0].message.content or ""
-        tokens = res.usage.total_tokens if res.usage else None
-        return LLMResponse(
-            content=content,
-            model=self.model,
-            provider="openai",
-            tokens_used=tokens,
-            finish_reason=res.choices[0].finish_reason,
-        )
-
-
 def get_llm_provider() -> BaseLLMProvider:
-    """Factory returning the active LLM provider based on application settings."""
-    provider_type = settings.LLM_PROVIDER.lower()
-
-    if provider_type == "ollama":
-        return OllamaLLMProvider(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_MODEL,
-        )
-
-    if provider_type == "gemini" and settings.GEMINI_API_KEY and not settings.GEMINI_API_KEY.startswith("your_"):
-        try:
-            return GeminiProvider(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
-        except Exception as e:
-            logger.warning(f"Failed to instantiate Gemini provider: {e}. Falling back to Ollama.")
-            return OllamaLLMProvider()
-
-    if provider_type == "openai" and settings.OPENAI_API_KEY and not settings.OPENAI_API_KEY.startswith("your_"):
-        try:
-            return OpenAIProvider(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL)
-        except Exception as e:
-            logger.warning(f"Failed to instantiate OpenAI provider: {e}. Falling back to Ollama.")
-            return OllamaLLMProvider()
-
-    if provider_type == "mock":
+    """
+    Factory returning the active LLM provider.
+    Groq is the single supported provider across production and development.
+    In automated test environments (APP_ENV='testing') without a real Groq API key,
+    returns deterministic MockLLMProvider to prevent external network calls.
+    """
+    if settings.APP_ENV == "testing" and not settings.is_llm_configured():
         return MockLLMProvider()
-
-    return OllamaLLMProvider()
+    return GroqLLMProvider()

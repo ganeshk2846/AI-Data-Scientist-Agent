@@ -82,10 +82,11 @@ def test_chat_query_endpoint(client):
     assert "composed_answer" in data
 
 
-def test_gemini_provider_instantiation():
-    from backend.app.llm.client import GeminiProvider
-    provider = GeminiProvider(api_key="AIzaSyTestMockKey", model="gemini-3.5-flash-lite")
-    assert provider.model == "gemini-3.5-flash-lite"
+def test_groq_provider_instantiation():
+    from backend.app.llm.client import GroqLLMProvider
+    provider = GroqLLMProvider(api_key="gsk_test_mock_key_123", model="llama-3.3-70b-versatile")
+    assert provider.model == "llama-3.3-70b-versatile"
     assert provider.client is not None
+    assert provider.base_url == "https://api.groq.com/openai/v1"
 
 

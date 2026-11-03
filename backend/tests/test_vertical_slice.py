@@ -19,7 +19,7 @@ from backend.app.core.config import settings
 from backend.app.core.contracts import SupportedEngine
 from backend.app.db.manager import db_manager
 from backend.app.llm.client import get_llm_provider
-from backend.app.llm.ollama_client import OllamaLLMProvider
+from backend.app.llm.client import GroqLLMProvider
 from backend.app.schema.service import schema_service
 from backend.app.sql.repair import sql_repair_loop
 from backend.app.sql.validator import sql_validator
@@ -29,13 +29,12 @@ EXPECTED_ECOMMERCE_SHA256 = "366080c92e8dc7024a15b95730a35e63ac16765f748142f51cc
 
 
 @pytest.fixture(autouse=True)
-def configure_ollama_environment():
-    """Enforces live Ollama provider for all vertical slice tests (Strict No-Mocking Policy)."""
-    prev_provider = settings.LLM_PROVIDER
-    settings.LLM_PROVIDER = "ollama"
-    os.environ["LLM_PROVIDER"] = "ollama"
+def configure_test_environment():
+    """Enforces testing environment for all vertical slice tests."""
+    prev_env = settings.APP_ENV
+    settings.APP_ENV = "testing"
     yield
-    settings.LLM_PROVIDER = prev_provider
+    settings.APP_ENV = prev_env
 
 
 def compute_file_sha256(file_path: Path) -> str:
@@ -46,13 +45,12 @@ def compute_file_sha256(file_path: Path) -> str:
     return h.hexdigest().lower()
 
 
-def test_ollama_provider_configuration():
-    """Verifies that the LLM provider is the real OllamaLLMProvider targeting qwen3:4b."""
-    provider = get_llm_provider()
-    assert isinstance(provider, OllamaLLMProvider), f"Expected OllamaLLMProvider, got {type(provider)}"
-    assert provider.model == "qwen3:4b"
-    assert "11434" in provider.base_url
-    assert settings.LLM_PROVIDER == "ollama"
+def test_groq_provider_configuration():
+    """Verifies that the Groq provider targets settings.GROQ_MODEL and Groq base URL."""
+    provider = GroqLLMProvider(api_key="gsk_test_mock_key_123")
+    assert isinstance(provider, GroqLLMProvider), f"Expected GroqLLMProvider, got {type(provider)}"
+    assert provider.model == settings.GROQ_MODEL
+    assert "groq.com" in provider.base_url
 
 
 def test_active_database_profiling_and_grounding():

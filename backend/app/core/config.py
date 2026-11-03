@@ -72,25 +72,19 @@ class Settings(BaseSettings):
         description="FastEmbed ONNX local embedding model identifier",
     )
 
-    # LLM Provider Configuration (Optional at startup)
-    LLM_PROVIDER: str = Field(
-        default="ollama",
-        description="LLM provider: ollama, openai, anthropic, gemini, or mock",
+    # LLM Configuration (Groq is the single supported LLM provider)
+    GROQ_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Groq API key for single-provider LLM inference",
     )
-    OLLAMA_BASE_URL: str = Field(
-        default="http://localhost:11434",
-        description="Base URL for local Ollama daemon",
+    GROQ_MODEL: str = Field(
+        default="openai/gpt-oss-120b",
+        description="Configured Groq model identifier",
     )
-    OLLAMA_MODEL: str = Field(
-        default="qwen3:4b",
-        description="Local Ollama model identifier",
+    GROQ_BASE_URL: str = Field(
+        default="https://api.groq.com/openai/v1",
+        description="Groq OpenAI-compatible Chat Completions API base URL",
     )
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4o-mini"
-    ANTHROPIC_API_KEY: Optional[str] = None
-    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
-    GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
 
     # Timeouts & safety limits
     SQL_QUERY_TIMEOUT_SECONDS: int = 30
@@ -130,28 +124,19 @@ class Settings(BaseSettings):
         return p.resolve()
 
     def is_llm_configured(self) -> bool:
-        """Checks if the configured LLM provider has a valid API key."""
-        provider = self.LLM_PROVIDER.lower()
-        if provider == "openai":
-            return bool(self.OPENAI_API_KEY and self.OPENAI_API_KEY.strip() and not self.OPENAI_API_KEY.startswith("your_"))
-        elif provider == "anthropic":
-            return bool(self.ANTHROPIC_API_KEY and self.ANTHROPIC_API_KEY.strip() and not self.ANTHROPIC_API_KEY.startswith("your_"))
-        elif provider == "gemini":
-            return bool(self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip() and not self.GEMINI_API_KEY.startswith("your_"))
-        elif provider == "ollama":
-            return True
-        elif provider == "mock":
-            return True
-        return False
+        """Checks if the Groq LLM provider has a valid API key configured."""
+        if not self.GROQ_API_KEY:
+            return False
+        key = self.GROQ_API_KEY.strip()
+        return bool(key and not key.startswith("your_") and key != "gsk_test_placeholder")
 
     def get_safe_dict(self) -> dict:
         """Returns configuration dictionary with secrets redacted."""
         d = self.model_dump()
-        for k in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"]:
-            if d.get(k):
-                d[k] = "[REDACTED]"
-            else:
-                d[k] = None
+        if d.get("GROQ_API_KEY"):
+            d["GROQ_API_KEY"] = "[REDACTED]"
+        else:
+            d["GROQ_API_KEY"] = None
         d["ecommerce_db_exists"] = self.resolved_ecommerce_db_path.exists()
         d["llm_configured"] = self.is_llm_configured()
         return d

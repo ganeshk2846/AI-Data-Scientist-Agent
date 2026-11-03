@@ -1,0 +1,193 @@
+flowchart TB
+    %% =========================================================================
+    %% DIAGRAM 2: BACKEND COMPONENT ARCHITECTURE
+    %% AI for BI — Domain-Independent AI Data Scientist Agent
+    %% Draw.io Compatible Mermaid Definition (flowchart TB)
+    %% =========================================================================
+
+    subgraph API_PACKAGE ["backend.app.api.v1"]
+        ROUTER_MAIN["api_router (router.py)"]
+        EP_AGENTIC["endpoints.agentic (supervise, stream)"]
+        EP_CHAT["endpoints.chat (query, stream)"]
+        EP_SCHEMA["endpoints.schema (tables, status, prepare)"]
+        EP_HEALTH["endpoints.health (health, ready)"]
+        EP_OPS["endpoints.ops (traces, telemetry)"]
+        EP_MEM["endpoints.memory (sessions, history)"]
+    end
+
+    subgraph ORCHESTRATION_PACKAGE ["backend.app.orchestration"]
+        SUPERVISOR_CLS["AgenticSupervisor (supervisor.py)"]
+        
+        subgraph MODELS ["orchestration.models"]
+            MOD_TASK["AgentTask (DAG Node & Status)"]
+            MOD_MGMT["ManagementResponse (WHAT / WHY / NEXT / SO WHAT)"]
+            MOD_RESULT["SupervisorExecutionResult (Provenance & Metrics)"]
+            MOD_ROLES["SpecialistRole (Enum) & TaskStatus (Enum)"]
+        end
+
+        subgraph SPECIALISTS_MODULE ["orchestration.specialists"]
+            SPEC_RET["DataRetrievalSpecialist"]
+            SPEC_DIAG["DiagnosticSpecialist"]
+            SPEC_PRED["PredictiveSpecialist"]
+            SPEC_PRESC["PrescriptiveSpecialist"]
+            SPEC_CRIT["CriticSpecialist"]
+        end
+    end
+
+    subgraph ANALYSIS_PACKAGE ["backend.app.analysis"]
+        ORCH_ANALYSIS["AnalyticalOrchestrator (orchestrator.py)"]
+        INTENT_CLASSIFIER["IntentClassifier (intent_classifier.py)"]
+        PLANNER_ANALYTICAL["AnalyticalPlanner (planner.py)"]
+        DATA_EXTRACTOR["AnalyticalDataExtractor (data_extractor.py)"]
+        
+        subgraph CORE_ENGINES ["Analysis Engine Modules"]
+            ENG_DESCRIPTIVE["DescriptiveAnalyticsEngine (descriptive_engine.py)"]
+            ENG_DIAGNOSTIC["DiagnosticAnalyticsEngine (diagnostic_engine.py)"]
+            ENG_PREDICTIVE["PredictiveAnalyticsEngine (predictive_engine.py)"]
+            ENG_PRESCRIPTIVE["PrescriptiveAnalyticsEngine (prescriptive_engine.py)"]
+            ENG_FAITHFULNESS["FaithfulnessValidator (faithfulness.py)"]
+        end
+
+        subgraph CONTRACTS_V2 ["analysis.contracts_v2"]
+            CONTR_PLAN["AnalyticalPlan"]
+            CONTR_RES["StandardizedAnalyticalResult"]
+            CONTR_FAITH["FaithfulnessReport & StructuredClaim"]
+        end
+    end
+
+    subgraph RETRIEVAL_PACKAGE ["backend.app.retrieval"]
+        RET_HYBRID["HybridSchemaRetriever (hybrid.py)"]
+        RET_BM25["PersistentBM25Retriever (persistent_bm25.py)"]
+        RET_VECTOR["LanceDBVectorStore (vector_store.py)"]
+        RET_EMBED["FastEmbedProvider (embeddings.py)"]
+        RET_VALUE["ValueLinker (value_linker.py)"]
+        RET_SEMANTICS["DynamicSemanticEngine (semantics.py)"]
+        RET_CORPUS["SchemaCorpus & Tokenizer (corpus.py)"]
+    end
+
+    subgraph SCHEMA_PACKAGE ["backend.app.schema"]
+        SCHEMA_SVC["SchemaService (service.py)"]
+        SCHEMA_PROF["AdaptiveSamplingProfiler (profiler.py)"]
+        SCHEMA_CATALOG["DatabaseCatalog & TableModel (models.py)"]
+        
+        subgraph INTROSPECTORS ["schema.introspectors"]
+            INTRO_BASE["BaseIntrospector"]
+            INTRO_SQLITE["SQLiteIntrospector"]
+            INTRO_PG["PostgresIntrospector"]
+            INTRO_MYSQL["MySQLIntrospector"]
+        end
+    end
+
+    subgraph SQL_PACKAGE ["backend.app.sql"]
+        SQL_VAL["SQLValidator (validator.py via sqlglot)"]
+        SQL_EXEC["SQLExecutor (executor.py)"]
+        SQL_REP["SQLRepairLoop (repair.py)"]
+    end
+
+    subgraph SECURITY_PACKAGE ["backend.app.security"]
+        SEC_GUARD["guardrails.py (detect_prompt_injection, validate_sql_security)"]
+    end
+
+    subgraph DB_PACKAGE ["backend.app.db"]
+        DB_MGR["DatabaseConnectionManager (manager.py)"]
+        ADAPT_BASE["BaseDatabaseAdapter (base.py)"]
+        ADAPT_SQLITE_CLS["SQLiteAdapter (adapters/sqlite.py)"]
+        ADAPT_PG_CLS["PostgresAdapter (adapters/postgres.py)"]
+        ADAPT_MYSQL_CLS["MySQLAdapter (adapters/mysql.py)"]
+        DB_MIGRATION["run_agent_store_migration (migration.py)"]
+        DB_SEC["encrypt/decrypt_connection_params (security.py)"]
+    end
+
+    subgraph LLM_PACKAGE ["backend.app.llm"]
+        LLM_CLIENT["get_llm_provider (client.py)"]
+        LLM_OLLAMA["OllamaLLMProvider (ollama_client.py)"]
+        LLM_GEMINI["GeminiProvider (official google-genai)"]
+        LLM_OPENAI["OpenAIProvider (AsyncOpenAI)"]
+        LLM_MOCK["MockLLMProvider (grounded mock)"]
+    end
+
+    subgraph TELEMETRY_PACKAGE ["backend.app.observability & memory"]
+        TRACER_OBS["ObservabilityTracer (tracer.py)"]
+        MEM_SVC["MemoryService (memory/service.py)"]
+        MEM_STORE["MemoryStore (memory/store.py)"]
+    end
+
+    %% Routing to Orchestration
+    ROUTER_MAIN --> EP_AGENTIC
+    ROUTER_MAIN --> EP_CHAT
+    ROUTER_MAIN --> EP_SCHEMA
+    ROUTER_MAIN --> EP_OPS
+    ROUTER_MAIN --> EP_MEM
+    ROUTER_MAIN --> EP_HEALTH
+
+    EP_AGENTIC --> SUPERVISOR_CLS
+    EP_CHAT --> ORCH_ANALYSIS
+    EP_SCHEMA --> SCHEMA_SVC
+    EP_OPS --> TRACER_OBS
+    EP_MEM --> MEM_SVC
+
+    %% Supervisor Internal Flow
+    SUPERVISOR_CLS --> SEC_GUARD
+    SUPERVISOR_CLS --> INTENT_CLASSIFIER
+    SUPERVISOR_CLS --> PLANNER_ANALYTICAL
+    SUPERVISOR_CLS --> MOD_TASK
+    SUPERVISOR_CLS --> MOD_MGMT
+    SUPERVISOR_CLS --> MOD_RESULT
+
+    %% Supervisor Delegation to Specialists
+    SUPERVISOR_CLS --> SPEC_RET
+    SUPERVISOR_CLS --> SPEC_DIAG
+    SUPERVISOR_CLS --> SPEC_PRED
+    SUPERVISOR_CLS --> SPEC_PRESC
+    SUPERVISOR_CLS --> SPEC_CRIT
+
+    %% Specialist Implementations
+    SPEC_RET --> DATA_EXTRACTOR
+    SPEC_DIAG --> ENG_DIAGNOSTIC
+    SPEC_PRED --> ENG_PREDICTIVE
+    SPEC_PRESC --> ENG_PRESCRIPTIVE
+    SPEC_CRIT --> ENG_FAITHFULNESS
+    SUPERVISOR_CLS -.-> ENG_DESCRIPTIVE
+
+    %% Planning and Retrieval Pipeline
+    PLANNER_ANALYTICAL --> RET_HYBRID
+    PLANNER_ANALYTICAL --> RET_VALUE
+    PLANNER_ANALYTICAL --> RET_SEMANTICS
+    RET_HYBRID --> RET_BM25
+    RET_HYBRID --> RET_VECTOR
+    RET_HYBRID --> RET_CORPUS
+    RET_VECTOR -.-> RET_EMBED
+
+    %% SQL Generation & Validation Pipeline
+    DATA_EXTRACTOR --> SQL_VAL
+    SQL_VAL --> SQL_EXEC
+    SQL_EXEC --> DB_MGR
+    SQL_REP -.-> SQL_VAL
+
+    %% Database Abstraction Layer
+    DB_MGR --> ADAPT_BASE
+    ADAPT_BASE <|-- ADAPT_SQLITE_CLS
+    ADAPT_BASE <|-- ADAPT_PG_CLS
+    ADAPT_BASE <|-- ADAPT_MYSQL_CLS
+    DB_MGR --> DB_MIGRATION
+    DB_MGR --> DB_SEC
+
+    %% Schema Introspection Pipeline
+    SCHEMA_SVC --> INTRO_BASE
+    INTRO_BASE <|-- INTRO_SQLITE
+    INTRO_BASE <|-- INTRO_PG
+    INTRO_BASE <|-- INTRO_MYSQL
+    SCHEMA_SVC --> SCHEMA_PROF
+    SCHEMA_SVC --> SCHEMA_CATALOG
+
+    %% LLM Invocations
+    SUPERVISOR_CLS -.-> LLM_CLIENT
+    LLM_CLIENT --> LLM_OLLAMA
+    LLM_CLIENT -.-> LLM_GEMINI
+    LLM_CLIENT -.-> LLM_OPENAI
+    LLM_CLIENT -.-> LLM_MOCK
+
+    %% Memory and Telemetry
+    MEM_SVC --> MEM_STORE
+    SUPERVISOR_CLS --> TRACER_OBS
+

@@ -3,7 +3,7 @@ backend/app/retrieval/semantics.py
 Dynamic Semantic Layer and Metric Provenance Engine.
 Provides dynamic derivation, AST validation, and strict 3-tier lifecycle management
 for business definitions and SQL calculation formulas:
-  1. AUTO_INFERRED: Derived by Ollama LLM analyzing active schema and column statistics.
+  1. AUTO_INFERRED: Derived by Groq LLM analyzing active schema and column statistics.
   2. VALIDATED_CANDIDATE: AST-verified and syntactically sound.
   3. SYSTEM_APPROVED: Domain-validated baseline canonical metric.
   4. USER_APPROVED: Human-verified authoritative ground truth.
@@ -314,7 +314,7 @@ class DynamicSemanticEngine:
     ) -> List[SemanticMetricDefinition]:
         """
         Analyzes active schema tables, numeric columns, and foreign keys to dynamically
-        infer candidate business metrics using Ollama qwen3:4b.
+        infer candidate business metrics using Groq LLM.
         Metrics are AST-checked and stored with status AUTO_INFERRED or VALIDATED_CANDIDATE.
         """
         with self._lock:

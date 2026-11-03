@@ -432,23 +432,17 @@ def test_j_reconnection_persistence(tmp_path: Path):
 
 
 # =====================================================================
-# Test K: Real Ollama Inference on Unfamiliar Domain (Live Local Ollama)
+# Test K: Real Groq Inference on Unfamiliar Domain (Live Groq verification)
 # =====================================================================
-def is_ollama_online() -> bool:
-    """Checks if local Ollama daemon is reachable."""
-    import urllib.request
-    try:
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as res:
-            return res.status == 200
-    except Exception:
-        return False
+def is_groq_configured() -> bool:
+    """Checks if Groq API key is configured."""
+    return settings.is_llm_configured()
 
 
-@pytest.mark.skipif(not is_ollama_online(), reason="Local Ollama service is not running")
-def test_k_live_ollama_unfamiliar_domain_inference(tmp_path: Path):
+@pytest.mark.skipif(not is_groq_configured(), reason="Groq API key is not configured")
+def test_k_live_groq_unfamiliar_domain_inference(tmp_path: Path):
     """
-    Verifies actual Ollama qwen3:4b model inference on a synthetic unfamiliar University Library domain.
+    Verifies actual Groq model inference on a synthetic unfamiliar University Library domain.
     Verifies structured response, schema validation, candidate persistence, and explicit approval.
     """
     app_db = tmp_path / "agent_store.sqlite"
@@ -488,12 +482,12 @@ def test_k_live_ollama_unfamiliar_domain_inference(tmp_path: Path):
     catalog = svc.profile_database(force_refresh=True)
     fp = adapter.compute_fingerprint()
 
-    # Run genuine Ollama inference using real local Ollama
-    from backend.app.llm.ollama_client import OllamaLLMProvider
-    ollama_provider = OllamaLLMProvider()
+    # Run genuine Groq inference using real GroqLLMProvider
+    from backend.app.llm.client import GroqLLMProvider
+    groq_provider = GroqLLMProvider()
 
-    inferred = engine.infer_metrics_from_schema(catalog, llm_provider=ollama_provider)
-    assert len(inferred) >= 2, f"Ollama should infer at least 2 metrics, got {len(inferred)}"
+    inferred = engine.infer_metrics_from_schema(catalog, llm_provider=groq_provider)
+    assert len(inferred) >= 2, f"Groq should infer at least 2 metrics, got {len(inferred)}"
 
     for m in inferred:
         assert m.metric_key

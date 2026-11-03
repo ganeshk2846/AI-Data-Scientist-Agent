@@ -62,11 +62,11 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database readiness warning: {db_status.error}")
 
     if settings.is_llm_configured():
-        logger.info(f"LLM Provider configured: {settings.LLM_PROVIDER}")
+        logger.info(f"Groq LLM configured: model={settings.GROQ_MODEL}")
     else:
-        logger.info(
-            f"LLM Provider '{settings.LLM_PROVIDER}' running in unconfigured/offline mode. "
-            "Natural language answers will use mock/fallback until credentials are provided."
+        logger.warning(
+            "GROQ_API_KEY is not configured. Natural language SQL synthesis and explanations "
+            "require setting GROQ_API_KEY in the backend .env file."
         )
 
     yield

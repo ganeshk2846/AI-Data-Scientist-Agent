@@ -6,8 +6,8 @@ import os
 import sys
 from pathlib import Path
 
-# Force mock LLM provider for tests to prevent external API calls and latency
-os.environ["LLM_PROVIDER"] = "mock"
+# Enforce testing environment for automated test suites
+os.environ["APP_ENV"] = "testing"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +20,7 @@ if str(REPO_ROOT) not in sys.path:
 from backend.app.main import app
 from backend.app.core.config import settings
 
-settings.LLM_PROVIDER = "mock"
+settings.APP_ENV = "testing"
 
 
 @pytest.fixture(scope="session")
@@ -28,4 +28,3 @@ def client():
     """Provides a synchronous FastAPI TestClient."""
     with TestClient(app) as test_client:
         yield test_client
-
