@@ -72,6 +72,32 @@ class DiagnosticAnalyticsEngine:
                 target_col = clean_t
         if not target_col and numeric_cols:
             target_col = numeric_cols[0]
+        if not target_col:
+            for c in df.columns:
+                if c not in date_cols and pd.to_numeric(df[c], errors="coerce").notna().sum() > 0:
+                    target_col = c
+                    numeric_cols.append(c)
+                    break
+
+        if not target_col:
+            abstain_msg = f"Diagnostic analysis abstained: Dataframe has no numeric metric column for statistical diagnosis (columns: {list(df.columns)})."
+            return StandardizedAnalyticalResult(
+                analysis_id=analysis_id,
+                analytical_type=IntentCategory.DIAGNOSTIC,
+                analysis_question=plan.question,
+                success=False,
+                confidence_score=0.0,
+                selected_methods=[plan.selected_method.value],
+                source_tables=plan.relevant_tables,
+                source_columns=list(df.columns),
+                executed_queries=executed_queries or [],
+                computed_metrics={},
+                findings=[abstain_msg],
+                limitations=["No numeric target variable available in extracted dataset."],
+                uncertainty_notes=["Statistical Note: Identified relationships reflect empirical observational correlation and do not imply verified counterfactual causality."],
+                abstain_reason=abstain_msg,
+                created_at=now_str,
+            )
 
         date_col = None
         if plan.time_dimension:
@@ -168,6 +194,12 @@ class DiagnosticAnalyticsEngine:
         Decomposes total metric delta between two chronological periods or groups across dimensions.
         Calculates absolute dollar delta and percentage contribution to overall variance.
         """
+        if not metric_col or metric_col not in df.columns or not dimension_col or dimension_col not in df.columns:
+            return {
+                "drivers": [],
+                "summary": {"total_delta": 0.0, "pct_total_change": 0.0},
+                "findings": ["Insufficient numeric or dimension columns in dataframe for variance decomposition."],
+            }
         temp = df.copy()
         temp[metric_col] = pd.to_numeric(temp[metric_col], errors="coerce")
         temp = temp.dropna(subset=[metric_col])
@@ -259,6 +291,12 @@ class DiagnosticAnalyticsEngine:
         Detects statistical anomalies and outliers.
         Selects Isolation Forest for multi-record data (>=15 samples) and Robust MAD Z-score for smaller samples.
         """
+        if not metric_col or metric_col not in df.columns:
+            return {
+                "anomalies": [],
+                "summary": {"total_points": 0, "anomaly_count": 0},
+                "findings": ["No valid numeric metric column found in dataframe for anomaly detection."],
+            }
         s = pd.to_numeric(df[metric_col], errors="coerce").dropna()
         if len(s) < 5:
             return {

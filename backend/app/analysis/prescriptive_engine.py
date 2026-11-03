@@ -252,7 +252,17 @@ class PrescriptiveAnalyticsEngine:
 
             if not df.empty and cat_cols and target_col:
 
-                grp = df.groupby(cat_cols[0])[target_col].mean().dropna()
+                numeric_s = pd.to_numeric(df[target_col], errors='coerce')
+
+                if numeric_s.notna().sum() > 0:
+
+                    temp_df = pd.DataFrame({cat_cols[0]: df[cat_cols[0]], target_col: numeric_s})
+
+                    grp = temp_df.groupby(cat_cols[0])[target_col].mean().dropna()
+
+                else:
+
+                    grp = pd.Series(dtype=float)
 
                 if len(grp) >= 2:
 

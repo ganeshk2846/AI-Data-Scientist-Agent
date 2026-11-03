@@ -119,11 +119,16 @@ class AnalyticalDataExtractor:
                 if join_cond:
                     cols = []
                     order_col = None
+                    valid_tables = {primary_table.lower(), secondary_table.lower()}
                     if plan.time_dimension:
-                        cols.append(plan.time_dimension)
-                        order_col = plan.time_dimension
+                        time_tbl = plan.time_dimension.split(".")[0].lower() if "." in plan.time_dimension else primary_table.lower()
+                        if time_tbl in valid_tables:
+                            cols.append(plan.time_dimension)
+                            order_col = plan.time_dimension
                     if plan.target_variable and plan.target_variable not in cols:
-                        cols.append(plan.target_variable)
+                        tgt_tbl = plan.target_variable.split(".")[0].lower() if "." in plan.target_variable else primary_table.lower()
+                        if tgt_tbl in valid_tables:
+                            cols.append(plan.target_variable)
 
                     # Add dimension columns from secondary table
                     for c in sec_model.columns:

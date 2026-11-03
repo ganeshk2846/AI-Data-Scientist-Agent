@@ -186,10 +186,12 @@ class PredictiveAnalyticsEngine:
         Executes rolling-origin backtesting across Naive, Seasonal Naive, Exponential Smoothing,
         ARIMA, and LightGBM models, selecting the champion model based on lowest out-of-sample sMAPE.
         """
-        temp = df[[date_col, target_col]].copy()
-        temp[date_col] = pd.to_datetime(temp[date_col], errors="coerce")
-        temp[target_col] = pd.to_numeric(temp[target_col], errors="coerce")
-        temp = temp.dropna().sort_values(by=date_col)
+        date_series = df[date_col].iloc[:, 0] if isinstance(df[date_col], pd.DataFrame) else df[date_col]
+        target_series = df[target_col].iloc[:, 0] if isinstance(df[target_col], pd.DataFrame) else df[target_col]
+        temp = pd.DataFrame({
+            date_col: pd.to_datetime(date_series, errors="coerce"),
+            target_col: pd.to_numeric(target_series, errors="coerce"),
+        }).dropna().sort_values(by=date_col)
 
         if len(temp) < MIN_FORECAST_OBSERVATIONS:
             return {"success": False, "error": "Insufficient points after cleaning."}
