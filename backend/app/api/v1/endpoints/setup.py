@@ -91,7 +91,7 @@ async def get_setup_status(request: Request) -> APIResponse[SetupStatusResponse]
         try:
             adapter = db_manager.get_active_adapter()
             is_db_connected = adapter.is_connected
-            active_fp = adapter.compute_fingerprint()
+            active_fp = db_config.fingerprint or adapter.compute_fingerprint()
             table_count = len(adapter.get_table_names())
             db_info = SetupDatabaseInfo(
                 name=db_config.name,

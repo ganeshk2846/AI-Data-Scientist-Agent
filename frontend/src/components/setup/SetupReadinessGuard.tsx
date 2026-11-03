@@ -27,15 +27,19 @@ export function SetupReadinessGuard({ children }: SetupReadinessGuardProps) {
   const queryClient = useQueryClient();
   const [activeStepOverride, setActiveStepOverride] = useState<number | null>(null);
 
-  const { data: setupData, isLoading, refetch } = useQuery({
+  const { data: setupData, isLoading, isError, refetch } = useQuery({
     queryKey: ["setupStatus"],
     queryFn: fetchSetupStatus,
+    staleTime: 10000,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data?.preparation_status === "RUNNING") {
         return 1500;
       }
-      return 8000;
+      if (data?.chat_ready) {
+        return 30000;
+      }
+      return 10000;
     },
   });
 
@@ -58,12 +62,15 @@ export function SetupReadinessGuard({ children }: SetupReadinessGuardProps) {
 
   const effectiveStep = activeStepOverride !== null ? activeStepOverride : currentStep;
 
-  // If chat is ready and no override, render the conversational BI workspace
-  if (!isLoading && chatReady && activeStepOverride === null) {
+  // If chat is ready and no override, render the conversational BI workspace directly
+  // Note: We check chatReady directly without blocking on background refetches
+  if (chatReady && activeStepOverride === null) {
     return <>{children}</>;
   }
 
-  if (isLoading) {
+  // Only show full-page loading on the very first mount when no data is in cache yet
+  const isInitialLoading = isLoading && !setupData;
+  if (isInitialLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
         <div className="p-4 rounded-2xl bg-primary/10 text-primary border border-primary/20 animate-pulse">
@@ -77,6 +84,28 @@ export function SetupReadinessGuard({ children }: SetupReadinessGuardProps) {
             Checking Groq LLM inference channel, active database connection, and retrieval indexes.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // If there's an error and no data at all, show connection error with retry
+  if (isError && !setupData) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="p-4 rounded-2xl bg-destructive/10 text-destructive border border-destructive/20">
+          <RefreshCw className="w-8 h-8 text-destructive" />
+        </div>
+        <div className="space-y-1 max-w-md">
+          <h3 className="text-base font-semibold text-foreground">
+            Backend Connection Offline
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Could not retrieve setup readiness status from the backend server at port 8001.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} icon={<RefreshCw className="w-4 h-4" />}>
+          Retry Connection
+        </Button>
       </div>
     );
   }
