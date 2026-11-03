@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 """
 Multi-Agent Orchestrator with Planning, Clarification, Bounded SQL Repair, and Hybrid Schema Retrieval.
 Coordinates Router, Answerability Gate, Clarification, Planner, Hybrid Retriever, Value Linker,
@@ -27,7 +28,7 @@ from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.db.manager import db_manager
 from backend.app.memory.service import memory_service
-from backend.app.observability.tracer import RunTraceRecord, observability_tracer
+from backend.app.observability.tracer import RunTraceRecord, StageSpanRecord, observability_tracer
 from backend.app.security.guardrails import detect_prompt_injection, validate_sql_security
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
@@ -146,6 +147,8 @@ class MultiAgentOrchestrator:
                     error_class="prompt_injection_block",
                     verification_status="blocked",
                     created_at=datetime.now(timezone.utc).isoformat(),
+                    orchestrator_type="workflow_orchestrator",
+                    llm_provider="groq",
                 )
             )
             return res
@@ -189,6 +192,8 @@ class MultiAgentOrchestrator:
                     error_class="answerability_refusal",
                     verification_status="refused",
                     created_at=datetime.now(timezone.utc).isoformat(),
+                    orchestrator_type="workflow_orchestrator",
+                    llm_provider="groq",
                 )
             )
             return MultiAgentWorkflowResult(
@@ -241,6 +246,8 @@ class MultiAgentOrchestrator:
                     error_class="answerability_refusal",
                     verification_status="refused",
                     created_at=datetime.now(timezone.utc).isoformat(),
+                    orchestrator_type="workflow_orchestrator",
+                    llm_provider="groq",
                 )
             )
             return MultiAgentWorkflowResult(
@@ -627,8 +634,30 @@ class MultiAgentOrchestrator:
                 error_class=None,
                 verification_status="verified" if (verification and verification.is_valid) else "unverified",
                 created_at=datetime.now(timezone.utc).isoformat(),
+                    orchestrator_type="workflow_orchestrator",
+                    llm_provider="groq",
             )
         )
+
+        try:
+            spans = []
+            for idx, t in enumerate(traces):
+                spans.append(
+                    StageSpanRecord(
+                        span_id=f"{run_id}_{t.step}_{idx}",
+                        run_id=run_id,
+                        stage_name=t.step,
+                        duration_ms=t.duration_ms or 0.0,
+                        start_time=datetime.now(timezone.utc).isoformat(),
+                        end_time=datetime.now(timezone.utc).isoformat(),
+                        status=t.status,
+                        metadata_json=json.dumps({"message": t.message, "metadata": t.metadata}),
+                    )
+                )
+            if spans:
+                observability_tracer.record_stage_spans(spans)
+        except Exception as _e:
+            logger.warning(f"Failed to record stage spans: {_e}")
 
         return MultiAgentWorkflowResult(
             run_id=run_id,

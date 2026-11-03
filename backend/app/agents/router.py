@@ -158,6 +158,18 @@ class RouterAgent:
                 target_domains=["Financials & Planning", "Inventory"],
                 suggested_entities=["expenses", "inventory", "daily_targets"],
             )
+        elif any(lower.startswith(prefix) for prefix in [
+            "what are", "what is", "how many", "show", "list", "display", "count",
+            "which tables", "who are", "find", "get", "total"
+        ]) or any(w in lower for w in ["total orders", "total sales", "total revenue", "order count", "customer count", "tables in database", "schema"]):
+            return RouteResult(
+                intent="descriptive",
+                confidence=0.96,
+                complexity="simple",
+                reasoning="Deterministic fast-path: fact retrieval, aggregation, or schema lookup.",
+                target_domains=["Orders & Transactions"],
+                suggested_entities=["orders"],
+            )
 
         # Default descriptive LLM routing
         try:

@@ -507,7 +507,39 @@ export const RunTraceRecordSchema = z.object({
   error_class: z.string().nullable().optional(),
   verification_status: z.string(),
   created_at: z.string(),
+  orchestrator_type: z.string().nullable().optional(),
+  llm_provider: z.string().nullable().optional(),
+  llm_calls_count: z.number().optional().default(0),
+  streaming_ttfe_ms: z.number().nullable().optional(),
+  streaming_ttfo_ms: z.number().nullable().optional(),
 });
+
+export const StageLatencyMetricSchema = z.object({
+  p50_ms: z.number(),
+  p95_ms: z.number(),
+  avg_ms: z.number(),
+  count: z.number(),
+});
+
+export const StreamingTimingMetricSchema = z.object({
+  ttfe_p50_ms: z.number().default(0),
+  ttfe_p95_ms: z.number().default(0),
+  ttfo_p50_ms: z.number().default(0),
+  ttfo_p95_ms: z.number().default(0),
+  count: z.number().default(0),
+});
+
+export const StageSpanRecordSchema = z.object({
+  span_id: z.string(),
+  run_id: z.string(),
+  stage_name: z.string(),
+  duration_ms: z.number(),
+  start_time: z.string(),
+  end_time: z.string(),
+  status: z.string(),
+  metadata_json: z.string().nullable().optional(),
+});
+export type StageSpanRecord = z.infer<typeof StageSpanRecordSchema>;
 
 export const ObservabilityMetricsSchema = z.object({
   total_runs: z.number(),
@@ -518,6 +550,17 @@ export const ObservabilityMetricsSchema = z.object({
   avg_latency_ms: z.number(),
   safety_block_count: z.number(),
   error_classes_breakdown: z.record(z.number()).default({}),
+  window: z.string().default("all"),
+  window_sample_count: z.number().default(0),
+  active_engine: z.string().default("Groq Cloud API"),
+  verified_runs_count: z.number().default(0),
+  verified_latency_p50_ms: z.number().default(0),
+  verified_latency_p95_ms: z.number().default(0),
+  verified_latency_p99_ms: z.number().default(0),
+  verified_avg_latency_ms: z.number().default(0),
+  orchestrator_breakdown: z.record(z.number()).default({}),
+  stage_latencies: z.record(StageLatencyMetricSchema).default({}),
+  streaming_timings: StreamingTimingMetricSchema.nullable().optional(),
 });
 
 export const ObservabilityMetricsResponseSchema = createAPIResponseSchema(ObservabilityMetricsSchema);

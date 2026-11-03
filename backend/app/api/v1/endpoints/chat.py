@@ -6,11 +6,13 @@ Powered by Multi-Agent Planning, Clarification, and Bounded Repair Orchestrator.
 
 import asyncio
 import json
+import time
 from typing import AsyncGenerator, Optional
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from backend.app.core.models import APIResponse
+from backend.app.observability.tracer import observability_tracer
 from backend.app.workflow.models import WorkflowProgressState
 from backend.app.workflow.orchestrator import MultiAgentWorkflowResult, multi_agent_orchestrator
 
@@ -54,10 +56,11 @@ async def stream_chat_query(
     request: Request,
 ) -> EventSourceResponse:
     """
-    Streams observable progress states and decision summaries via SSE.
-    Events: 'progress', 'result', 'error'.
+    Streams observable progress states and decision summaries via SSE with high-resolution latency instrumentation.
+    Events: 'progress', 'result', 'error', 'done'.
     """
     request_id = getattr(request.state, "request_id", None)
+    stream_start = time.perf_counter()
     queue: asyncio.Queue = asyncio.Queue()
 
     def sync_progress_callback(step: WorkflowProgressState, msg: str):
@@ -80,6 +83,9 @@ async def stream_chat_query(
     asyncio.create_task(workflow_task())
 
     async def event_generator() -> AsyncGenerator[dict, None]:
+        ttfe_ms: Optional[float] = None
+        ttfo_ms: Optional[float] = None
+
         while True:
             if await request.is_disconnected():
                 break
@@ -89,13 +95,33 @@ async def stream_chat_query(
                 yield {"event": "done", "data": json.dumps({"status": "completed"})}
                 break
 
+            now_ms = round((time.perf_counter() - stream_start) * 1000, 2)
             if item["type"] == "progress":
+                if ttfe_ms is None:
+                    ttfe_ms = now_ms
                 yield {
                     "event": "progress",
-                    "data": json.dumps({"step": item["step"], "message": item["message"]}),
+                    "data": json.dumps({
+                        "step": item["step"],
+                        "message": item["message"],
+                        "streaming_ttfe_ms": ttfe_ms,
+                    }),
                 }
             elif item["type"] == "result":
-                yield {"event": "result", "data": json.dumps(item["payload"])}
+                if ttfo_ms is None:
+                    ttfo_ms = now_ms
+                payload = item["payload"]
+                run_id = payload.get("run_id")
+                if run_id and ttfe_ms is not None:
+                    try:
+                        observability_tracer.update_streaming_timings(
+                            run_id=run_id,
+                            ttfe_ms=ttfe_ms,
+                            ttfo_ms=ttfo_ms,
+                        )
+                    except Exception:
+                        pass
+                yield {"event": "result", "data": json.dumps(payload)}
             elif item["type"] == "error":
                 yield {"event": "error", "data": json.dumps({"error": item["message"]})}
 

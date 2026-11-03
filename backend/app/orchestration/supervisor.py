@@ -20,6 +20,7 @@ Coordinates:
 """
 
 from datetime import datetime, timezone
+import json
 import re
 import time
 import uuid
@@ -48,7 +49,7 @@ from backend.app.analysis.scenario_engine import scenario_analytics_engine
 from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.memory.service import memory_service
-from backend.app.observability.tracer import RunTraceRecord, observability_tracer
+from backend.app.observability.tracer import RunTraceRecord, StageSpanRecord, observability_tracer
 from backend.app.orchestration.models import (
     AgentTask,
     ExecutiveSection,
@@ -1474,8 +1475,34 @@ class AgenticSupervisor:
                     error_class=final_result.abstain_reason if not final_result.success else None,
                     verification_status="verified" if final_result.success else "abstained",
                     created_at=datetime.now(timezone.utc).isoformat(),
+                    orchestrator_type="agentic_supervisor",
+                    llm_provider="groq",
                 )
             )
+
+            # Record granular stage spans for all tasks in the execution
+            spans = []
+            for t in getattr(final_result, "tasks", []):
+                s_id = f"{t.task_id}_span"
+                s_name = t.task_type or (t.specialist.value if hasattr(t.specialist, "value") else str(t.specialist))
+                spans.append(
+                    StageSpanRecord(
+                        span_id=s_id,
+                        run_id=execution_id,
+                        stage_name=s_name,
+                        duration_ms=t.duration_ms or 0.0,
+                        start_time=t.start_time or datetime.now(timezone.utc).isoformat(),
+                        end_time=t.end_time or datetime.now(timezone.utc).isoformat(),
+                        status=t.status.value if hasattr(t.status, "value") else str(t.status),
+                        metadata_json=json.dumps({
+                            "output_summary": t.output_summary,
+                            "error": t.error_or_abstain_reason,
+                            "specialist": t.specialist.value if hasattr(t.specialist, "value") else str(t.specialist),
+                        }),
+                    )
+                )
+            if spans:
+                observability_tracer.record_stage_spans(spans)
         except Exception as _e:
             logger.warning(f"Failed to record run trace in observability_tracer: {_e}")
 

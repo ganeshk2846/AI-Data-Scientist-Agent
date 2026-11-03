@@ -9,6 +9,7 @@ Exposes:
 
 import asyncio
 import json
+import time
 from typing import AsyncGenerator, Optional
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from backend.app.analysis.contracts_v2 import IntentCategory
 from backend.app.core.models import APIResponse
+from backend.app.observability.tracer import observability_tracer
 from backend.app.orchestration.models import SupervisorExecutionResult
 from backend.app.orchestration.supervisor import agentic_supervisor
 from backend.app.schema.service import schema_service
@@ -69,17 +71,20 @@ async def stream_agentic_query(
 ) -> EventSourceResponse:
     """
     Server-Sent Events (SSE) stream providing real-time visibility into specialist task executions
-    and delivering the final executive management response.
+    and delivering the final executive management response with high-resolution streaming latency instrumentation.
     """
     request_id = getattr(request.state, "request_id", None)
+    stream_start = time.perf_counter()
 
     async def event_generator() -> AsyncGenerator[dict, None]:
-        # Emit initial planning event
+        # Emit initial planning event (Time to First Event - TTFE)
+        ttfe_ms = round((time.perf_counter() - stream_start) * 1000, 2)
         yield {
             "event": "progress",
             "data": json.dumps({
                 "type": "planning",
                 "message": f"Supervisor analyzing business question: '{body.question[:80]}...'",
+                "streaming_ttfe_ms": ttfe_ms,
             }),
         }
         await asyncio.sleep(0.05)
@@ -97,6 +102,18 @@ async def stream_agentic_query(
             ),
         )
 
+        ttfo_ms = round((time.perf_counter() - stream_start) * 1000, 2)
+
+        # Record streaming latency metrics into telemetry store
+        try:
+            observability_tracer.update_streaming_timings(
+                run_id=result.execution_id,
+                ttfe_ms=ttfe_ms,
+                ttfo_ms=ttfo_ms,
+            )
+        except Exception:
+            pass
+
         # Emit task progress updates
         for task in result.tasks:
             yield {
@@ -112,7 +129,12 @@ async def stream_agentic_query(
             }
             await asyncio.sleep(0.02)
 
-        # Emit final completed result
+        # Emit final completed result with streaming telemetry metadata
+        augmented_metrics = dict(result.metrics)
+        augmented_metrics["streaming_ttfe_ms"] = ttfe_ms
+        augmented_metrics["streaming_ttfo_ms"] = ttfo_ms
+        augmented_metrics["streaming_total_ms"] = round((time.perf_counter() - stream_start) * 1000, 2)
+
         yield {
             "event": "result",
             "data": json.dumps({
@@ -120,7 +142,7 @@ async def stream_agentic_query(
                 "execution_id": result.execution_id,
                 "plan_summary": result.plan_summary,
                 "management_response": result.management_response.model_dump(),
-                "metrics": result.metrics,
+                "metrics": augmented_metrics,
                 "tasks": [t.model_dump() for t in result.tasks],
             }),
         }

@@ -19,6 +19,7 @@ import {
   ObservabilityMetricsResponseSchema,
   RunTraceRecord,
   RunTraceListResponseSchema,
+  StageSpanRecord,
   SessionModel,
   SessionListResponseSchema,
   TurnModel,
@@ -134,8 +135,16 @@ export async function clearSessionApi(sessionId: string): Promise<boolean> {
   return Boolean(json.success);
 }
 
-export async function fetchObservabilityMetrics(): Promise<ObservabilityMetrics> {
-  const url = `${API_BASE_URL}/api/v1/ops/metrics`;
+export async function fetchObservabilityMetrics(
+  window: string = "all",
+  orchestrator: string = "all",
+  status: string = "all"
+): Promise<ObservabilityMetrics> {
+  const params = new URLSearchParams();
+  if (window) params.append("window", window);
+  if (orchestrator) params.append("orchestrator", orchestrator);
+  if (status) params.append("status", status);
+  const url = `${API_BASE_URL}/api/v1/ops/metrics?${params.toString()}`;
   const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
   const json = await res.json();
   const parsed = ObservabilityMetricsResponseSchema.safeParse(json);
@@ -143,6 +152,13 @@ export async function fetchObservabilityMetrics(): Promise<ObservabilityMetrics>
     throw new Error(parsed.data?.error?.message || "Failed to fetch observability metrics");
   }
   return parsed.data.data;
+}
+
+export async function fetchRunSpans(runId: string): Promise<StageSpanRecord[]> {
+  const url = `${API_BASE_URL}/api/v1/ops/spans/${encodeURIComponent(runId)}`;
+  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+  const json = await res.json();
+  return json.data || [];
 }
 
 export async function fetchRecentTraces(limit: number = 25): Promise<RunTraceRecord[]> {
