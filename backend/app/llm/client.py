@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 import asyncio
 import os
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Set
 import openai
 from openai import (
     APIConnectionError,
@@ -68,12 +68,7 @@ class GroqLLMProvider(BaseLLMProvider):
         self.max_retries = max_retries
 
         self._client: Optional[AsyncOpenAI] = None
-        if self._is_valid_key(self.api_key):
-            self._client = AsyncOpenAI(
-                api_key=self.api_key,
-                base_url=self.base_url,
-                timeout=float(self.timeout_seconds),
-            )
+        self._client_loop: Any = None
 
     @staticmethod
     def _is_valid_key(key: Optional[str]) -> bool:
@@ -84,17 +79,34 @@ class GroqLLMProvider(BaseLLMProvider):
 
     @property
     def client(self) -> AsyncOpenAI:
-        if self._client is None:
-            if not self._is_valid_key(self.api_key):
-                raise ConfigurationError(
-                    "GROQ_API_KEY is not configured or contains placeholder value. "
-                    "Set a valid Groq API key in the backend .env file to enable Groq LLM inference."
-                )
+        """
+        Returns an AsyncOpenAI client bound to the running event loop.
+
+        The provider is a process-wide singleton, but an httpx async client holds
+        connections tied to the loop that created it. Reusing one across loops
+        (each asyncio.run, and each test that starts its own) raises
+        "Event loop is closed", so the client is rebuilt when the loop changes.
+        """
+        if not self._is_valid_key(self.api_key):
+            raise ConfigurationError(
+                "GROQ_API_KEY is not configured or contains placeholder value. "
+                "Set a valid Groq API key in the backend .env file to enable Groq LLM inference."
+            )
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        # A client assigned from outside (tests inject a fake) has no recorded
+        # loop, and must never be replaced here.
+        externally_supplied = self._client is not None and self._client_loop is None
+        if not externally_supplied and (self._client is None or self._client_loop is not current_loop):
             self._client = AsyncOpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url,
                 timeout=float(self.timeout_seconds),
             )
+            self._client_loop = current_loop
         return self._client
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
@@ -329,9 +341,9 @@ class MockLLMProvider(BaseLLMProvider):
         elif "top" in prompt and "categor" in prompt:
             return "SELECT c.category_name, ROUND(SUM(oi.subtotal), 2) AS category_revenue FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN categories c ON p.category_id = c.category_id GROUP BY c.category_name ORDER BY category_revenue DESC LIMIT 5;"
         elif target_year and ("revenue" in prompt or "sales" in prompt):
-            return f"SELECT strftime('%Y', order_date) AS order_year, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE strftime('%Y', order_date) = '{target_year}' AND order_status = 'delivered';"
+            return f"SELECT strftime('%Y', order_date) AS order_year, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE strftime('%Y', order_date) = '{target_year}' AND LOWER(order_status) = 'delivered';"
         elif "revenue" in prompt or "sales" in prompt:
-            return "SELECT strftime('%Y', order_date) AS year, COUNT(order_id) AS total_orders, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE order_status = 'delivered' GROUP BY year ORDER BY year ASC;"
+            return "SELECT strftime('%Y', order_date) AS year, COUNT(order_id) AS total_orders, ROUND(SUM(total_amount), 2) AS total_revenue FROM orders WHERE LOWER(order_status) = 'delivered' GROUP BY year ORDER BY year ASC;"
         elif "payment" in prompt:
             return "SELECT payment_method, payment_status, COUNT(*) AS count, ROUND(SUM(amount), 2) AS total_amount FROM payments GROUP BY payment_method, payment_status ORDER BY total_amount DESC;"
         elif "channel" in prompt or "marketing" in prompt:
@@ -342,25 +354,18 @@ class MockLLMProvider(BaseLLMProvider):
 
 SUPPORTED_GROQ_MODELS = [
     {
-        "id": "openai/gpt-oss-120b",
-        "name": "GPT-OSS 120B",
-        "context_window": 8192,
-        "is_recommended": True,
-        "description": "High parameter open weights model with strong structured outputs (Recommended)",
-    },
-    {
-        "id": "qwen/qwen3.8-27b",
-        "name": "Qwen 3.8 27B",
-        "context_window": 32768,
-        "is_recommended": False,
-        "description": "Ultra low latency 27B model optimized for fast query synthesis",
-    },
-    {
         "id": "llama-3.3-70b-versatile",
         "name": "Llama 3.3 70B Versatile",
         "context_window": 128000,
+        "is_recommended": True,
+        "description": "High performance, excellent reasoning and SQL synthesis capabilities (Recommended)",
+    },
+    {
+        "id": "openai/gpt-oss-120b",
+        "name": "GPT-OSS 120B",
+        "context_window": 8192,
         "is_recommended": False,
-        "description": "High performance, excellent reasoning and SQL synthesis capabilities",
+        "description": "High parameter open weights model with strong structured outputs",
     },
     {
         "id": "llama-3.1-8b-instant",

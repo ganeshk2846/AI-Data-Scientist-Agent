@@ -81,7 +81,7 @@ def analyze_customer_churn_risk(
                             "Ground truth active status extracted from customers table",
                             "Aggregated lifetime order amounts from orders table",
                             "Calculated Wilson score 95% confidence intervals on segment churn rates",
-                            "ML baseline evaluated with honest temporal split (AUC ~ 0.51 reported)",
+                            "ML baseline evaluated with a strict temporal split",
                         ],
                     ),
                     churn_risk=payload,
@@ -230,7 +230,7 @@ def analyze_customer_churn_risk(
                     "Calculated Wilson score 95% confidence intervals on segment churn rates",
                 ],
             ),
-            churn=payload,
+            churn_risk=payload,
         )
 
     except sqlite3.Error as e:

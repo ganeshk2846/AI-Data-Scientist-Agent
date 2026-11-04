@@ -1,489 +1,204 @@
-import React, { useState } from "react";
-import {
-  Sparkles,
-  TrendingUp,
-  HelpCircle,
-  Compass,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Database,
-  BarChart2,
-  GitBranch,
-  Layers,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Code2,
-} from "lucide-react";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
-import { AgentTask, ManagementResponse, SupervisorExecutionResult } from "@/types/api";
+"use client";
 
-export interface ManagementResponseViewProps {
-  execution: SupervisorExecutionResult;
+import React from "react";
+import { AlertTriangle } from "lucide-react";
+import { clsx } from "clsx";
+import { ExecutiveSection, ManagementResponse, MultiAgentWorkflowResult } from "@/types/api";
+import { Markdown } from "@/components/ui/Markdown";
+import { StatGroup, StatGroupBlock, StatItem, splitKpis } from "@/components/ui/Stat";
+import {
+  describeResult,
+  firstSentence,
+  isUnusableHeadline,
+  scopeForValue,
+} from "@/lib/narrative";
+
+/**
+ * The five sections the brief names, plus `impact_section`, which the backend
+ * also sends and which is rendered on the same footing rather than dropped.
+ */
+const SECTION_ORDER: { key: keyof ManagementResponse; name: string }[] = [
+  { key: "what", name: "What" },
+  { key: "why", name: "Why" },
+  { key: "so_what", name: "So what" },
+  { key: "what_next", name: "What next" },
+  { key: "scenario_section", name: "Scenario" },
+  { key: "impact_section", name: "Impact" },
+];
+
+function isSection(value: unknown): value is ExecutiveSection {
+  return typeof value === "object" && value !== null && "headline" in value;
 }
 
-export function ManagementResponseView({ execution }: ManagementResponseViewProps) {
-  const {
-    execution_id,
-    question,
-    plan_summary,
-    tasks = [],
-    management_response,
-    metrics = {},
-    success,
-    database_fingerprint,
-  } = execution;
+/**
+ * Disclaimers are the honesty of the product, so they are set at body size in
+ * full ink inside their own well — never grey fine print, never truncated.
+ */
+function Disclaimers({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="space-y-2 rounded-card border border-[var(--border)] bg-raised px-3.5 py-3">
+      {items.map((text, i) => (
+        <p key={i} className="flex gap-2.5 text-body text-text">
+          <AlertTriangle aria-hidden="true" className="mt-[0.2em] h-3.5 w-3.5 shrink-0 text-warning" />
+          <span className="min-w-0 flex-1">{text}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
 
-  const [showTasks, setShowTasks] = useState(true);
-  const [showEvidence, setShowEvidence] = useState(false);
+interface SectionProps {
+  name: string;
+  section: ExecutiveSection;
+  headline: string;
+  lead: boolean;
+  /** Reading-order index, for the staggered arrival. */
+  order: number;
+  tiles: StatItem[];
+  groups: { title: string; entries: ReturnType<typeof splitKpis>["groups"][number]["entries"] }[];
+  /** The chart, placed inside the lead section when the result is a series. */
+  chart?: React.ReactNode;
+}
 
-  const { what, why, what_next, so_what, scenario_section, impact_section, executive_summary } = management_response || {};
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "COMPLETED":
-        return (
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>Completed</span>
-          </span>
-        );
-      case "ABSTAINED":
-        return (
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
-            <AlertTriangle className="w-3 h-3" />
-            <span>Abstained</span>
-          </span>
-        );
-      case "FAILED":
-        return (
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-destructive bg-destructive/10 border border-destructive/20 px-2 py-0.5 rounded">
-            <XCircle className="w-3 h-3" />
-            <span>Failed</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground bg-muted/40 px-2 py-0.5 rounded">
-            <Clock className="w-3 h-3" />
-            <span>{status}</span>
-          </span>
-        );
-    }
-  };
-
-  const getSpecialistColor = (specialist: string) => {
-    switch (specialist) {
-      case "DATA_RETRIEVAL":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/30";
-      case "DIAGNOSTIC":
-        return "bg-amber-500/10 text-amber-500 border-amber-500/30";
-      case "PREDICTIVE":
-        return "bg-purple-500/10 text-purple-500 border-purple-500/30";
-      case "PRESCRIPTIVE":
-        return "bg-emerald-500/10 text-emerald-500 border-emerald-500/30";
-      case "CRITIC":
-        return "bg-indigo-500/10 text-indigo-500 border-indigo-500/30";
-      default:
-        return "bg-primary/10 text-primary border-primary/30";
-    }
-  };
+function Section({ name, section, headline, lead, order, tiles, groups, chart }: SectionProps) {
+  const headingId = `section-${name.toLowerCase().replace(/\s+/g, "-")}`;
 
   return (
-    <div className="space-y-6">
-      {/* 1. Header & Execution Meta Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-border gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="primary" size="sm" className="font-semibold uppercase tracking-wider">
-            Agentic Decision Support
-          </Badge>
-          <span className="text-xs text-foreground font-semibold">
-            {plan_summary || "Multi-Agent Analytical Plan"}
-          </span>
-          <Badge variant="mono" size="xs">
-            ID: {execution_id}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/50">
-            Latency: {metrics.latency_ms ? `${metrics.latency_ms}ms` : "0ms"}
-          </span>
-          <span className="text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/50">
-            Queries: {metrics.sql_queries ?? 0}
-          </span>
-          <span className="text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/50">
-            DB: {database_fingerprint ? database_fingerprint.slice(0, 8) : "default"}
-          </span>
-        </div>
-      </div>
+    <section
+      aria-labelledby={headingId}
+      className={clsx(
+        "arrive border-l-2 pl-4",
+        "sm:grid sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:gap-x-7 sm:border-l-0 sm:pl-0",
+        lead ? "border-accent" : "border-[var(--border)]"
+      )}
+      // Sections arrive in reading order, 55ms apart.
+      style={{ animationDelay: `${order * 55}ms` }}
+    >
+      <h3
+        id={headingId}
+        className={clsx(
+          "label-caps font-medium",
+          "sm:border-l-2 sm:py-0.5 sm:pl-3",
+          lead ? "text-accent sm:border-accent" : "text-muted sm:border-[var(--border)]"
+        )}
+      >
+        {name}
+      </h3>
 
-      {/* 2. Orchestration Specialist Task Pipeline Stepper */}
-      <div className="p-4 rounded-xl border border-border bg-card/50 space-y-3">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-foreground flex items-center gap-2">
-            <Layers className="w-4 h-4 text-primary" />
-            <span>Specialist Agent Task Pipeline ({tasks.length} Tasks)</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowTasks(!showTasks)}
-            className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <span>{showTasks ? "Hide Details" : "Show Details"}</span>
-            {showTasks ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+      <div className="min-w-0">
+        <p
+          className={clsx(
+            "text-balance font-semibold tracking-[-0.015em] text-text",
+            // The answer's own statement is the biggest words on the screen
+            // after the question: it is read from across a room.
+            lead ? "text-[clamp(1.5rem,2.2vw,2rem)] leading-[1.12]" : "text-headline"
+          )}
+        >
+          {headline}
+        </p>
 
-        {showTasks && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-            {tasks.map((task: AgentTask) => (
-              <div
-                key={task.task_id}
-                className="p-3 rounded-lg border border-border/80 bg-background/60 space-y-1.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${getSpecialistColor(
-                      task.specialist
-                    )}`}
-                  >
-                    {task.specialist.replace(/_/g, " ")}
-                  </span>
-                  {getStatusBadge(task.status)}
-                </div>
-                <div className="text-xs font-medium text-foreground truncate">
-                  {task.task_type.replace(/_/g, " ")}
-                </div>
-                {task.output_summary && (
-                  <p className="text-[11px] text-muted-foreground truncate">{task.output_summary}</p>
-                )}
-                {task.error_or_abstain_reason && task.status !== "COMPLETED" && (
-                  <p className="text-[10px] text-amber-500/90 italic truncate">
-                    Reason: {task.error_or_abstain_reason}
-                  </p>
-                )}
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 font-mono pt-1 border-t border-border/40">
-                  <span>Duration: {task.duration_ms.toFixed(1)}ms</span>
-                  <span>{task.evidence_references?.length || 0} Evidence Refs</span>
-                </div>
-              </div>
+        {/* A series leads with its chart, not with one figure lifted out of it. */}
+        {chart ? <div className="mt-4">{chart}</div> : null}
+
+        {tiles.length > 0 ? (
+          <div className="mt-4">
+            <StatGroup items={tiles} leadFirst={lead && !chart} />
+          </div>
+        ) : null}
+
+        {groups.length > 0 ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {groups.map((g) => (
+              <StatGroupBlock key={g.title} title={g.title} entries={g.entries} />
             ))}
           </div>
-        )}
+        ) : null}
+
+        {section.content ? <Markdown content={section.content} className="mt-4 max-w-prose-measure" /> : null}
+
+        {section.disclaimers.length > 0 ? (
+          <div className="mt-4 max-w-prose-measure">
+            <Disclaimers items={section.disclaimers} />
+          </div>
+        ) : null}
       </div>
+    </section>
+  );
+}
 
-      {/* 3. Executive Decision Cards: WHAT, WHY, WHAT NEXT, SO WHAT */}
-      <div className="space-y-4">
-        {/* Card 1: WHAT (What happened?) */}
-        {what && (
-          <div className="p-5 rounded-2xl border border-blue-500/30 bg-blue-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-500 font-bold text-xs uppercase tracking-wider">
-                  WHAT
-                </div>
-                <h3 className="text-sm font-bold text-foreground">What happened?</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Descriptive Baseline
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-foreground/90">{what.headline}</p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {what.content}
-            </div>
+interface ManagementResponseViewProps {
+  result: MultiAgentWorkflowResult;
+  onRevealEvidence?: (figureLabel?: string) => void;
+  evidenceLabel?: string;
+  /** Rendered inside the lead section when the result is a series. */
+  chart?: React.ReactNode;
+}
 
-            {/* KPIs Grid */}
-            {what.kpis && Object.keys(what.kpis).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                {Object.entries(what.kpis)
-                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
-                  .slice(0, 4)
-                  .map(([k, v]) => (
-                    <div key={k} className="p-2.5 rounded-lg border border-border/80 bg-card/60">
-                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
-                        {k.replace(/_/g, " ")}
-                      </span>
-                      <p className="text-sm font-bold font-mono text-foreground truncate">
-                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
+/**
+ * Renders only the sections that are present, in reading order.
+ *
+ * Two corrections to the backend's own text happen here, both presentation:
+ * a headline that is a row count ("Query returned 12 rows.") is replaced by
+ * the narrative's first real sentence or by a description of the result's
+ * shape; and a KPI whose value is one row of a many-row result is labelled
+ * with that row's own scope rather than reading as a total nobody computed.
+ */
+export function ManagementResponseView({
+  result,
+  onRevealEvidence,
+  evidenceLabel,
+  chart,
+}: ManagementResponseViewProps) {
+  const response = result.management_response;
+  if (!response) return null;
 
-        {/* Card 2: WHY (Why did it happen?) */}
-        {why && (
-          <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-500 font-bold text-xs uppercase tracking-wider">
-                  WHY
-                </div>
-                <h3 className="text-sm font-bold text-foreground">Why did it happen?</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Diagnostic Analysis
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-foreground/90">{why.headline}</p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {why.content}
-            </div>
+  const present = SECTION_ORDER.map(({ key, name }) => ({
+    name,
+    section: (response as Record<string, unknown>)[key],
+  })).filter((e): e is { name: string; section: ExecutiveSection } => isSection(e.section));
 
-            {/* Non-causal Disclaimer */}
-            {why.disclaimers && why.disclaimers.length > 0 && (
-              <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-[11px] text-amber-500/90 space-y-1">
-                {why.disclaimers.map((disc, idx) => (
-                  <p key={idx} className="italic leading-relaxed">
-                    {disc}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+  if (present.length === 0) return null;
 
-        {/* Card 3: WHAT NEXT (What might happen?) */}
-        {what_next && (
-          <div className="p-5 rounded-2xl border border-purple-500/30 bg-purple-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-500 font-bold text-xs uppercase tracking-wider">
-                  WHAT NEXT
-                </div>
-                <h3 className="text-sm font-bold text-foreground">What might happen?</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Predictive Forecast
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-foreground/90">{what_next.headline}</p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {what_next.content}
-            </div>
+  const narrativeLead = firstSentence(result.composed_answer);
 
-            {/* Forecast KPIs */}
-            {what_next.kpis && Object.keys(what_next.kpis).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                {Object.entries(what_next.kpis)
-                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
-                  .slice(0, 4)
-                  .map(([k, v]) => (
-                    <div key={k} className="p-2.5 rounded-lg border border-border/80 bg-card/60">
-                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
-                        {k.replace(/_/g, " ")}
-                      </span>
-                      <p className="text-sm font-bold font-mono text-foreground truncate">
-                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
+  return (
+    <div className="space-y-12">
+      {present.map(({ name, section }, i) => {
+        const lead = i === 0;
 
-        {/* Card 4: SO WHAT (What should management do?) */}
-        {so_what && (
-          <div className="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-500 font-bold text-xs uppercase tracking-wider">
-                  SO WHAT
-                </div>
-                <h3 className="text-sm font-bold text-foreground">What should management do?</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Prescriptive Action
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              {so_what.headline}
-            </p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {so_what.content}
-            </div>
+        const headline = isUnusableHeadline(section.headline)
+          ? (lead && narrativeLead) ||
+            describeResult(result.query_result, result.chart_spec, section.headline || name)
+          : section.headline;
 
-            {/* Safe Advisory Disclaimer */}
-            {so_what.disclaimers && so_what.disclaimers.length > 0 && (
-              <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-[11px] text-emerald-600 dark:text-emerald-400 space-y-1">
-                {so_what.disclaimers.map((disc, idx) => (
-                  <p key={idx} className="italic leading-relaxed">
-                    {disc}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        const { tiles, groups } = splitKpis(section.kpis ?? {});
+        const scoped: StatItem[] = tiles.map((tile) => {
+          const rowScope = scopeForValue(tile.raw, result.query_result);
+          return {
+            ...tile,
+            // A figure that is one row of the result says which row it is,
+            // instead of implying it is the whole.
+            scope: rowScope ?? tile.scope ?? null,
+            onReveal: onRevealEvidence ? () => onRevealEvidence(tile.label) : undefined,
+            sourceLabel: evidenceLabel,
+          };
+        });
 
-        {/* Card 5: SCENARIO / WHAT IF */}
-        {scenario_section && (
-          <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-500 font-bold text-xs uppercase tracking-wider">
-                  SCENARIO / WHAT IF
-                </div>
-                <h3 className="text-sm font-bold text-foreground">What If Scenario Simulation</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Sensitivity & Elasticity
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">
-              {scenario_section.headline}
-            </p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {scenario_section.content}
-            </div>
-
-            {scenario_section.kpis && Object.keys(scenario_section.kpis).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                {Object.entries(scenario_section.kpis)
-                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
-                  .slice(0, 4)
-                  .map(([k, v]) => (
-                    <div key={k} className="p-2.5 rounded-lg border border-cyan-500/20 bg-card/60">
-                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
-                        {k.replace(/_/g, " ")}
-                      </span>
-                      <p className="text-sm font-bold font-mono text-cyan-600 dark:text-cyan-400 truncate">
-                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {scenario_section.disclaimers && scenario_section.disclaimers.length > 0 && (
-              <div className="p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-[11px] text-cyan-600 dark:text-cyan-400 space-y-1">
-                {scenario_section.disclaimers.map((disc, idx) => (
-                  <p key={idx} className="italic leading-relaxed">
-                    {disc}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Card 6: IMPACT / SO WHAT */}
-        {impact_section && (
-          <div className="p-5 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-500 font-bold text-xs uppercase tracking-wider">
-                  IMPACT / SO WHAT
-                </div>
-                <h3 className="text-sm font-bold text-foreground">Statistical Impact & Hypothesis Testing</h3>
-              </div>
-              <Badge variant="mono" size="xs">
-                Welch t-test & 95% CI
-              </Badge>
-            </div>
-            <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">
-              {impact_section.headline}
-            </p>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
-              {impact_section.content}
-            </div>
-
-            {impact_section.kpis && Object.keys(impact_section.kpis).length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                {Object.entries(impact_section.kpis)
-                  .filter(([_, v]) => typeof v === "number" || typeof v === "string")
-                  .slice(0, 4)
-                  .map(([k, v]) => (
-                    <div key={k} className="p-2.5 rounded-lg border border-rose-500/20 bg-card/60">
-                      <span className="text-[9px] uppercase font-mono text-muted-foreground truncate block">
-                        {k.replace(/_/g, " ")}
-                      </span>
-                      <p className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 truncate">
-                        {typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(v)}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {impact_section.disclaimers && impact_section.disclaimers.length > 0 && (
-              <div className="p-3 rounded-lg border border-rose-500/20 bg-rose-500/10 text-[11px] text-rose-600 dark:text-rose-400 space-y-1">
-                {impact_section.disclaimers.map((disc, idx) => (
-                  <p key={idx} className="italic leading-relaxed">
-                    {disc}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 4. Grounding & Evidence Inspector Toggle */}
-      <div className="p-4 rounded-xl border border-border bg-card/40 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-primary" />
-            <span>Grounded Evidence & Query Provenance</span>
-          </span>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setShowEvidence(!showEvidence)}
-          >
-            {showEvidence ? "Hide Evidence" : "Inspect Evidence"}
-          </Button>
-        </div>
-
-        {showEvidence && (
-          <div className="pt-2 space-y-2 text-xs">
-            <div className="p-3 rounded-lg bg-background/80 border border-border space-y-1 font-mono text-[11px]">
-              <span className="text-muted-foreground uppercase text-[10px] block">
-                Executed SQL Queries:
-              </span>
-              {execution.analytical_result?.executed_queries?.length ? (
-                execution.analytical_result.executed_queries.map((q, idx) => (
-                  <pre key={idx} className="overflow-x-auto text-primary whitespace-pre-wrap">
-                    {q}
-                  </pre>
-                ))
-              ) : (
-                <span className="text-muted-foreground italic">No queries executed.</span>
-              )}
-            </div>
-
-            {execution.analytical_result?.faithfulness?.structured_claims?.length ? (
-              <div className="p-3 rounded-lg bg-background/80 border border-border space-y-1">
-                <span className="text-muted-foreground uppercase text-[10px] font-mono block">
-                  Critic Verified Claims:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
-                  {execution.analytical_result.faithfulness.structured_claims.map((claim) => (
-                    <div
-                      key={claim.claim_id}
-                      className="p-1.5 rounded border border-border/60 flex items-center gap-1.5 text-foreground/80"
-                    >
-                      {claim.verified ? (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                      ) : (
-                        <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                      )}
-                      <span className="truncate">{claim.statement}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </div>
+        return (
+          <Section
+            key={name}
+            name={name}
+            section={section}
+            headline={headline}
+            lead={lead}
+            order={i}
+            tiles={scoped}
+            groups={groups}
+            chart={lead ? chart : undefined}
+          />
+        );
+      })}
     </div>
   );
 }

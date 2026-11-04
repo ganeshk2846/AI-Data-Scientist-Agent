@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { messageFrom } from "@/lib/errors";
 
 type SupportedEngine = "sqlite" | "postgresql" | "mysql";
 
@@ -114,9 +115,9 @@ export function DatabaseConnectionForm({
         message: data.message || `Discovered ${data.table_count} tables. Connection verified.`,
       });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       setIsUploading(false);
-      setErrorMessage(err.message || "Database connection test failed.");
+      setErrorMessage(messageFrom(err, "Database connection test failed."));
     },
   });
 
@@ -159,27 +160,24 @@ export function DatabaseConnectionForm({
         onNavigateToPreparation(job.job_id);
       }
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       setIsUploading(false);
-      setErrorMessage(err.message || "Failed to establish database connection.");
+      setErrorMessage(messageFrom(err, "Failed to establish database connection."));
     },
   });
 
   return (
-    <div className="bg-card border border-border/80 rounded-2xl p-6 sm:p-8 max-w-xl mx-auto shadow-lg space-y-6">
+    <div className="bg-surface border border-[var(--border)] rounded-card p-6 sm:p-8 max-w-xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <div className="p-3 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-          <Database className="w-6 h-6" />
-        </div>
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <h2 className="text-title font-semibold tracking-tight text-text flex items-center gap-2">
             Connect Your Business Database
             <Badge variant="success" size="xs" className="font-mono">
               mode=ro
             </Badge>
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-label text-muted mt-1">
             Connect the database containing the business information you want to analyze. Strict read-only access is enforced on all queries.
           </p>
         </div>
@@ -187,17 +185,17 @@ export function DatabaseConnectionForm({
 
       {/* Engine Tabs */}
       <div className="space-y-2">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <label className="text-label font-semibold text-muted">
           Database Engine
         </label>
-        <div className="grid grid-cols-3 gap-2 p-1 bg-background/80 rounded-xl border border-border">
+        <div className="grid grid-cols-3 gap-2 p-1 bg-ground rounded-card border border-[var(--border)]">
           <button
             type="button"
             onClick={() => handleEngineChange("sqlite")}
-            className={`py-2 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`py-2 px-3 rounded-control text-label font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               selectedEngine === "sqlite"
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-[var(--primary)] text-[var(--primary-ink)]"
+                : "text-muted hover:text-text"
             }`}
           >
             <HardDrive className="w-3.5 h-3.5" />
@@ -206,10 +204,10 @@ export function DatabaseConnectionForm({
           <button
             type="button"
             onClick={() => handleEngineChange("postgresql")}
-            className={`py-2 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`py-2 px-3 rounded-control text-label font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               selectedEngine === "postgresql"
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-[var(--primary)] text-[var(--primary-ink)]"
+                : "text-muted hover:text-text"
             }`}
           >
             <Server className="w-3.5 h-3.5" />
@@ -218,10 +216,10 @@ export function DatabaseConnectionForm({
           <button
             type="button"
             onClick={() => handleEngineChange("mysql")}
-            className={`py-2 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`py-2 px-3 rounded-control text-label font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer ${
               selectedEngine === "mysql"
-                ? "bg-primary text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-[var(--primary)] text-[var(--primary-ink)]"
+                : "text-muted hover:text-text"
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -232,7 +230,7 @@ export function DatabaseConnectionForm({
 
       {/* Connection Name */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <label className="text-label font-semibold text-muted">
           Connection Name
         </label>
         <input
@@ -241,21 +239,21 @@ export function DatabaseConnectionForm({
           onChange={(e) => setConnectionName(e.target.value)}
           placeholder="e.g. Production Analytics"
           required
-          className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2.5 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)]"
         />
       </div>
 
       {/* SQLite Specific Controls */}
       {selectedEngine === "sqlite" && (
         <div className="space-y-4 pt-1">
-          <div className="flex gap-2 text-xs">
+          <div className="flex gap-2 text-label">
             <button
               type="button"
               onClick={() => setSqliteMode("managed")}
-              className={`flex-1 py-1.5 px-3 rounded-lg border text-center transition-colors cursor-pointer ${
+              className={`flex-1 py-1.5 px-3 rounded-control border text-center transition-colors cursor-pointer ${
                 sqliteMode === "managed"
-                  ? "bg-primary/10 border-primary text-primary font-medium"
-                  : "bg-background border-border text-muted-foreground"
+                  ? "bg-raised border-primary text-text font-medium"
+                  : "bg-ground border-[var(--border)] text-muted"
               }`}
             >
               Default Business DB (ecommerce.db)
@@ -263,10 +261,10 @@ export function DatabaseConnectionForm({
             <button
               type="button"
               onClick={() => setSqliteMode("upload")}
-              className={`flex-1 py-1.5 px-3 rounded-lg border text-center transition-colors cursor-pointer ${
+              className={`flex-1 py-1.5 px-3 rounded-control border text-center transition-colors cursor-pointer ${
                 sqliteMode === "upload"
-                  ? "bg-primary/10 border-primary text-primary font-medium"
-                  : "bg-background border-border text-muted-foreground"
+                  ? "bg-raised border-primary text-text font-medium"
+                  : "bg-ground border-[var(--border)] text-muted"
               }`}
             >
               Upload SQLite File
@@ -274,23 +272,23 @@ export function DatabaseConnectionForm({
           </div>
 
           {sqliteMode === "managed" ? (
-            <div className="p-3.5 rounded-xl bg-background/80 border border-border space-y-1.5 text-xs">
+            <div className="p-3.5 rounded-card bg-ground border border-[var(--border)] space-y-1.5 text-label">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">ecommerce.db</span>
+                <span className="font-semibold text-text">ecommerce.db</span>
                 <Badge variant="mono" size="xs">
                   46 Tables
                 </Badge>
               </div>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted text-micro">
                 Pre-configured e-commerce schema with 2.4M rows across orders, customers, products, inventory, payments, marketing and telemetry.
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-label font-semibold text-muted">
                 Upload SQLite Database (.db, .sqlite)
               </label>
-              <div className="border-2 border-dashed border-border rounded-xl p-5 text-center bg-background/50 hover:bg-background/80 transition-colors">
+              <div className="border-2 border-dashed border-[var(--border)] rounded-card p-5 text-center bg-ground hover:bg-ground transition-colors">
                 <input
                   type="file"
                   id="sqlite-file-input"
@@ -306,11 +304,11 @@ export function DatabaseConnectionForm({
                   htmlFor="sqlite-file-input"
                   className="cursor-pointer flex flex-col items-center gap-2"
                 >
-                  <Upload className="w-6 h-6 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">
+                  <Upload className="w-6 h-6 text-muted" />
+                  <span className="text-label font-medium text-text">
                     {uploadedFile ? uploadedFile.name : "Click to select SQLite file"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-micro text-muted">
                     Supports .db, .sqlite formats (Validated by SQLite format 3 magic header)
                   </span>
                 </label>
@@ -325,7 +323,7 @@ export function DatabaseConnectionForm({
         <div className="space-y-3.5 pt-1">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-label font-semibold text-muted">
                 Host
               </label>
               <input
@@ -334,11 +332,11 @@ export function DatabaseConnectionForm({
                 onChange={(e) => setHost(e.target.value)}
                 placeholder="localhost or db.company.com"
                 required
-                className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)]"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-label font-semibold text-muted">
                 Port
               </label>
               <input
@@ -346,13 +344,13 @@ export function DatabaseConnectionForm({
                 value={port}
                 onChange={(e) => setPort(Number(e.target.value))}
                 required
-                className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
+                className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)] font-mono"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label className="text-label font-semibold text-muted">
               Database Name
             </label>
             <input
@@ -361,13 +359,13 @@ export function DatabaseConnectionForm({
               onChange={(e) => setDatabaseName(e.target.value)}
               placeholder="e.g. analytics_warehouse"
               required
-              className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)]"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-label font-semibold text-muted">
                 Username
               </label>
               <input
@@ -376,11 +374,11 @@ export function DatabaseConnectionForm({
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="readonly_user"
                 required
-                className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)]"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-label font-semibold text-muted">
                 Password
               </label>
               <input
@@ -388,7 +386,7 @@ export function DatabaseConnectionForm({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full bg-ground border border-[var(--border)] rounded-card px-3.5 py-2 text-body text-text focus:outline-none focus:ring-2 focus:ring-[var(--control)]"
               />
             </div>
           </div>
@@ -399,9 +397,9 @@ export function DatabaseConnectionForm({
               id="ssl-checkbox"
               checked={ssl}
               onChange={(e) => setSsl(e.target.checked)}
-              className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
+              className="w-4 h-4 rounded text-text focus:ring-primary cursor-pointer"
             />
-            <label htmlFor="ssl-checkbox" className="text-xs text-muted-foreground cursor-pointer">
+            <label htmlFor="ssl-checkbox" className="text-label text-muted cursor-pointer">
               Enable SSL / TLS encryption
             </label>
           </div>
@@ -409,14 +407,14 @@ export function DatabaseConnectionForm({
       )}
 
       {/* Safety Notice */}
-      <div className="flex items-center gap-2 p-3 rounded-xl bg-success/5 border border-success/20 text-xs text-muted-foreground">
-        <ShieldCheck className="w-4 h-4 text-success shrink-0" />
+      <div className="flex items-center gap-2 p-3 rounded-card bg-pill-positive-bg border border-[var(--border)] text-label text-muted">
+        <ShieldCheck className="w-4 h-4 text-positive shrink-0" />
         <span>Strict read-only access (mode=ro, PRAGMA query_only=ON). Credentials encrypted on backend.</span>
       </div>
 
       {/* Test Result Feedback */}
       {testResult && (
-        <div className="p-3.5 rounded-xl bg-success/10 border border-success/30 flex items-start gap-2.5 text-success text-xs">
+        <div className="p-3.5 rounded-card bg-pill-positive-bg border border-[var(--border)] flex items-start gap-2.5 text-positive text-label">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <span className="font-semibold block">Connection Successful</span>
@@ -427,7 +425,7 @@ export function DatabaseConnectionForm({
 
       {/* Error Message Feedback */}
       {errorMessage && (
-        <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 flex items-start gap-2.5 text-destructive text-xs">
+        <div className="p-3.5 rounded-card bg-pill-negative-bg border border-[var(--border)] flex items-start gap-2.5 text-negative text-label">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <span className="font-semibold block">Connection Failed</span>

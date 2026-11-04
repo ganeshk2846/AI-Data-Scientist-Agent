@@ -9,9 +9,9 @@ export default function ConnectDatabasePage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-ground">
       <Header />
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+      <main className="mx-auto flex w-full max-w-[1200px] flex-1 items-start justify-center px-4 py-10 sm:px-6">
         <DatabaseConnectionForm
           onSuccess={(job) => {
             router.push(`/setup/preparing?jobId=${job.job_id}`);

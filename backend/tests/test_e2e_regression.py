@@ -12,6 +12,7 @@ Validates the complete application lifecycle:
 import pytest
 from starlette.testclient import TestClient
 from backend.app.main import app
+from backend.tests.db_facts import EXPECTED_TABLE_COUNT, EXPECTED_TOTAL_ROWS
 
 
 @pytest.fixture(scope="module")
@@ -28,8 +29,8 @@ def test_e2e_readiness_and_database_isolation(e2e_client):
     assert data["ready"] is True
     assert data["database"]["connected"] is True
     assert data["database"]["read_only_verified"] is True
-    assert data["database"]["table_count"] == 30
-    assert data["database"]["total_rows"] == 334503
+    assert data["database"]["table_count"] == EXPECTED_TABLE_COUNT
+    assert data["database"]["total_rows"] == EXPECTED_TOTAL_ROWS
 
 
 def test_e2e_schema_catalog_and_inspection(e2e_client):
@@ -43,7 +44,7 @@ def test_e2e_schema_catalog_and_inspection(e2e_client):
     t_res = e2e_client.get("/api/v1/schema/tables")
     assert t_res.status_code == 200
     tables = t_res.json()["data"]
-    assert len(tables) == 30
+    assert len(tables) == EXPECTED_TABLE_COUNT
     assert any(t["name"] == "orders" for t in tables)
 
     # Table profile detail

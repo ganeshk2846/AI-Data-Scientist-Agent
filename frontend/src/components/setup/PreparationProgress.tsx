@@ -45,7 +45,6 @@ export function PreparationProgress({
   const [activeJobId, setActiveJobId] = useState<string | null>(initialJobId || null);
   const [startTime] = useState<number>(Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  const hasNotifiedRef = React.useRef(false);
 
   // Timer ticker
   useEffect(() => {
@@ -109,8 +108,7 @@ export function PreparationProgress({
 
   // Automatically notify parent when completed
   useEffect(() => {
-    if (isSucceeded && onComplete && !hasNotifiedRef.current) {
-      hasNotifiedRef.current = true;
+    if (isSucceeded && onComplete) {
       const timer = setTimeout(() => {
         onComplete();
       }, 1500);
@@ -122,7 +120,7 @@ export function PreparationProgress({
   const percent = currentJob?.progress_percent ?? (isSucceeded ? 100 : 15);
 
   return (
-    <div className="bg-card border border-border/80 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto shadow-lg space-y-6">
+    <div className="bg-surface border border-[var(--border)] rounded-card p-6 sm:p-8 max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="space-y-1.5 text-center sm:text-left">
         <div className="flex items-center gap-2 justify-center sm:justify-start">
@@ -135,60 +133,60 @@ export function PreparationProgress({
             </Badge>
           )}
           {isRunning && (
-            <Badge variant="mono" size="xs" className="text-primary border-primary/30">
+            <Badge variant="mono" size="xs" className="text-text border-[var(--control)]">
               <RefreshCw className="w-3 h-3 animate-spin mr-1" />
               RUNNING
             </Badge>
           )}
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">
+        <h2 className="text-title font-semibold tracking-tight text-text">
           Preparing Your Database for AI Analysis
         </h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-label text-muted">
           Your database is connected. We are discovering its structure, computing profiling metrics, and building high-performance retrieval indexes.
         </p>
       </div>
 
       {/* Progress Bar & Key Metrics */}
-      <div className="space-y-3 bg-background/60 p-4 rounded-xl border border-border/60">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-foreground">
+      <div className="space-y-3 bg-ground p-4 rounded-card border border-[var(--border)]">
+        <div className="flex items-center justify-between text-label">
+          <span className="font-medium text-text">
             {currentJob?.message || "Running preparation..."}
           </span>
-          <span className="font-mono font-bold text-primary">{percent}%</span>
+          <span className="font-mono font-semibold text-text">{percent}%</span>
         </div>
 
         {/* Progress Bar */}
         <div className="w-full bg-border/40 rounded-full h-2 overflow-hidden">
           <div
-            className={`h-full transition-all duration-500 rounded-full ${
+            className={`h-full transition-colors duration-500 rounded-full ${
               isFailed
-                ? "bg-destructive"
+                ? "bg-negative"
                 : isSucceeded
-                ? "bg-success"
-                : "bg-primary"
+                ? "bg-positive"
+                : "bg-[var(--primary)]"
             }`}
             style={{ width: `${Math.min(100, Math.max(5, percent))}%` }}
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-xs pt-1">
-          <div className="p-2 rounded-lg bg-card/80 border border-border/50 text-center">
-            <span className="text-[10px] text-muted-foreground block">TABLES PROCESSED</span>
-            <span className="font-mono font-semibold text-foreground">
+        <div className="grid grid-cols-3 gap-2 text-label pt-1">
+          <div className="p-2 rounded-control bg-surface border border-[var(--border)] text-center">
+            <span className="text-micro text-muted block">Tables processed</span>
+            <span className="font-mono font-semibold text-text">
               {currentJob?.tables_processed || 0} / {currentJob?.total_tables || "--"}
             </span>
           </div>
-          <div className="p-2 rounded-lg bg-card/80 border border-border/50 text-center">
-            <span className="text-[10px] text-muted-foreground block">ELAPSED TIME</span>
-            <span className="font-mono font-semibold text-foreground">
+          <div className="p-2 rounded-control bg-surface border border-[var(--border)] text-center">
+            <span className="text-micro text-muted block">Elapsed time</span>
+            <span className="font-mono font-semibold text-text">
               {elapsedSeconds}s
             </span>
           </div>
-          <div className="p-2 rounded-lg bg-card/80 border border-border/50 text-center">
-            <span className="text-[10px] text-muted-foreground block">STATUS</span>
-            <span className={`font-mono font-semibold uppercase ${
-              isSucceeded ? "text-success" : isFailed ? "text-destructive" : "text-primary"
+          <div className="p-2 rounded-control bg-surface border border-[var(--border)] text-center">
+            <span className="text-micro text-muted block">Status</span>
+            <span className={`font-mono font-semibold ${
+              isSucceeded ? "text-positive" : isFailed ? "text-negative" : "text-text"
             }`}>
               {currentJob?.status || "Running"}
             </span>
@@ -198,7 +196,7 @@ export function PreparationProgress({
 
       {/* 7-Stage Detailed Stepper */}
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className="text-label font-semibold text-muted">
           Preparation Stages
         </h3>
 
@@ -211,26 +209,26 @@ export function PreparationProgress({
             return (
               <div
                 key={def.id}
-                className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
+                className={`p-3 rounded-card border flex items-center justify-between text-label transition-colors ${
                   status === "completed"
-                    ? "bg-success/5 border-success/30"
+                    ? "bg-pill-positive-bg border-[var(--border)]"
                     : status === "running"
-                    ? "bg-primary/5 border-primary/40 shadow-sm"
+                    ? "bg-raised border-[var(--control)]"
                     : status === "failed"
-                    ? "bg-destructive/10 border-destructive/40"
-                    : "bg-background/40 border-border/50 opacity-60"
+                    ? "bg-pill-negative-bg border-[var(--border)]"
+                    : "bg-ground border-[var(--border)] opacity-60"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`w-7 h-7 rounded-control flex items-center justify-center shrink-0 ${
                       status === "completed"
-                        ? "bg-success/20 text-success"
+                        ? "bg-pill-positive-bg text-positive"
                         : status === "running"
-                        ? "bg-primary/20 text-primary animate-pulse"
+                        ? "bg-raised text-text"
                         : status === "failed"
-                        ? "bg-destructive/20 text-destructive"
-                        : "bg-muted text-muted-foreground"
+                        ? "bg-pill-negative-bg text-negative"
+                        : "bg-raised text-muted"
                     }`}
                   >
                     {status === "completed" ? (
@@ -245,20 +243,20 @@ export function PreparationProgress({
                   </div>
 
                   <div>
-                    <span className="font-semibold text-foreground block">
+                    <span className="font-semibold text-text block">
                       Stage {def.id}: {def.name}
                     </span>
                     {stageInfo?.details && (
-                      <span className="text-[11px] text-muted-foreground block truncate max-w-sm">
+                      <span className="text-micro text-muted block truncate max-w-sm">
                         {stageInfo.details}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 font-mono text-[11px]">
+                <div className="flex items-center gap-2 font-mono text-micro">
                   {stageInfo?.elapsed_ms !== undefined && stageInfo.elapsed_ms !== null && (
-                    <span className="text-muted-foreground">
+                    <span className="text-muted">
                       {stageInfo.elapsed_ms.toFixed(1)}ms
                     </span>
                   )}
@@ -286,8 +284,8 @@ export function PreparationProgress({
 
       {/* Failure Notification & Retry */}
       {isFailed && (
-        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30 space-y-3">
-          <div className="flex items-start gap-2 text-destructive text-xs">
+        <div className="p-4 rounded-card bg-pill-negative-bg border border-[var(--border)] space-y-3">
+          <div className="flex items-start gap-2 text-negative text-label">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <span className="font-semibold block">Preparation Stopped</span>

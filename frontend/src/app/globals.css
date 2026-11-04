@@ -2,71 +2,1071 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Geist, self-hosted from the `geist` package under its real family name.
+   Only the weights the interface actually uses are shipped. */
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* Instrument Serif (SIL Open Font License 1.1), self-hosted. The display voice:
+   one face, one weight, used only where the product speaks rather than
+   reports. Interface type stays Geist. */
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/InstrumentSerif-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/InstrumentSerif-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===========================================================================
+   Tokens — see frontend/DESIGN.md
+
+   Warm near-black ground, champagne gold as the one accent,
+   sage/terracotta polarity.
+   NOTHING in this file sits in the banned hue band (purple, violet, indigo,
+   magenta, pink: hue 248-352 at any meaningful saturation). Verified by
+   scripts in the report; re-run the hue audit after any change here.
+
+   Every colour that carries text clears 4.5:1 on the darkest surface it can
+   land on. Every polarity and series pair is validated with
+   dataviz/scripts/validate_palette.js in BOTH modes. Do not hand-edit.
+   =========================================================================== */
+
 :root {
-  --background: #090d16;
-  --foreground: #f1f5f9;
+  color-scheme: light;
+
+  /* Three tonal planes, warm. The page recedes, panels sit forward,
+     floating surfaces sit above both. */
+  --ground: #faf8f4;
+  --surface: #ffffff;
+  --raised: #f2efe8;
+  --active: #eae5dc;
+  --sunken: #efebe3;
+  --border: #e3ded3;
+  --rule: #eeeae1;
+  --control: #cdc6b8;
+
+  /* ink — measured on #f3f1ed, the darkest surface any of it lands on */
+  --text: #1a1713;
+  --muted: #615a50; /* 5.93:1 on raised */
+  --faint: #6d665b; /* 4.95:1 on raised */
+
+  /* the one accent: active nav, focus, links, selected, live, key marker */
+  --accent: #7a5c12; /* champagne gold, deepened for light: 6.24:1 white, 5.53:1 raised */
+  --accent-ink: #ffffff;
+  --accent-soft: #f5edd9;
+  --accent-edge: #dcc894;
+
+  --primary: #1a1713;
+  --primary-ink: #faf8f4;
+
+  /* polarity — sage / terracotta. CVD dE 8.1, normal 19.5 */
+  --positive: #417751; /* 5.27:1 white, 4.67:1 raised */
+  --negative: #8a3320; /* 8.16:1 white, 7.23:1 raised */
+  --warning: #8a5a00;
+
+  --pill-positive-bg: #e4efe6;
+  --pill-positive-ink: #24452f;
+  --pill-negative-bg: #f7e7e2;
+  --pill-negative-ink: #6b2718;
+  --pill-warning-bg: #f7efdd;
+  --pill-warning-ink: #6b4600;
+  --pill-neutral-bg: #efece7;
+  --pill-neutral-ink: #4a443d;
+  --pill-accent-bg: #f5edd9;
+  --pill-accent-ink: #5c470f;
+  /* a quieter gold for supporting marks, hairlines and chart furniture */
+  --gold-muted: #8a6a2a;
+  --gold-hairline: #d8c79b;
+  /* a lone series takes the accent itself: with one mark there is no
+     adjacency to separate, so the band does not bind and the drama wins */
+  --chart-primary: #9a7b1e;
+
+  /* chart series — light: worst adjacent CVD dE 19.1, normal 19.6.
+     Slot 1 is the accent's hue family, so the main data element and the
+     interface accent read as one decision. */
+  --series-1: #9a7b1e;
+  --series-2: #1d5fbf;
+  --series-3: #8c2f10;
+  --series-4: #0b6ea8;
+  --series-other: #8a847a;
+
+  --grid: #e7e2d8;
+  --chart-ink: #1a1713;
+  --chart-comparison: #a49d93;
+
+  /* elevation: offset and blur, warm-tinted. Never a glow. */
+  --shadow-raised: 0 1px 2px rgba(26, 24, 20, 0.04), 0 2px 6px rgba(26, 24, 20, 0.05);
+  --shadow-float: 0 2px 6px rgba(26, 24, 20, 0.06), 0 12px 28px rgba(26, 24, 20, 0.1);
+  --shadow-lift: 0 4px 10px rgba(26, 24, 20, 0.07), 0 18px 40px rgba(26, 24, 20, 0.12);
+
+  /* geometry */
+  --radius-card: 10px;
+  --radius-control: 7px;
+  --radius-chip: 5px;
+  --gap: 12px;
+  --card-pad: 24px;
+  --pad: 32px;
+  --rail-width: 64px;
+  --canvas-max: 1320px;
+  --thread-max: 900px;
+  --prose-measure: 34rem;
+  --row-height: 48px;
+  --control-height: 40px;
+
+  /* material: the implied light source is top-left, so a raised surface
+     catches it on its top edge and casts beneath. The grain is one inline
+     turbulence, 180px tiled; the foil is the accent with a specular band. */
+  --edge-light: rgba(255, 255, 255, 0.9);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  --grain-opacity: 0.035;
+  --selection: rgba(220, 200, 148, 0.45);
+  --gold-foil: linear-gradient(104deg, #8a6a2a 0%, #7a5c12 34%, #8d6f1c 52%, #7a5c12 70%, #6a4f0e 100%); /* taste-skill-ignore: gold is foil here, not a swatch: the brief asks for a gradient with a specular band, and every stop is contrast-measured */
+  --hero-wash: rgba(122, 92, 18, 0.07);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
+/* Dark is SELECTED, not inverted: a warm charcoal ramp that elevates by
+   lightening. No navy, no slate, and never #000. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ground: #0f0e0c;
+  --surface: #191714;
+  --raised: #221f1b;
+  --active: #2b2724;
+  --sunken: #141211;
+  --border: #2e2a25;
+  --rule: #221f1a;
+  --control: #4c463c;
+
+  --text: #f7f4ee;
+  --muted: #b8b0a4;
+  --faint: #9c948a;
+
+  --accent: #e3c178; /* champagne gold: 10.26:1 on surface, 9.29:1 on raised */
+  --accent-ink: #1a1408;
+  --accent-soft: #2a2113;
+  --accent-edge: #574a2c;
+
+  --primary: #f7f4ee;
+  --primary-ink: #1a1713;
+
+  /* polarity — dark pair: CVD dE 14.3, 10.85:1 / 6.18:1 */
+  --positive: #a4d6b6;
+  --negative: #e0957a;
+  --warning: #e0b057;
+
+  --pill-positive-bg: #1b2c21;
+  --pill-positive-ink: #a4d6b6;
+  --pill-negative-bg: #2e1d17;
+  --pill-negative-ink: #e9a186;
+  --pill-warning-bg: #2a2113;
+  --pill-warning-ink: #e0b057;
+  --pill-neutral-bg: #2b2826;
+  --pill-neutral-ink: #b5ada2;
+  --pill-accent-bg: #2a2113;
+  --pill-accent-ink: #e3c178;
+  --gold-muted: #a88449;
+  --gold-hairline: #4a3d22;
+  --chart-primary: #e3c178;
+
+  /* chart series — dark: worst adjacent CVD dE 12.8, normal 20.1 */
+  --series-1: #ab8830;
+  --series-2: #3f86e0;
+  --series-3: #b8732f;
+  --series-4: #4a90d8;
+  --series-other: #8a847a;
+
+  --grid: #2b2724;
+  --chart-ink: #e8e3da;
+  --chart-comparison: #7d766b;
+
+  --edge-light: rgba(255, 249, 237, 0.07);
+  --grain-opacity: 0.055;
+  --selection: rgba(227, 193, 120, 0.3);
+  --gold-foil: linear-gradient(104deg, #a88449 0%, #e3c178 32%, #f6e3b4 50%, #e3c178 68%, #a88449 100%); /* taste-skill-ignore: gold is foil here, not a swatch: the brief asks for a gradient with a specular band, and every stop is contrast-measured */
+  --hero-wash: rgba(227, 193, 120, 0.09);
+
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.26);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.4), 0 14px 32px rgba(0, 0, 0, 0.42);
+  --shadow-lift: 0 4px 12px rgba(0, 0, 0, 0.45), 0 20px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* Custom Sleek Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--text);
+    caret-color: var(--accent);
+    font-feature-settings: "cv11";
+    min-height: 100vh;
+  }
+
+  /* The focus ring is the accent, so the one colour that marks "here" is the
+     same colour everywhere it appears. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* The parts we did not draw still carry the design. */
+  ::selection {
+    background: var(--selection);
+    color: var(--text);
+  }
+
+  /* One scrollbar for the whole product, in the ramp, warming to gold under
+     the pointer. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--control) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--control);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--gold-muted);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* The ground is a material, not a hex value: one tiled turbulence over the
+     whole page, fixed, never animated, never in the way. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: var(--grain);
+    background-size: 180px 180px;
+  }
+
+  .num {
+    font-family: "Geist Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* A display figure stands alone, so it takes the text face with tabular
+     figures: it still aligns digit for digit while a counting animation runs,
+     but the thousands separator is set proportionally. */
+  .num-display {
+    font-family: "Geist", Inter, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+@layer components {
+  /* --- planes ----------------------------------------------------------- */
+  .plane-base {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+  .plane-raised {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      var(--shadow-raised);
+  }
+  .plane-float {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      var(--shadow-float);
+  }
+
+  /* --- material --------------------------------------------------------- */
+
+  /* A film of noise over a surface, so the ground reads as paper or anodised
+     metal rather than as a hex value. One inline SVG turbulence, no request,
+     no animation, no cost after the first paint. */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: var(--grain);
+    background-size: 180px 180px;
+  }
+
+  /* Gold as foil catching light: a gradient across the glyphs with a specular
+     band, not a flat swatch. Both stops clear 4.5:1 on the surfaces this is
+     used on, and the fallback colour is the accent itself, so a browser
+     without background-clip still renders legible gold. */
+  .gold-foil {
+    color: var(--accent);
+  }
+  @supports (background-clip: text) or (-webkit-background-clip: text) { /* taste-skill-ignore: feature test for the foil, not a gradient of its own */
+    .gold-foil {
+      background-image: var(--gold-foil);
+      -webkit-background-clip: text; /* taste-skill-ignore: gold foil on the glyphs; the solid accent is the fallback and forced colours override it */
+      background-clip: text; /* taste-skill-ignore: gold foil on the glyphs; the solid accent is the fallback and forced colours override it */
+      color: transparent;
+      /* The gradient is the ink; a transparent colour needs the real one for
+         forced-colours and selection. */
+      -webkit-text-fill-color: transparent;
+    }
+    @media (forced-colors: active) {
+      .gold-foil {
+        background-image: none;
+        color: CanvasText;
+        -webkit-text-fill-color: CanvasText;
+      }
+    }
+  }
+
+  /* One implied light source, top-left: a highlight on the top edge of a
+     raised surface, shadow beneath it. This is what makes a surface read as
+     rendered rather than drawn. */
+  .lit {
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      var(--shadow-raised);
+  }
+  .lit-float {
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      var(--shadow-float);
+  }
+
+  /* --- micro-interactions ------------------------------------------------ */
+  /* Nothing is inert under the cursor. Every response starts inside 100ms and
+     is transform, colour or shadow only — never a layout property. */
+
+  /* A surface that answers the pointer: it lifts a pixel, its edge warms to
+     gold, and the light under it deepens. */
+  .responds {
+    transition:
+      transform 120ms var(--ease-out),
+      border-color 100ms var(--ease-out),
+      box-shadow 160ms var(--ease-out),
+      background-color 100ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .responds:hover {
+      border-color: var(--accent-edge);
+      box-shadow:
+        inset 0 1px 0 var(--edge-light),
+        var(--shadow-lift);
+      transform: translateY(-1px);
+    }
+  }
+  .responds:active {
+    transform: translateY(0) scale(0.995);
+  }
+
+  /* A row in a list or a table: the quietest version of the same gesture. */
+  .row-responds {
+    transition:
+      background-color 90ms var(--ease-out),
+      color 90ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .row-responds:hover {
+      background: var(--raised);
+    }
+  }
+
+  /* A link: gold, with the underline set off the baseline. */
+  .link-gold {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: var(--gold-hairline);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 100ms var(--ease-out);
+  }
+  .link-gold:hover {
+    text-decoration-color: var(--accent);
+  }
+
+  /* A small caps label: the one place tracking opens up. */
+  .label-caps {
+    font-size: 12px;
+    line-height: 1.1;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* --- the hero --------------------------------------------------------- */
+
+  .hero-shell {
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius-card) * 1.6);
+    background:
+      radial-gradient(120% 120% at 85% 0%, var(--hero-wash), transparent 62%), /* taste-skill-ignore: light falling across the hero from the one implied source; there is no flat-colour equivalent */
+      var(--surface);
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      var(--shadow-float);
+  }
+
+  /* The plane resolves as the field lands: the line traces left to right, the
+     wash under it fades up, then the labels arrive on their own points. */
+  .hero-trace {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: hero-trace 1500ms var(--ease-out) 350ms forwards;
+  }
+  @keyframes hero-trace {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .hero-area {
+    opacity: 0;
+    animation: hero-fade 900ms var(--ease-out) 1100ms forwards;
+  }
+  @keyframes hero-fade {
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* The labels arrive on their own points. Opacity only: each one carries its
+     own translate utilities to sit on its point, and an animation that touched
+     transform would fight them off it. */
+  .hero-label {
+    opacity: 0;
+    animation: hero-fade 520ms var(--ease-out) both;
+  }
+
+  .hero-readout circle {
+    animation: hero-fade 160ms var(--ease-out) both;
+  }
+
+  /* --- the opening sequence --------------------------------------------- */
+
+  .intro-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    overflow: hidden;
+    background:
+      radial-gradient(90% 70% at 50% 46%, var(--hero-wash), transparent 70%), /* taste-skill-ignore: the same light over the opening sequence */
+      var(--ground);
+    opacity: 1;
+    transition:
+      opacity 520ms var(--ease-out),
+      transform 620ms var(--ease-out);
+  }
+  .intro-overlay[data-leaving="true"] {
+    opacity: 0;
+    transform: scale(1.035);
+    pointer-events: none;
+  }
+
+  .intro-field {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .intro-stage {
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    z-index: 10;
+    translate: 0 -58%;
+    text-align: center;
+    padding-inline: 1.5rem;
+  }
+
+  .intro-wordmark {
+    position: relative;
+    display: inline-block;
+    font-size: clamp(3.25rem, 11vw, 7.5rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  /* Letter by letter, each one rising into place. */
+  .intro-letter {
+    display: inline-block;
+    white-space: pre;
+    opacity: 0;
+    animation: intro-letter 620ms var(--ease-out) both;
+  }
+  @keyframes intro-letter {
+    from {
+      opacity: 0;
+      transform: translateY(0.14em);
+      filter: blur(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+
+  /* The signature moment: gold sweeping across the wordmark, like light
+     crossing foil. A masked band travelling over the glyphs — transform only,
+     and it runs once. */
+  .intro-sweep {
+    position: absolute;
+    inset: 0;
+    white-space: pre;
+    pointer-events: none;
+    color: transparent;
+    background-image: linear-gradient( /* taste-skill-ignore: the gold sweep across the wordmark, the brief's signature moment */
+      104deg,
+      transparent 38%,
+      var(--gold-muted) 46%,
+      var(--accent) 50%,
+      var(--gold-muted) 54%,
+      transparent 62%
+    );
+    background-size: 320% 100%;
+    background-position: 130% 0;
+    /* Moving light across glyphs is a paint every frame and has no
+       composite-only equivalent. The layer is promoted for the single run it
+       has, on an element that exists only while the overlay does. */
+    will-change: background-position, opacity;
+    -webkit-background-clip: text; /* taste-skill-ignore: gold foil on the glyphs; the solid accent is the fallback and forced colours override it */
+    background-clip: text; /* taste-skill-ignore: gold foil on the glyphs; the solid accent is the fallback and forced colours override it */
+    opacity: 0;
+    animation: intro-sweep 1200ms var(--ease-out) 620ms both;
+  }
+  @keyframes intro-sweep {
+    0% {
+      opacity: 0;
+      background-position: 130% 0;
+    }
+    18% {
+      opacity: 1;
+    }
+    82% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      background-position: -40% 0;
+    }
+  }
+
+  .intro-line {
+    margin-top: 1.5rem;
+    font-size: clamp(0.875rem, 1.4vw, 1.0625rem);
+    letter-spacing: 0.01em;
+    color: var(--muted);
+    opacity: 0;
+    animation: hero-fade 620ms var(--ease-out) 980ms both;
+  }
+
+  .intro-rule {
+    position: absolute;
+    left: 50%;
+    top: 68%;
+    z-index: 5;
+    height: 1px;
+    width: min(42rem, 76vw);
+    translate: -50% 0;
+    opacity: 0;
+    animation: hero-fade 700ms var(--ease-out) 1180ms both;
+  }
+
+  .intro-skip {
+    position: absolute;
+    inset-inline: 0;
+    /* Clear of the phone's bottom bar, which sits under this overlay. */
+    bottom: 6rem;
+    z-index: 10;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    opacity: 0;
+    animation: hero-fade 500ms var(--ease-out) 1500ms both;
+  }
+
+  /* The app arrives behind the overlay as it lifts, in reading order. */
+  [data-intro="done"] nav[aria-label="Sections"] {
+    animation: intro-arrive 520ms var(--ease-out) 60ms both;
+  }
+  [data-intro="done"] header {
+    animation: intro-arrive 520ms var(--ease-out) 140ms both;
+  }
+  [data-intro="done"] main > * {
+    animation: intro-arrive 620ms var(--ease-out) 220ms both;
+  }
+  @keyframes intro-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* --- the shell -------------------------------------------------------- */
+
+  /* Keyboard route past the rail, visible only when it has focus. */
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 60;
+    transform: translateY(-200%);
+    border-radius: var(--radius-control);
+    border: 1px solid var(--accent-edge);
+    background: var(--surface);
+    padding: 0.5rem 0.875rem;
+    font-size: 12px;
+    color: var(--text);
+    transition: transform 160ms var(--ease-out);
+  }
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
+
+  /* A rail item: 40px of ink on a 44px pitch, with its own tooltip. The
+     warming to gold on hover is the same gesture everything else in the
+     product makes under the cursor. */
+  .rail-item {
+    position: relative;
+    display: flex;
+    height: 40px;
+    width: 40px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-control);
+    color: var(--muted);
+    transition:
+      color 90ms var(--ease-out),
+      background-color 90ms var(--ease-out),
+      transform 140ms var(--ease-out);
+  }
+  .rail-item.is-active {
+    color: var(--accent);
+  }
+  .rail-mark {
+    color: var(--text);
+  }
+  .rail-item:active {
+    transform: scale(0.94);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .rail-item:hover {
+      background: var(--raised);
+      color: var(--accent);
+    }
+    /* The tooltip is a convenience, never the accessible name — every rail
+       item carries an aria-label of its own. */
+    .rail-item[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      translate: 0 -50%;
+      z-index: 50;
+      white-space: nowrap;
+      border-radius: var(--radius-chip);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow-float);
+      padding: 4px 8px;
+      font-size: 11px;
+      line-height: 1;
+      color: var(--text);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-4px);
+      transition:
+        opacity 120ms var(--ease-out),
+        transform 120ms var(--ease-out);
+    }
+    .rail-item[data-tooltip]:hover::after {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Where the reader is: a 2px gold rule on the rail's edge. */
+  .rail-active-rule {
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    height: 20px;
+    width: 2px;
+    translate: 0 -50%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--gold-muted), var(--accent), var(--gold-muted)); /* taste-skill-ignore: the active rail rule, lit along its length by the same source */
+  }
+
+  /* A hairline that fades at both ends, so a rule stops rather than being cut. */
+  .rule-fade {
+    background: linear-gradient(90deg, transparent, var(--gold-hairline) 22%, var(--gold-hairline) 78%, transparent); /* taste-skill-ignore: a hairline that fades at both ends rather than being cut, as the brief asks */
+  }
+  .rule-fade-v {
+    background: linear-gradient(180deg, transparent, var(--gold-hairline) 22%, var(--gold-hairline) 78%, transparent); /* taste-skill-ignore: the same hairline, vertical */
+  }
+
+  /* --- pointer-tracked tilt --------------------------------------------- */
+  /* The highlight follows the pointer across the card; the tilt is a couple
+     of degrees. Both read as a surface under a light, not as a toy. */
+  .tilt {
+    transform-style: preserve-3d;
+    transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
+    will-change: transform;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tilt:hover {
+      box-shadow: var(--shadow-lift);
+    }
+    .tilt-sheen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 220ms var(--ease-out);
+      /* A pointer-tracked highlight is light falling off from a point; there
+         is no flat-colour equivalent. Requested in the brief ("pointer-tracked
+         tilt and highlight ... glass under a light"), kept under 12% alpha,
+         hover only, fine pointers only. */
+      background: radial-gradient( /* taste-skill-ignore */
+        18rem circle at var(--px, 50%) var(--py, 0%),
+        color-mix(in srgb, var(--accent) 12%, transparent),
+        transparent 70%
+      );
+    }
+    .tilt:hover .tilt-sheen::after,
+    .tilt-sheen:hover::after {
+      opacity: 1;
+    }
+  }
+
+  /* A specular highlight that tracks the pointer: light falling across the
+     face of the material, not a glow behind it. */
+  @media (hover: hover) and (pointer: fine) {
+    .specular::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 240ms var(--ease-out);
+      background: radial-gradient( /* taste-skill-ignore */
+        22rem circle at var(--px, 50%) var(--py, 0%),
+        color-mix(in srgb, var(--accent) 22%, transparent),
+        transparent 62%
+      );
+      mix-blend-mode: plus-lighter;
+    }
+    .specular:hover::before {
+      opacity: 1;
+    }
+  }
+
+  /* The one hairline that matters: a gold rule under a lead figure. */
+  .rule-gold {
+    border-color: var(--gold-hairline);
+  }
+
+  /* A panel opening rotates about its top edge, so it reads as a surface
+     hinging towards the reader rather than a box appearing. */
+  .flip-open {
+    animation: flip-open 420ms var(--ease-out) both;
+    transform-origin: top center;
+    backface-visibility: hidden;
+  }
+  @keyframes flip-open {
+    from {
+      opacity: 0;
+      transform: perspective(1200px) rotateX(-7deg) translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: perspective(1200px) rotateX(0deg) translateY(0);
+    }
+  }
+
+  /* --- scrollbars ------------------------------------------------------- */
+  .scroll-quiet {
+    scrollbar-width: thin;
+    scrollbar-color: var(--control) transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-quiet::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background: var(--control);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  /* --- disclosure ------------------------------------------------------- */
+  .disclosure {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 260ms var(--ease-out);
+  }
+  .disclosure[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  .disclosure > * {
+    overflow: hidden;
+  }
+
+  /* --- the answer assembling ------------------------------------------- */
+  /* Sections arrive in reading order, staggered. Transform and opacity only;
+     the delay is set per element so nothing is hidden if script fails. */
+  .arrive {
+    animation: arrive 420ms var(--ease-out) both;
+  }
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .step-in {
+    animation: arrive 260ms var(--ease-out) both;
+  }
+
+  /* A chart wipes in from the left, so a line appears to trace. */
+  .chart-draw {
+    animation: chart-draw 760ms var(--ease-out) both;
+  }
+  @keyframes chart-draw {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  /* Bars rise from the baseline rather than wiping sideways. */
+  .chart-rise .barlayer,
+  .chart-rise .bars {
+    animation: chart-rise 620ms var(--ease-out) both;
+    transform-origin: center bottom;
+  }
+  @keyframes chart-rise {
+    from {
+      transform: scaleY(0.02);
+      opacity: 0.4;
+    }
+    to {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  /* The live indicator during streaming: the accent, breathing. */
+  .pulse-dot {
+    animation: pulse-dot 1.6s var(--ease-in-out) infinite;
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.4;
+      transform: scale(0.82);
+    }
+  }
+
+  .pulse-ring::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    animation: pulse-ring 1.8s var(--ease-out) infinite;
+  }
+  @keyframes pulse-ring {
+    0% {
+      opacity: 0.55;
+      transform: scale(0.75);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.7);
+    }
+  }
+
+  /* A slide enters from the side the reader is travelling towards. */
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--slide-from, 28px));
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* --- skeletons: shaped like what loads, never a spinner --------------- */
+  .skeleton {
+    background: var(--raised);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--active);
+    opacity: 0;
+    animation: skeleton-breathe 1.6s var(--ease-in-out) infinite;
+  }
+  @keyframes skeleton-breathe {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.8);
-  border-radius: 9999px;
+/* Fewer and gentler, not zero: opacity stays, travel and scale go. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+    scroll-behavior: auto !important;
+  }
+  .disclosure {
+    transition: none;
+  }
+  .arrive,
+  .step-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .chart-draw,
+  .chart-rise .barlayer,
+  .chart-rise .bars {
+    animation: none;
+    clip-path: none;
+    transform: none;
+  }
+  .tilt {
+    transform: none !important;
+    transition: none;
+  }
+  .pulse-dot,
+  .pulse-ring::before,
+  .skeleton::after {
+    animation: none;
+  }
+  .flip-open {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .specular::before {
+    display: none;
+  }
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 1);
-}
-
-/* Glassmorphism Surface Utilities */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(30, 41, 59, 0.8);
-}
-
-.glass-card {
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(30, 41, 59, 0.6);
-}
-
-.glass-card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-card-hover:hover {
-  background: rgba(30, 41, 59, 0.5);
-  border-color: rgba(59, 130, 246, 0.4);
-  transform: translateY(-1px);
-}
-
-/* Subtle Glow Animations */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-

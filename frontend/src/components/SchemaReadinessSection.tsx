@@ -1,473 +1,265 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  fetchSchemaStatus,
-  fetchTableDetail,
-  fetchTables,
-  fetchBusinessMetrics,
-  triggerSchemaPreparation,
-} from "@/lib/api";
-import { TableModel, TableSummary, BusinessMetric } from "@/types/api";
-import {
-  ArrowRight,
-  BookOpen,
-  Calendar,
-  CheckCircle2,
-  Database,
-  Hash,
-  Key,
-  Layers,
-  Link as LinkIcon,
-  Play,
-  RefreshCw,
-  Search,
-  Table as TableIcon,
-  MessageSquare,
-  Sparkles,
-} from "lucide-react";
-import { Button } from "./ui/Button";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { clsx } from "clsx";
+import { fetchSchemaStatus, fetchTableDetail, fetchTables, fetchBusinessMetrics } from "@/lib/api";
 import { Badge } from "./ui/Badge";
+import { Disclosure } from "./ui/Disclosure";
+import { SqlBlock } from "./ui/SqlBlock";
+import { StatGroup, StatItem } from "./ui/Stat";
+import { formatFigure, MISSING_DASH } from "@/lib/format";
+import { ScreenHeader } from "./ui/ScreenHeader";
 
-// Business domains mapped to warehouse tables
-const DOMAIN_GROUPS: Record<string, string[]> = {
-  "Orders & Sales": ["orders", "order_items", "payments", "order_timeline"],
-  "Customers": ["customers", "customer_segments", "customer_segment_history", "loyalty_cards", "loyalty_transactions"],
-  "Catalog & Merchandising": ["products", "product_categories", "brands", "categories", "promotions", "promotion_rules", "seller_products", "sellers"],
-  "Supply Chain & Inventory": ["warehouses", "suppliers", "purchase_orders", "purchase_order_items", "warehouse_stock", "monthly_inventory_snapshot", "inbound_shipments"],
-  "Marketing & Traffic": ["channels", "daily_marketing_spend", "website_sessions", "session_events"],
-  "Post-Purchase & Service": ["returns", "refunds", "customer_reviews", "support_tickets"],
-  "Financials & Targets": ["expenses", "daily_targets"],
-};
-
+/**
+ * The Catalog: what tables exist, what is in them, and the metric definitions
+ * the agent grounds against.
+ *
+ * A list beside a detail pane — the list is the index, the pane answers "what
+ * is in this table". On a phone the pane follows the list rather than sitting
+ * beside it.
+ */
 export function SchemaReadinessSection() {
-  const queryClient = useQueryClient();
-  const [selectedTableName, setSelectedTableName] = useState<string>("orders");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDomain, setSelectedDomain] = useState<string>("All");
-  const [activeSubTab, setActiveSubTab] = useState<"catalog" | "metrics">("catalog");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"tables" | "metrics">("tables");
 
-  // Query schema preparation status
-  const { data: schemaStatus } = useQuery({
-    queryKey: ["schemaStatus"],
-    queryFn: fetchSchemaStatus,
-    refetchInterval: (query) => {
-      const state = query.state.data?.latest_job?.status;
-      return state === "pending" || state === "running" ? 1500 : 15000;
-    },
-  });
-
-  // Query tables list
-  const { data: tables, isLoading: isLoadingTables } = useQuery({
-    queryKey: ["schemaTables"],
-    queryFn: fetchTables,
-  });
-
-  // Query selected table detail
-  const { data: selectedTable, isLoading: isLoadingTableDetail } = useQuery({
-    queryKey: ["tableDetail", selectedTableName],
-    queryFn: () => (selectedTableName ? fetchTableDetail(selectedTableName) : null),
-    enabled: !!selectedTableName,
-  });
-
-  // Query verified business metrics
-  const { data: businessMetrics, isLoading: isLoadingMetrics } = useQuery({
+  const { data: status } = useQuery({ queryKey: ["schemaStatus"], queryFn: fetchSchemaStatus });
+  const { data: tables, isLoading: loadingTables } = useQuery({ queryKey: ["tables"], queryFn: fetchTables });
+  const { data: metrics, isLoading: loadingMetrics } = useQuery({
     queryKey: ["businessMetrics"],
     queryFn: fetchBusinessMetrics,
+    enabled: view === "metrics",
   });
 
-  // Prepare schema mutation
-  const prepareMutation = useMutation({
-    mutationFn: (force: boolean) => triggerSchemaPreparation(force),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["schemaStatus"] });
-      queryClient.invalidateQueries({ queryKey: ["schemaTables"] });
-      if (selectedTableName) {
-        queryClient.invalidateQueries({ queryKey: ["tableDetail", selectedTableName] });
-      }
-    },
+  const activeTable = selected ?? tables?.[0]?.name ?? null;
+
+  const { data: detail, isLoading: loadingDetail } = useQuery({
+    queryKey: ["tableDetail", activeTable],
+    queryFn: () => (activeTable ? fetchTableDetail(activeTable) : null),
+    enabled: Boolean(activeTable),
   });
 
-  const isPreparing =
-    prepareMutation.isPending ||
-    schemaStatus?.latest_job?.status === "running" ||
-    schemaStatus?.latest_job?.status === "pending";
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return tables ?? [];
+    return (tables ?? []).filter((t) => t.name.toLowerCase().includes(term));
+  }, [tables, search]);
 
-  // Filtered tables based on search and domain
-  const filteredTables = useMemo(() => {
-    return (tables || []).filter((t) => {
-      const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (!matchesSearch) return false;
-      if (selectedDomain === "All") return true;
-      const domainTables = DOMAIN_GROUPS[selectedDomain] || [];
-      return domainTables.includes(t.name);
-    });
-  }, [tables, searchTerm, selectedDomain]);
+  const summary = status?.catalog_summary;
+  const tiles: StatItem[] = summary
+    ? [
+        {
+          metricKey: "total_rows",
+          raw: summary.total_rows,
+          label: "Rows catalogued",
+          figure: formatFigure(summary.total_rows, "total_rows"),
+          scope: summary.generated_at ? `Prepared ${new Date(summary.generated_at).toLocaleDateString()}` : null,
+        },
+        {
+          metricKey: "total_tables",
+          raw: summary.total_tables,
+          label: "Tables",
+          figure: formatFigure(summary.total_tables, "total_tables"),
+        },
+      ]
+    : [];
 
   return (
-    <section className="space-y-6">
-      {/* 1. Header & Profiler Management Bar */}
-      <div className="p-6 rounded-2xl border border-border/80 bg-card/90 shadow-md space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-primary/15 text-primary">
-                <Database className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-foreground">
-                    Data Warehouse & Schema Catalog
-                  </h2>
-                  <Badge variant={schemaStatus?.is_prepared ? "success" : "warning"} size="xs">
-                    {schemaStatus?.is_prepared ? "Catalogue Active" : "Unprepared"}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Idempotent profiling of 30 tables, relational lineage, distinct distributions, and null rates
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => prepareMutation.mutate(false)}
-              disabled={isPreparing}
-              isLoading={isPreparing}
-              icon={!isPreparing ? <Play className="w-3.5 h-3.5" /> : undefined}
-            >
-              {isPreparing ? "Profiling..." : "Run Preparation"}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => prepareMutation.mutate(true)}
-              disabled={isPreparing}
-              title="Force re-profiling bypasses cache"
-            >
-              Force Refresh
-            </Button>
-          </div>
-        </div>
-
-        {/* Live Progress Bar during active profiling job */}
-        {isPreparing && (
-          <div className="p-4 rounded-xl bg-background/70 border border-primary/30 space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="font-medium text-primary flex items-center gap-2">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>{schemaStatus?.latest_job?.message || "Running preparation worker..."}</span>
-              </span>
-              <span className="font-mono text-muted-foreground">
-                {schemaStatus?.latest_job?.progress_percent || 0}%
-              </span>
-            </div>
-            <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-primary h-2 transition-all duration-300"
-                style={{ width: `${schemaStatus?.latest_job?.progress_percent || 5}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Summary Metric Ribbon */}
-        {schemaStatus?.catalog_summary && !isPreparing && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-3 border-t border-border/60">
-            <div className="p-2.5 rounded-xl bg-background/50 border border-border/60 flex items-center justify-between">
-              <span className="text-muted-foreground">Profiled Tables:</span>
-              <span className="font-bold text-foreground font-mono">
-                {schemaStatus.catalog_summary.total_tables}
-              </span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-background/50 border border-border/60 flex items-center justify-between">
-              <span className="text-muted-foreground">Total Warehouse Rows:</span>
-              <span className="font-bold text-foreground font-mono">
-                {schemaStatus.catalog_summary.total_rows.toLocaleString()}
-              </span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-background/50 border border-border/60 flex items-center justify-between">
-              <span className="text-muted-foreground">Fingerprint:</span>
-              <span
-                className="font-mono text-primary truncate max-w-[100px]"
-                title={schemaStatus.catalog_summary.source_fingerprint || ""}
+    <div className="space-y-10">
+      <ScreenHeader
+        title="Data"
+        description={
+          status?.is_prepared
+            ? "Every table the agent can see, the columns inside them, and the metric definitions it is grounded against."
+            : "The schema has not been prepared yet, so the agent has nothing to ground against."
+        }
+        actions={
+          <div
+            role="group"
+            aria-label="What to show"
+            className="flex items-center gap-0.5 rounded-control border border-[var(--border)] bg-surface p-1 shadow-raised"
+          >
+            {(["tables", "metrics"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={clsx(
+                  "h-8 rounded-[5px] px-3.5 text-label capitalize",
+                  "transition-[background-color,color] duration-[90ms] ease-out",
+                  view === v
+                    ? "bg-active font-medium text-text"
+                    : "text-muted hover:[@media(hover:hover)and(pointer:fine)]:text-accent"
+                )}
               >
-                {schemaStatus.catalog_summary.source_fingerprint?.slice(0, 10)}...
-              </span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-background/50 border border-border/60 flex items-center justify-between">
-              <span className="text-muted-foreground">Cache State:</span>
-              <span className="text-success font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified Fresh</span>
-              </span>
-            </div>
+                {v}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+        }
+      />
 
-      {/* 2. Sub-Tabs: Table Catalog vs Business Metrics Glossary */}
-      <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab("catalog")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
-            activeSubTab === "catalog"
-              ? "bg-primary text-white shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-          }`}
-        >
-          <TableIcon className="w-3.5 h-3.5" />
-          <span>Relational Table Catalog ({tables?.length || 0})</span>
-        </button>
+      {tiles.length > 0 ? <StatGroup items={tiles} /> : null}
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab("metrics")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
-            activeSubTab === "metrics"
-              ? "bg-primary text-white shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-warning" />
-          <span>Verified Business Metrics ({businessMetrics?.length || 0})</span>
-        </button>
-      </div>
-
-      {/* 3. Sub-View A: Interactive Table Catalog & Inspector */}
-      {activeSubTab === "catalog" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Pane: Table Selector */}
-          <div className="lg:col-span-4 p-5 rounded-2xl border border-border/80 bg-card/90 shadow-md space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-border/70">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <TableIcon className="w-4 h-4 text-primary" />
-                <span>Cataloged Tables</span>
-              </div>
-              <Badge variant="mono" size="xs">
-                {filteredTables.length} / {tables?.length || 0}
-              </Badge>
-            </div>
-
-            {/* Domain Filter Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-              {["All", ...Object.keys(DOMAIN_GROUPS)].map((dom) => (
-                <button
-                  key={dom}
-                  type="button"
-                  onClick={() => setSelectedDomain(dom)}
-                  className={`text-[10px] px-2 py-0.5 rounded-md whitespace-nowrap transition-colors cursor-pointer ${
-                    selectedDomain === dom
-                      ? "bg-primary/20 text-primary border border-primary/40 font-semibold"
-                      : "bg-background/60 text-muted-foreground hover:text-foreground border border-border/60"
-                  }`}
-                >
-                  {dom}
-                </button>
+      {view === "metrics" ? (
+        <section className="space-y-2">
+          <h2 className="text-section font-semibold text-text">Metric definitions</h2>
+          {loadingMetrics ? (
+            <ul className="space-y-1.5" aria-label="Loading metrics">
+              {[0, 1, 2].map((i) => (
+                <li key={i} className="skeleton h-[52px] w-full rounded-card" />
               ))}
-            </div>
-
-            {/* Search Box */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Filter tables by name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-background/60 border border-border rounded-lg text-foreground focus:outline-none focus:border-primary placeholder:text-muted-foreground/70"
-              />
-            </div>
-
-            {/* Table List Scrollable Container */}
-            <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
-              {isLoadingTables && (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  <RefreshCw className="w-4 h-4 animate-spin text-primary mx-auto mb-2" />
-                  <span>Loading tables from database...</span>
-                </div>
-              )}
-              {filteredTables.map((tbl) => {
-                const isSelected = selectedTableName === tbl.name;
-                return (
-                  <button
-                    key={tbl.name}
-                    type="button"
-                    onClick={() => setSelectedTableName(tbl.name)}
-                    className={`w-full text-left p-3 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer ${
-                      isSelected
-                        ? "bg-primary text-white shadow-sm font-semibold ring-1 ring-primary/40"
-                        : "hover:bg-muted/50 text-foreground/90 border border-transparent hover:border-border/60"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <TableIcon
-                        className={`w-3.5 h-3.5 flex-shrink-0 ${
-                          isSelected ? "text-white" : "text-primary"
-                        }`}
-                      />
-                      <span className="truncate">{tbl.name}</span>
+            </ul>
+          ) : !metrics || metrics.length === 0 ? (
+            <p className="rounded-card border border-dashed border-[var(--border)] px-3 py-8 text-center text-body text-muted">
+              No business metrics are defined for this database.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {metrics.map((metric) => (
+                <li key={metric.name} className="responds plane-raised px-4">
+                  <Disclosure label={metric.display_name} meta={metric.primary_tables.join(", ")}>
+                    <div className="space-y-2.5 pb-3">
+                      <p className="text-body text-text">{metric.plain_description}</p>
+                      <SqlBlock sql={metric.formula_sql} label="Definition" copyLabel="metric SQL" />
+                      {metric.business_caveat ? (
+                        <p className="text-body text-warning">{metric.business_caveat}</p>
+                      ) : null}
                     </div>
-                    <span
-                      className={`font-mono text-[11px] flex-shrink-0 ${
-                        isSelected ? "text-white/80" : "text-muted-foreground"
-                      }`}
-                    >
-                      {tbl.row_count.toLocaleString()} rows
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                  </Disclosure>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          {/* The index */}
+          <section className="space-y-2" aria-label="Tables">
+            <label htmlFor="table-search" className="sr-only">
+              Search tables
+            </label>
+            <input
+              id="table-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tables"
+              className="h-9 w-full rounded-control border border-[var(--control)] bg-surface px-3 text-body text-text placeholder:text-faint focus:border-[var(--text)] focus:outline-none"
+            />
 
-          {/* Right Pane: Table Detail Inspector */}
-          <div className="lg:col-span-8 p-6 rounded-2xl border border-border/80 bg-card/90 shadow-md space-y-5">
-            {isLoadingTableDetail && (
-              <div className="py-24 text-center text-xs text-muted-foreground flex flex-col items-center justify-center space-y-3">
-                <RefreshCw className="w-7 h-7 animate-spin text-primary" />
-                <span>Introspecting schema profile for {selectedTableName}...</span>
-              </div>
+            {loadingTables ? (
+              <ul className="space-y-1" aria-label="Loading tables">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <li key={i} className="skeleton h-[36px] w-full rounded-control" />
+                ))}
+              </ul>
+            ) : filtered.length === 0 ? (
+              <p className="rounded-card border border-dashed border-[var(--border)] px-3 py-6 text-center text-body text-muted">
+                No table matches “{search}”.
+              </p>
+            ) : (
+              <ul className="scroll-quiet max-h-[32rem] space-y-0.5 overflow-y-auto">
+                {filtered.map((table) => {
+                  const isActive = table.name === activeTable;
+                  return (
+                    <li key={table.name}>
+                      <button
+                        type="button"
+                        onClick={() => setSelected(table.name)}
+                        aria-current={isActive ? "true" : undefined}
+                        className={clsx(
+                          "row-responds flex w-full items-baseline justify-between gap-2 rounded-control px-3 py-2.5 text-left",
+                          isActive ? "bg-active text-text" : "text-text"
+                        )}
+                      >
+                        <span className="min-w-0 truncate font-mono text-body">{table.name}</span>
+                        <span className="num shrink-0 text-label text-muted">
+                          {table.row_count.toLocaleString("en-US")}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
+          </section>
 
-            {!isLoadingTableDetail && selectedTable && (
+          {/* The detail */}
+          <section aria-label="Table detail" className="min-w-0 space-y-3">
+            {loadingDetail || !detail ? (
+              <div className="rounded-card border border-[var(--border)] bg-surface p-4">
+                <span className="skeleton block h-[18px] w-40" />
+                <span className="skeleton mt-3 block h-[14px] w-full" />
+                <span className="skeleton mt-2 block h-[14px] w-5/6" />
+              </div>
+            ) : (
               <>
-                {/* Table Header Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border/80 gap-3">
-                  <div>
-                    <div className="flex items-center gap-2.5">
-                      <h3 className="text-lg font-bold text-foreground font-mono">
-                        {selectedTable.name}
-                      </h3>
-                      <Badge variant="primary" size="xs">
-                        {selectedTable.row_count.toLocaleString()} rows
-                      </Badge>
-                      <Badge variant="mono" size="xs">
-                        {selectedTable.columns.length} columns
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Primary Key:{" "}
-                      <code className="text-foreground font-mono">
-                        {selectedTable.primary_key_columns.join(", ") || "RowID"}
-                      </code>{" "}
-                      | Foreign Keys: {selectedTable.foreign_keys.length} | Indexes:{" "}
-                      {selectedTable.indexes.length}
-                    </p>
-                  </div>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="font-mono text-headline font-semibold text-text">{detail.name}</h2>
+                  <p className="num text-label text-muted">
+                    {detail.row_count.toLocaleString("en-US")} rows · {detail.columns.length} columns
+                  </p>
                 </div>
 
-                {/* Columns Table */}
-                <div className="overflow-x-auto border border-border/70 rounded-xl bg-background/40">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-muted/70 text-muted-foreground font-semibold border-b border-border">
+                {detail.description ? <p className="text-body text-muted">{detail.description}</p> : null}
+
+                <div className="scroll-quiet overflow-x-auto rounded-card border border-[var(--border)]">
+                  <table className="w-full border-collapse text-body">
+                    <thead>
                       <tr>
-                        <th className="p-3">Column</th>
-                        <th className="p-3">Type</th>
-                        <th className="p-3">Constraints</th>
-                        <th className="p-3">Null Rate</th>
-                        <th className="p-3 font-mono">Distinct</th>
-                        <th className="p-3">Sample / Range</th>
+                        {["Column", "Type", "Nulls", "Distinct", "Example"].map((h, i) => (
+                          <th
+                            key={h}
+                            scope="col"
+                            className={clsx(
+                              "whitespace-nowrap border-b border-[var(--border)] bg-surface px-3 py-2.5 text-label font-normal text-muted last:pr-4",
+                              i >= 2 && i <= 3 ? "text-right" : "text-left"
+                            )}
+                          >
+                            {h}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/50">
-                      {selectedTable.columns.map((c) => (
-                        <tr key={c.name} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-mono text-foreground font-semibold">
-                            {c.name}
+                    <tbody>
+                      {detail.columns.map((column) => (
+                        <tr key={column.name} className="row-responds border-b border-[var(--rule)] last:border-0">
+                          <td className="px-3 py-2.5 last:pr-4">
+                            <span className="font-mono text-body text-text">{column.name}</span>
+                            <span className="ml-2 inline-flex gap-1 align-middle">
+                              {column.is_pk ? <Badge variant="neutral">PK</Badge> : null}
+                              {column.is_fk ? (
+                                <Badge variant="neutral" title={`References ${column.fk_target_table}.${column.fk_target_column}`}>
+                                  FK
+                                </Badge>
+                              ) : null}
+                            </span>
                           </td>
-                          <td className="p-3 font-mono text-muted-foreground">
-                            {c.sqlite_type}
+                          <td className="px-3 py-2.5 font-mono text-label text-muted last:pr-4">{column.sqlite_type}</td>
+                          <td className="num px-3 py-2.5 text-right text-text last:pr-4">
+                            {column.null_percentage.toFixed(1)}%
                           </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {c.is_pk && (
-                                <Badge variant="warning" size="xs" className="gap-0.5">
-                                  <Key className="w-2.5 h-2.5" />
-                                  <span>PK</span>
-                                </Badge>
-                              )}
-                              {c.is_fk && (
-                                <Badge
-                                  variant="primary"
-                                  size="xs"
-                                  className="gap-0.5 cursor-pointer"
-                                  title={`Foreign Key -> ${c.fk_target_table}.${c.fk_target_column}`}
-                                  onClick={() => {
-                                    if (c.fk_target_table) {
-                                      setSelectedTableName(c.fk_target_table);
-                                    }
-                                  }}
-                                >
-                                  <LinkIcon className="w-2.5 h-2.5" />
-                                  <span>FK</span>
-                                </Badge>
-                              )}
-                              {c.is_date_candidate && (
-                                <Badge variant="mono" size="xs" className="gap-0.5">
-                                  <Calendar className="w-2.5 h-2.5" />
-                                  <span>Date</span>
-                                </Badge>
-                              )}
-                              {c.is_numeric_candidate && !c.is_pk && !c.is_fk && (
-                                <Badge variant="mono" size="xs" className="gap-0.5">
-                                  <Hash className="w-2.5 h-2.5" />
-                                  <span>Num</span>
-                                </Badge>
-                              )}
-                              {c.not_null && (
-                                <span className="text-[10px] text-muted-foreground font-mono">
-                                  NN
-                                </span>
-                              )}
-                            </div>
+                          <td className="num px-3 py-2.5 text-right text-text last:pr-4">
+                            {column.distinct_count.toLocaleString("en-US")}
                           </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
+                          {/* The truncation lives on a block inside the cell:
+                              max-width on a <td> is advisory and the table
+                              layout overrides it, so a long sample ran 202px
+                              past the frame and was clipped rather than
+                              ellipsised. */}
+                          <td className="px-3 py-2.5 pr-4 text-muted">
+                            {column.sample_values.length > 0 ? (
                               <span
-                                className={`font-mono text-[11px] ${
-                                  c.null_percentage > 50
-                                    ? "text-destructive font-bold"
-                                    : c.null_percentage > 0
-                                    ? "text-warning font-medium"
-                                    : "text-muted-foreground"
-                                }`}
+                                className="block max-w-[14rem] truncate"
+                                title={column.sample_values[0]}
                               >
-                                {c.null_percentage}%
-                              </span>
-                              {c.null_percentage > 0 && (
-                                <div className="w-12 bg-border rounded-full h-1.5 overflow-hidden">
-                                  <div
-                                    className={`h-1.5 ${
-                                      c.null_percentage > 50 ? "bg-destructive" : "bg-warning"
-                                    }`}
-                                    style={{ width: `${c.null_percentage}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3 font-mono text-muted-foreground">
-                            {c.distinct_count.toLocaleString()}
-                          </td>
-                          <td className="p-3 text-[11px] text-muted-foreground max-w-[200px] truncate">
-                            {c.sample_values && c.sample_values.length > 0 ? (
-                              <span className="text-foreground/90 font-mono">
-                                [{c.sample_values.slice(0, 3).join(", ")}
-                                {c.sample_values.length > 3 ? "..." : ""}]
-                              </span>
-                            ) : c.min_sample && c.max_sample ? (
-                              <span className="font-mono text-foreground/80">
-                                {c.min_sample} → {c.max_sample}
+                                {column.sample_values[0]}
                               </span>
                             ) : (
-                              "—"
+                              <span className="text-faint">{MISSING_DASH}</span>
                             )}
                           </td>
                         </tr>
@@ -476,103 +268,23 @@ export function SchemaReadinessSection() {
                   </table>
                 </div>
 
-                {/* Foreign Key Lineage Cards */}
-                {selectedTable.foreign_keys.length > 0 && (
-                  <div className="pt-4 border-t border-border/80 space-y-3">
-                    <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <LinkIcon className="w-3.5 h-3.5 text-primary" />
-                      <span>Foreign Key Lineage ({selectedTable.foreign_keys.length})</span>
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      {selectedTable.foreign_keys.map((fk, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3 rounded-xl bg-background/50 border border-border/80 flex items-center justify-between"
-                        >
-                          <span className="font-mono text-primary font-semibold">
-                            {fk.source_column}
-                          </span>
-                          <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTableName(fk.target_table)}
-                            className="font-mono text-foreground hover:text-primary transition-colors cursor-pointer text-left truncate"
-                            title={`Jump to ${fk.target_table}`}
-                          >
-                            {fk.target_table}.{fk.target_column}
-                          </button>
-                        </div>
+                {detail.foreign_keys.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <h3 className="text-label font-medium text-text">Relationships</h3>
+                    <ul className="space-y-1">
+                      {detail.foreign_keys.map((fk) => (
+                        <li key={`${fk.source_column}-${fk.target_table}`} className="font-mono text-label text-muted">
+                          {fk.source_column} → {fk.target_table}.{fk.target_column}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
-                )}
+                ) : null}
               </>
             )}
-          </div>
+          </section>
         </div>
       )}
-
-      {/* 4. Sub-View B: Verified Business Metrics Glossary */}
-      {activeSubTab === "metrics" && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl border border-border/80 bg-card/90 shadow-md">
-            <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-warning" />
-              <span>Verified Business Semantic Definitions</span>
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Standardized corporate metric definitions, calculation formulas, and filter conditions
-            </p>
-          </div>
-
-          {isLoadingMetrics && (
-            <div className="py-12 text-center text-xs text-muted-foreground">
-              <RefreshCw className="w-5 h-5 animate-spin text-primary mx-auto mb-2" />
-              <span>Loading business metrics from semantics registry...</span>
-            </div>
-          )}
-
-          {!isLoadingMetrics && businessMetrics && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {businessMetrics.map((bm: BusinessMetric) => (
-                <div
-                  key={bm.name}
-                  className="p-5 rounded-2xl border border-border/80 bg-card/80 space-y-3 shadow-sm hover:border-primary/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="font-semibold text-sm text-foreground">{bm.display_name}</h4>
-                      <span className="font-mono text-[11px] text-primary">{bm.name}</span>
-                    </div>
-                    <Badge variant="mono" size="xs">
-                      {bm.primary_tables.join(", ")}
-                    </Badge>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {bm.plain_description}
-                  </p>
-
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-muted-foreground font-mono uppercase font-bold">
-                      SQL Formula
-                    </span>
-                    <pre className="p-2.5 rounded-lg bg-background/80 text-[11px] font-mono text-primary border border-border/60 overflow-x-auto">
-                      <code>{bm.formula_sql}</code>
-                    </pre>
-                  </div>
-
-                  {bm.business_caveat && (
-                    <p className="text-[11px] text-warning bg-warning/10 p-2 rounded-lg border border-warning/20">
-                      <strong>Caveat:</strong> {bm.business_caveat}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </section>
+    </div>
   );
 }

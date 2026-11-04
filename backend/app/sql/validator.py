@@ -6,7 +6,7 @@ Dialect-aware across SQLite, PostgreSQL, and MySQL.
 """
 
 import re
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 import sqlglot
 from sqlglot import exp
 from backend.app.core.config import settings

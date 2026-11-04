@@ -1,43 +1,53 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/cn";
 
+/**
+ * A status pill: a pale tint with dark ink of the same hue, never a saturated
+ * fill with white text. 11px floor, 20px tall, inside rows and beside values
+ * only — never above a heading.
+ *
+ * The legacy variant names are kept as aliases so existing call sites keep
+ * compiling while taking the new look.
+ */
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: "default" | "primary" | "success" | "warning" | "destructive" | "outline" | "mono";
+  variant?:
+    | "neutral"
+    | "positive"
+    | "negative"
+    | "warning"
+    | "outline"
+    | "mono"
+    // aliases
+    | "default"
+    | "primary"
+    | "success"
+    | "destructive";
   size?: "xs" | "sm";
 }
 
-export function Badge({
-  className,
-  variant = "default",
-  size = "xs",
-  children,
-  ...props
-}: BadgeProps) {
-  const variantStyles = {
-    default: "bg-muted text-muted-foreground border-border/60",
-    primary: "bg-primary/15 text-primary border-primary/30",
-    success: "bg-success/15 text-success border-success/30",
-    warning: "bg-warning/15 text-warning border-warning/30",
-    destructive: "bg-destructive/15 text-destructive border-destructive/30",
-    outline: "bg-transparent text-foreground/80 border-border hover:border-border/80",
-    mono: "bg-muted/80 text-foreground/90 font-mono border-border/80",
-  };
+const VARIANTS: Record<string, string> = {
+  neutral: "bg-pill-neutral-bg text-pill-neutral-ink",
+  positive: "bg-pill-positive-bg text-pill-positive-ink",
+  negative: "bg-pill-negative-bg text-pill-negative-ink",
+  warning: "bg-pill-warning-bg text-pill-warning-ink",
+  outline: "bg-transparent text-muted border border-[var(--border)]",
+  mono: "bg-pill-neutral-bg text-pill-neutral-ink font-mono",
+  // aliases
+  default: "bg-pill-neutral-bg text-pill-neutral-ink",
+  primary: "bg-pill-neutral-bg text-pill-neutral-ink",
+  success: "bg-pill-positive-bg text-pill-positive-ink",
+  destructive: "bg-pill-negative-bg text-pill-negative-ink",
+};
 
-  const sizeStyles = {
-    xs: "text-[10px] px-1.5 py-0.5",
-    sm: "text-xs px-2 py-0.5",
-  };
-
+export function Badge({ className, variant = "neutral", size = "sm", children, ...props }: BadgeProps) {
   return (
     <span
-      className={twMerge(
-        clsx(
-          "inline-flex items-center gap-1 font-medium rounded-full border transition-colors select-none",
-          variantStyles[variant],
-          sizeStyles[size],
-          className
-        )
+      className={cn(
+        "inline-flex items-center gap-1 rounded-chip font-medium whitespace-nowrap",
+        "h-5 px-2",
+        size === "xs" ? "text-micro" : "text-label",
+        VARIANTS[variant] ?? VARIANTS.neutral,
+        className
       )}
       {...props}
     >
@@ -46,3 +56,4 @@ export function Badge({
   );
 }
 
+export { Badge as StatusPill };

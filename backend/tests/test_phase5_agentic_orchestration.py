@@ -445,15 +445,39 @@ def test_scenario_16_regional_weekly_order_drop_investigation(setup_test_environ
     assert result.tasks[3].task_type == "factual_faithfulness_and_causal_interception"
 
     m = result.analytical_result.computed_metrics
+    # Every figure below is computed from the executed SQL, not stored in the code.
     assert m["target_region"] == "JP-Kanto"
+    assert m["region_selection"] == "resolved automatically as the steepest decline across all regions"
+    assert m["baseline_orders"] == 363
+    assert m["current_orders"] == 298
     assert m["pct_change_monthly"] == -17.91
-    assert m["z_score"] == -1.81
+    assert m["z_score"] == -2.33
     assert m["is_unusual"] is True
     assert m["primary_driver"] == "Website"
     assert m["primary_driver_pct"] == 63.1
+    # The decomposition must account for the whole decline it reports.
+    declines = [c for c in m["channel_breakdown"] if c["delta"] < 0]
+    assert round(sum(c["pct_contribution"] for c in declines), 1) == 100.0
+    assert sum(c["delta"] for c in declines) == m["delta_orders"]
 
     # Verify management response contains required weekly order sections and non-causal disclosures
     assert "JP-Kanto" in result.management_response.composed_markdown
     assert "Website" in result.management_response.composed_markdown
-    assert "Statistical Note" in result.management_response.composed_markdown
+    assert "Observational note" in result.management_response.composed_markdown
+
+
+def test_scenario_16b_order_drop_answers_the_region_that_was_asked(setup_test_environment):
+    """The workflow must analyse the region in the question, not a region fixed in the code."""
+    _, catalog = setup_test_environment
+    result = agentic_supervisor.supervise(
+        question="Orders dropped in the US-West region last month - is it unusual and what is driving it?",
+        catalog=catalog,
+    )
+
+    assert result.success is True
+    m = result.analytical_result.computed_metrics
+    assert m["target_region"] == "US-West"
+    assert m["region_selection"] == "named in the question"
+    assert "US-West" in result.management_response.composed_markdown
+    assert "JP-Kanto" not in result.management_response.composed_markdown
 

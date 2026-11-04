@@ -6,6 +6,7 @@ Coordinates Router, Answerability Gate, Clarification, Planner, Hybrid Retriever
 Validator, Repair Loop, Executor, Visualization, and Composer.
 """
 
+import asyncio
 import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
@@ -29,6 +30,7 @@ from backend.app.core.logging import logger
 from backend.app.db.manager import db_manager
 from backend.app.memory.service import memory_service
 from backend.app.observability.tracer import RunTraceRecord, StageSpanRecord, observability_tracer
+from backend.app.orchestration.models import ExecutiveSection, ManagementResponse
 from backend.app.security.guardrails import detect_prompt_injection, validate_sql_security
 from backend.app.llm.client import get_llm_provider
 from backend.app.llm.models import LLMMessage, LLMRequest
@@ -95,6 +97,9 @@ class MultiAgentWorkflowResult(BaseModel):
     verification: Optional[VerificationResult] = None
     repair_attempts: List[RepairAttempt] = Field(default_factory=list)
     composed_answer: str
+    management_response: Optional[ManagementResponse] = None
+    analytical_result: Optional[Dict[str, Any]] = None
+    specialist_capability: Optional[str] = None
     key_findings: List[str] = Field(default_factory=list)
     limitations: List[str] = Field(default_factory=list)
     suggested_followups: List[str] = Field(default_factory=list)
@@ -102,8 +107,290 @@ class MultiAgentWorkflowResult(BaseModel):
     total_duration_ms: float = 0.0
 
 
+
+_CAPABILITY_INTENT = {
+    "churn": "diagnostic",
+    "order_drop": "diagnostic",
+    "impact": "diagnostic",
+    "scenario": "prescriptive",
+}
+
+
+def _tool_section(title: str, headline: str, payload: Dict[str, Any], disclaimers: List[str]) -> ExecutiveSection:
+    """Builds an executive section from a deterministic tool result, using only its own values."""
+    scalars = {
+        k: v for k, v in payload.items()
+        if isinstance(v, (int, float, str, bool)) and k not in ("tool_name", "analysis_type")
+    }
+    lines = [f"- **{k.replace('_', ' ').capitalize()}:** {v}" for k, v in list(scalars.items())[:8]]
+    return ExecutiveSection(
+        title=title,
+        headline=headline,
+        content="\n".join(lines) if lines else "- No reportable values were produced by this tool.",
+        kpis={k: v for k, v in scalars.items() if isinstance(v, (int, float)) and not isinstance(v, bool)},
+        disclaimers=disclaimers,
+    )
+
+
+def _synthesize_management_from_workflow(
+    route: RouteResult,
+    query_result: Optional[QueryExecutionResult],
+    analysis_res: Optional[AnalysisToolResult],
+    composed_text: str,
+    key_findings: List[str],
+    warnings: List[str],
+    sanitized_sql: Optional[str],
+) -> ManagementResponse:
+    """
+    Builds the WHAT / WHY / WHAT NEXT / SO WHAT response from the outputs this run
+    already produced. No extra queries are issued, so the narrative and the sections
+    are always derived from the same verified figures. Sections without a verified
+    basis are omitted rather than invented.
+    """
+    numeric_kpis: Dict[str, Any] = {}
+    if query_result and query_result.rows:
+        for k, v in query_result.rows[0].items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                numeric_kpis[k] = v
+
+    headline = ""
+    in_fence = False
+    for raw_line in (composed_text or "").splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not line or line.startswith(("#", ">", "|", "-", "*")):
+            continue
+        headline = line.lstrip("#* ").strip()
+        break
+    if not headline:
+        headline = f"Query returned {query_result.row_count if query_result else 0} rows."
+
+    what = ExecutiveSection(
+        title="WHAT",
+        headline=headline[:300],
+        content="\n".join(f"- {f}" for f in key_findings) or "- No rows were returned for this question.",
+        kpis=numeric_kpis,
+        evidence_references=([f"sql:{sanitized_sql}"] if sanitized_sql else []),
+        disclaimers=list(warnings or []),
+    )
+
+    why = what_next = so_what = scenario_section = None
+    if analysis_res and analysis_res.success:
+        dump = analysis_res.model_dump()
+        if analysis_res.anomaly_detection:
+            why = _tool_section(
+                "WHY",
+                "Anomaly detection ran on the returned series.",
+                dump.get("anomaly_detection") or {},
+                ["Observational: an anomaly marks where a value departs from its baseline, not why."],
+            )
+        elif analysis_res.driver_analysis:
+            why = _tool_section(
+                "WHY",
+                "Driver decomposition ran on the returned series.",
+                dump.get("driver_analysis") or {},
+                ["Observational: driver shares describe where the change sits, not its cause."],
+            )
+        if analysis_res.forecast:
+            what_next = _tool_section(
+                "WHAT NEXT",
+                "A forecast was fitted to the returned series.",
+                dump.get("forecast") or {},
+                ["Forecast intervals assume the fitted model's conditions hold."],
+            )
+        if analysis_res.optimization:
+            so_what = _tool_section(
+                "SO WHAT",
+                "An allocation was optimised against the supplied constraints.",
+                dump.get("optimization") or {},
+                ["Advisory only: optimisation output is decision support, not a committed plan."],
+            )
+        elif analysis_res.churn_risk:
+            so_what = _tool_section(
+                "SO WHAT",
+                "Churn exposure was quantified for the current segments.",
+                dump.get("churn_risk") or {},
+                ["Advisory only: prioritise by verified exposure, not by stored risk scores."],
+            )
+        if analysis_res.scenario:
+            scenario_section = _tool_section(
+                "SCENARIO / WHAT IF",
+                "A parameter shock was simulated against the baseline.",
+                dump.get("scenario") or {},
+                ["Scenario output is a simulation, not an observed outcome."],
+            )
+
+    blocks = [f"### WHAT (What happened?)\n\n**{what.headline}**\n\n{what.content}"]
+    for sec, header in (
+        (why, "### WHY (Why did it happen?)"),
+        (what_next, "### WHAT NEXT (What might happen?)"),
+        (so_what, "### SO WHAT (What should management do?)"),
+        (scenario_section, "### SCENARIO (What if?)"),
+    ):
+        if sec:
+            block = f"{header}\n\n**{sec.headline}**\n\n{sec.content}"
+            if sec.disclaimers:
+                block += f"\n\n> *{sec.disclaimers[0]}*"
+            blocks.append(block)
+
+    return ManagementResponse(
+        what=what,
+        why=why,
+        what_next=what_next,
+        so_what=so_what,
+        scenario_section=scenario_section,
+        executive_summary=what.headline,
+        composed_markdown="\n\n".join(blocks),
+    )
+
+
 class MultiAgentOrchestrator:
     """Orchestrates the multi-agent pipeline with planning, clarification, hybrid retrieval, and bounded repair."""
+
+    async def _run_specialist_capability(
+        self,
+        capability: str,
+        query: str,
+        effective_query: str,
+        standalone_q: Optional[str],
+        session_id: str,
+        run_id: str,
+        overall_start: float,
+        traces: List[StepTrace],
+        catalog: Any,
+        progress_callback: Optional[Callable[[WorkflowProgressState, str], None]] = None,
+    ) -> MultiAgentWorkflowResult:
+        """
+        Executes a specialist analytical workflow and returns it on the chat contract,
+        so the UI receives one shape whichever path a question takes.
+        """
+        from backend.app.orchestration.supervisor import agentic_supervisor
+
+        if progress_callback:
+            progress_callback("generating_query", f"Routing to the {capability.replace('_', ' ')} specialist workflow...")
+
+        stage_start = time.perf_counter()
+        loop = asyncio.get_running_loop()
+        sup_res = await loop.run_in_executor(
+            None,
+            lambda: agentic_supervisor.supervise(
+                question=effective_query,
+                session_id=session_id,
+                catalog=catalog,
+            ),
+        )
+        stage_ms = (time.perf_counter() - stage_start) * 1000
+
+        for task in sup_res.tasks:
+            raw_status = getattr(task.status, "value", str(task.status)).upper()
+            if raw_status == "COMPLETED":
+                t_status = "succeeded"
+            elif raw_status == "ABSTAINED":
+                t_status = "skipped"
+            else:
+                t_status = "failed"
+
+            dur = task.duration_ms
+            if dur is None or dur <= 0.0:
+                dur = round(stage_ms / max(len(sup_res.tasks) + 1, 1), 2)
+
+            traces.append(StepTrace(
+                step="running_query",
+                status=t_status,
+                duration_ms=dur,
+                message=f"{task.specialist.value}: {task.output_summary or task.error_or_abstain_reason or task.task_type}",
+            ))
+        traces.append(StepTrace(
+            step="composing_answer",
+            status="succeeded",
+            duration_ms=round(stage_ms, 2),
+            message=f"{capability.replace('_', ' ').title()} workflow composed the executive response.",
+        ))
+
+        if progress_callback:
+            progress_callback("composing_answer", "Composing executive narrative from verified analytical outputs...")
+
+        mgmt = sup_res.management_response
+        composed_text = (mgmt.composed_markdown or mgmt.executive_summary) if mgmt else ""
+        analytical = sup_res.analytical_result
+        executed_sql = list(analytical.executed_queries) if (analytical and analytical.executed_queries) else []
+
+        clarification = None
+        if sup_res.clarification_needed:
+            clarification = ClarificationResponse(
+                needs_clarification=True,
+                question=(mgmt.executive_summary if mgmt else None),
+                ambiguity_reason="The question needs one detail before it can be answered precisely.",
+                options=[],
+                default_interpretation=None,
+            )
+
+        route = RouteResult(
+            intent=_CAPABILITY_INTENT.get(capability, "diagnostic"),
+            confidence=0.9,
+            complexity="complex",
+            reasoning=f"Specialist capability '{capability}' matched by the shared router.",
+            target_domains=[],
+            suggested_entities=[],
+        )
+        answerability = AnswerabilityAssessment(
+            is_answerable=bool(sup_res.success),
+            confidence=float(analytical.confidence_score) if analytical else 0.9,
+            refusal_reason=sup_res.abstain_reason,
+            available_alternatives=[],
+        )
+        verification = VerificationResult(
+            is_valid=bool(sup_res.success),
+            empty_result=not bool(executed_sql),
+            row_count=len(analytical.result_data) if (analytical and analytical.result_data) else 0,
+            checks_passed=["Specialist workflow executed", "Figures derived from executed SQL"],
+            warnings=list(analytical.limitations) if analytical else [],
+        )
+
+        total_duration_ms = (time.perf_counter() - overall_start) * 1000
+        memory_service.record_assistant_turn(
+            session_id, composed_text, sql=(executed_sql[0] if executed_sql else None)
+        )
+        observability_tracer.record_run_trace(
+            RunTraceRecord(
+                run_id=run_id,
+                session_id=session_id,
+                query=query,
+                intent=route.intent,
+                latency_ms=total_duration_ms,
+                sql_executed=(executed_sql[0] if executed_sql else None),
+                row_count=verification.row_count,
+                cost_estimate_usd=0.0,
+                error_class=None,
+                verification_status="verified" if sup_res.success else "abstained",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                orchestrator_type="workflow_orchestrator",
+                llm_provider="groq",
+            )
+        )
+
+        return MultiAgentWorkflowResult(
+            run_id=run_id,
+            session_id=session_id,
+            query=query,
+            standalone_query=standalone_q,
+            route=route,
+            answerability=answerability,
+            clarification=clarification,
+            sanitized_sql=(executed_sql[0] if executed_sql else None),
+            verification=verification,
+            composed_answer=composed_text,
+            management_response=mgmt,
+            analytical_result=(analytical.model_dump() if analytical else None),
+            specialist_capability=capability,
+            key_findings=list(analytical.findings) if analytical else [],
+            limitations=list(analytical.limitations) if analytical else [],
+            suggested_followups=list(analytical.recommended_next_steps) if analytical else [],
+            trace_steps=traces,
+            total_duration_ms=round(total_duration_ms, 2),
+        )
 
     async def run(
         self,
@@ -167,6 +454,26 @@ class MultiAgentOrchestrator:
 
         catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
         llm = get_llm_provider()
+
+        # Step 0.6: Specialist capability routing. The chat pipeline is the single
+        # entry point; questions belonging to a specialist analytical workflow are
+        # executed there and returned on this same contract.
+        from backend.app.orchestration.supervisor import agentic_supervisor
+
+        capability = agentic_supervisor.detect_capability(effective_query)
+        if capability:
+            return await self._run_specialist_capability(
+                capability=capability,
+                query=query,
+                effective_query=effective_query,
+                standalone_q=standalone_q,
+                session_id=session_id,
+                run_id=run_id,
+                overall_start=overall_start,
+                traces=traces,
+                catalog=catalog,
+                progress_callback=progress_callback,
+            )
 
         # Step 0.5: Fast-Path Answerability Screening (Enforces Honest Refusal before expensive routing)
         pre_assessment = answerability_gate.evaluate(effective_query, route=None, catalog=catalog)
@@ -531,20 +838,21 @@ class MultiAgentOrchestrator:
                     date_col=date_col,
                     value_col=metric_col,
                 )
-        elif detected_tool == "simulate_scenario":
-            analysis_res = analysis_registry.execute_tool(
-                "simulate_scenario",
-                baseline_value=1000000.0,
-                parameter_name="price",
-                shock_pct=5.0,
-            )
-        elif detected_tool == "optimize_budget_allocation":
-            analysis_res = analysis_registry.execute_tool(
-                "optimize_budget_allocation",
-                total_budget=50000.0,
-                channels=["Search", "Social", "Email", "Affiliate"],
-                historical_roas={"Search": 3.2, "Social": 2.4, "Email": 4.5, "Affiliate": 2.1},
-            )
+        elif detected_tool in ("simulate_scenario", "optimize_budget_allocation"):
+            # These tools need a baseline and per-channel returns that this generic
+            # path has not measured. Inventing them would produce a computed-looking
+            # answer from made-up inputs, so the run abstains and says why. Scenario
+            # and prescriptive questions are routed to their specialist workflows,
+            # which derive these inputs from the warehouse.
+            traces.append(StepTrace(
+                step="verifying_results",
+                status="succeeded",
+                duration_ms=1.0,
+                message=(
+                    f"Tool '{detected_tool}' not executed: its inputs are not derivable from this "
+                    "query's results, and no values were assumed."
+                ),
+            ))
 
         if analysis_res and analysis_res.success:
             traces.append(StepTrace(
@@ -619,6 +927,16 @@ class MultiAgentOrchestrator:
             ]
         total_duration_ms = (time.perf_counter() - overall_start) * 1000
 
+        management_response = _synthesize_management_from_workflow(
+            route=route,
+            query_result=query_result,
+            analysis_res=analysis_res,
+            composed_text=composed_text,
+            key_findings=key_findings,
+            warnings=warnings,
+            sanitized_sql=sanitized_sql,
+        )
+
         memory_service.record_assistant_turn(session_id, composed_text, sql=sanitized_sql)
 
         observability_tracer.record_run_trace(
@@ -677,6 +995,7 @@ class MultiAgentOrchestrator:
             verification=verification,
             repair_attempts=repair_attempts,
             composed_answer=composed_text,
+            management_response=management_response,
             key_findings=key_findings,
             limitations=warnings,
             suggested_followups=followups,

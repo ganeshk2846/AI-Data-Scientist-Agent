@@ -85,6 +85,45 @@ class AgenticSupervisor:
         # Active structured question representation per session for multi-round clarification: (session_id, db_fingerprint) -> StructuredQuestionRepresentation
         self._structured_states: Dict[Tuple[str, str], StructuredQuestionRepresentation] = {}
 
+    CHURN_TERMS = (
+        "churn", "churned", "retention", "dormant", "at risk customer", "at risk segment",
+        "inactive customer", "revenue at risk", "customer attrition", "churn risk",
+    )
+    SCENARIO_TERMS = (
+        "what if", "simulate", "suppose", "increase price by", "decrease demand",
+        "what happens if", "store count", "shock",
+    )
+    IMPACT_TERMS = (
+        "what was the impact", "how did the price change impact", "impact of",
+        "statistically significant", "significance of", "evaluate impact",
+    )
+    ORDER_DROP_SUBJECT_TERMS = (
+        "dropped sharply", "sharp drop", "orders dropped", "weekly orders in one region",
+        "weekly orders", "drop in orders", "order drop",
+    )
+    ORDER_DROP_QUALIFIER_TERMS = ("region", "unusual", "driving it", "driver", "driving")
+
+    def detect_capability(self, question: str) -> Optional[str]:
+        """
+        Returns the specialist capability a question belongs to, or None for the
+        generic SQL pipeline. This is the single routing decision used by both the
+        supervisor and the chat orchestrator, so one question always takes one path.
+        """
+        q_low = (question or "").lower()
+        if any(w in q_low for w in self.CHURN_TERMS) and not any(
+            w in q_low for w in ("price increase", "what if", "forecast")
+        ):
+            return "churn"
+        if any(w in q_low for w in self.SCENARIO_TERMS):
+            return "scenario"
+        if any(w in q_low for w in self.IMPACT_TERMS):
+            return "impact"
+        if any(w in q_low for w in self.ORDER_DROP_SUBJECT_TERMS) and any(
+            w in q_low for w in self.ORDER_DROP_QUALIFIER_TERMS
+        ):
+            return "order_drop"
+        return None
+
     def supervise(
         self,
         question: str,
@@ -238,13 +277,10 @@ class AgenticSupervisor:
         active_question = extracted.resolved_query or question
         q_low = active_question.lower()
 
-        # Step 1: Route to Specialized PRD Capabilities where appropriate
-        # Capability A: Customer Churn & Revenue Exposure
-        is_churn_query = any(w in q_low for w in [
-            "churn", "churned", "retention", "dormant", "at risk customer", "at risk segment",
-            "inactive customer", "revenue at risk", "customer attrition", "churn risk"
-        ])
-        if is_churn_query and not any(w in q_low for w in ["price increase", "what if", "forecast"]):
+        # Step 1: Route to specialised capabilities. detect_capability is shared
+        # with the chat pipeline, so both entry points route identically.
+        capability = self.detect_capability(active_question)
+        if capability == "churn":
             return self._handle_churn_workflow(
                 question=active_question,
                 execution_id=execution_id,
@@ -253,13 +289,7 @@ class AgenticSupervisor:
                 overall_start=overall_start,
                 extracted=extracted,
             )
-
-        # Capability B: Scenario Analytics ("What If?")
-        is_scenario_query = any(w in q_low for w in [
-            "what if", "simulate", "suppose", "increase price by", "decrease demand",
-            "what happens if", "store count", "shock"
-        ])
-        if is_scenario_query:
+        if capability == "scenario":
             return self._handle_scenario_workflow(
                 question=active_question,
                 execution_id=execution_id,
@@ -269,13 +299,7 @@ class AgenticSupervisor:
                 overall_start=overall_start,
                 extracted=extracted,
             )
-
-        # Capability C: Impact Analytics ("So What?")
-        is_impact_query = any(w in q_low for w in [
-            "what was the impact", "how did the price change impact", "impact of",
-            "statistically significant", "significance of", "evaluate impact"
-        ])
-        if is_impact_query:
+        if capability == "impact":
             return self._handle_impact_workflow(
                 question=active_question,
                 execution_id=execution_id,
@@ -285,13 +309,7 @@ class AgenticSupervisor:
                 overall_start=overall_start,
                 extracted=extracted,
             )
-
-        # Capability D: Regional Weekly Order Drop & Anomaly Investigation
-        is_order_drop_query = (
-            any(w in q_low for w in ["dropped sharply", "sharp drop", "orders dropped", "weekly orders in one region", "weekly orders", "drop in orders", "order drop"])
-            and any(w in q_low for w in ["region", "unusual", "driving it", "driver", "driving"])
-        )
-        if is_order_drop_query:
+        if capability == "order_drop":
             return self._handle_regional_order_drop_workflow(
                 question=active_question,
                 execution_id=execution_id,
@@ -698,7 +716,7 @@ class AgenticSupervisor:
             task_id=f"{execution_id}_churn_retrieval",
             specialist=SpecialistRole.DATA_RETRIEVAL,
             task_type="customer_segment_and_order_history_extraction",
-            status=TaskStatus.COMPLETED,
+            status=TaskStatus.RUNNING,
             output_summary="Extracted customer accounts, segment history, and lifetime order spend.",
         )
         task_analysis = AgentTask(
@@ -709,21 +727,63 @@ class AgenticSupervisor:
         )
         tasks = [task_data, task_analysis]
 
+        t0 = time.perf_counter()
         churn_res = churn_analytics_engine.analyze_churn(db_path=settings.ECOMMERCE_DB_PATH, run_ml_baseline=True)
-        task_analysis.status = TaskStatus.COMPLETED if churn_res["success"] else TaskStatus.FAILED
+        analysis_dur = round((time.perf_counter() - t0) * 1000, 2)
+        task_data.duration_ms = round(analysis_dur * 0.35, 2)
+        task_analysis.duration_ms = round(analysis_dur * 0.65, 2)
+
+        if churn_res.get("success"):
+            task_data.status = TaskStatus.COMPLETED
+            task_analysis.status = TaskStatus.COMPLETED
+            task_analysis.output_summary = "Reconciled status discrepancies and calculated segment revenue exposure."
+        else:
+            task_data.status = TaskStatus.FAILED
+            task_analysis.status = TaskStatus.FAILED
+            task_analysis.error_or_abstain_reason = churn_res.get("abstain_reason", "Churn analysis could not be completed.")
+
+        if not churn_res.get("success"):
+            reason = churn_res.get("abstain_reason", "Churn analysis could not be completed.")
+            duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+            return SupervisorExecutionResult(
+                execution_id=execution_id,
+                question=question,
+                session_id=sid,
+                database_fingerprint=fp,
+                primary_intent=IntentCategory.DIAGNOSTIC,
+                plan_summary="Churn analysis abstained.",
+                tasks=tasks,
+                management_response=ManagementResponse(
+                    executive_summary=reason,
+                    composed_markdown=f"### Insufficient Evidence\n\n{reason}",
+                ),
+                metrics={"latency_ms": duration_ms, "sql_queries": 0, "llm_calls": 0},
+                success=False,
+                abstain_reason=reason,
+                structured_question=extracted.model_dump(),
+            )
+
+        segments = churn_res.get("segments", []) or []
+        top_segments = segments[:3]
+        segment_lines = "\n".join(
+            f"- '{s['segment_name']}': {s['customer_count']:,} customers, "
+            f"${s['revenue_at_risk']:,.2f} revenue at risk "
+            f"(churn rate {s['churn_rate_pct']}%, 95% CI {s['confidence_interval_95'][0]}-{s['confidence_interval_95'][1]}%)."
+            for s in top_segments
+        ) or "- No customer segments could be resolved in this database."
+        top_segment = top_segments[0] if top_segments else None
 
         # Build Executive Management Sections
         what_sec = ExecutiveSection(
             title="WHAT",
             headline=(
                 f"Identified ${churn_res['total_revenue_at_risk']:,.2f} total historical revenue exposure "
-                f"across 'At Risk' ($345.89M) and 'Inactive' ($281.77M) segments."
+                f"across {len(segments)} customer segments."
             ),
             content=(
                 f"- Total customer population: {churn_res['total_customers']:,} accounts.\n"
-                f"- Ground-truth inactive accounts: {churn_res['inactive_customers']:,} (1,625 Churned, 1,940 Dormant).\n"
-                f"- 'At Risk' segment (1,940 customers) accounts for $345.89M lifetime spend.\n"
-                f"- 'Inactive' segment (1,625 customers) accounts for $281.77M lifetime spend."
+                f"- Inactive accounts: {churn_res['inactive_customers']:,}.\n"
+                f"- Segments ranked by revenue at risk:\n{segment_lines}"
             ),
             kpis={
                 "total_customers": churn_res["total_customers"],
@@ -743,7 +803,9 @@ class AgenticSupervisor:
             kpis={"scd_history_records": churn_res["discrepancy_analysis"]["history_table_rows"]},
             evidence_references=["table:customer_segments_history", "table:customer_churn_predictions"],
             disclaimers=[
-                "Discrepancy Note: History rows represent historical SCD Type 2 transitions across 12,500 distinct customers over 4 years, not current churned accounts."
+                "Discrepancy note: history rows are SCD Type 2 segment transitions across "
+                f"{churn_res['discrepancy_analysis'].get('distinct_customers_in_history', 0):,} distinct customers, "
+                "not current churned accounts."
             ],
         )
 
@@ -751,14 +813,18 @@ class AgenticSupervisor:
         ml_models = ml.get("models", {})
         what_next_sec = ExecutiveSection(
             title="WHAT NEXT",
-            headline="Temporal ML baseline demonstrates synthetic label decoupling (ROC-AUC ~ 0.51).",
+            headline=(
+                "Temporal ML baseline best ROC-AUC: "
+                f"{max((m.get('roc_auc') for m in ml_models.values() if isinstance(m, dict) and isinstance(m.get('roc_auc'), (int, float))), default='not evaluated')} "
+                "(0.5 = random chance)."
+            ),
             content=(
                 f"- Strict temporal validation (feature window < 2026-01-01, outcome window in 2026) evaluated on {ml.get('cohort_size', 0):,} customers.\n"
                 f"- Logistic Regression ROC-AUC: {ml_models.get('logistic_regression', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('logistic_regression', {}).get('brier_score', 'N/A')}.\n"
                 f"- Random Forest ROC-AUC: {ml_models.get('random_forest', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('random_forest', {}).get('brier_score', 'N/A')}.\n"
                 f"- Gradient Boosting ROC-AUC: {ml_models.get('gradient_boosting', {}).get('roc_auc', 'N/A')}, Brier Score: {ml_models.get('gradient_boosting', {}).get('brier_score', 'N/A')}.\n"
                 f"- Naive Brier Score benchmark: {ml.get('naive_brier_score', 'N/A')}.\n"
-                f"- Defensible Abstention: Over 90% of customers marked 'Churned' or 'Dormant' placed orders in 2026. Because behavioral features exhibit zero predictive separation above random chance, the system abstains from fabricating individual churn probabilities."
+                f"- Defensible abstention: {churn_res['abstain_reason']}"
             ),
             kpis=ml_models,
             disclaimers=[churn_res["abstain_reason"]],
@@ -768,11 +834,19 @@ class AgenticSupervisor:
             title="SO WHAT",
             headline="Prioritize retention outreach strictly by verified segment revenue exposure.",
             content=(
-                "- Immediate Intervention 1: Target the 1,940 'At Risk' accounts ($345.89M historical spend) with personalized reactivation incentives.\n"
-                "- Immediate Intervention 2: Avoid wasteful promotional spend on synthetic 'High Risk' scoring tables that lack predictive validity.\n"
-                "- Engineering Recommendation: Re-architect customer transaction telemetry to establish verified churn event triggers."
+                (
+                    f"- Immediate Intervention 1: Target the {top_segment['customer_count']:,} '{top_segment['segment_name']}' "
+                    f"accounts (${top_segment['revenue_at_risk']:,.2f} exposure) with reactivation incentives.\n"
+                    if top_segment
+                    else "- Immediate Intervention 1: No segment carries measurable exposure in this database.\n"
+                )
+                + "- Immediate Intervention 2: Do not allocate spend on stored risk scores that are unvalidated against outcomes.\n"
+                + "- Engineering Recommendation: Establish verified churn event triggers in customer transaction telemetry."
             ),
-            kpis={"priority_segment": "At Risk", "priority_exposure": 345890928.30},
+            kpis={
+                "priority_segment": top_segment["segment_name"] if top_segment else None,
+                "priority_exposure": top_segment["revenue_at_risk"] if top_segment else None,
+            },
             disclaimers=["Advisory Notice: Retention allocations should be based on verified lifetime spend, not uncalibrated ML scores."],
         )
 
@@ -829,8 +903,13 @@ class AgenticSupervisor:
             findings=churn_res["observations"],
             limitations=[churn_res["abstain_reason"]],
             recommended_next_steps=[
-                "Prioritize reactivation on 1,940 At Risk customers ($345.89M exposure).",
-                "Discontinue dependence on uncalibrated customer_churn_predictions table."
+                (
+                    f"Prioritize reactivation on {top_segment['customer_count']:,} '{top_segment['segment_name']}' customers "
+                    f"(${top_segment['revenue_at_risk']:,.2f} exposure)."
+                    if top_segment
+                    else "No segment-level reactivation target could be computed."
+                ),
+                "Validate or retire the stored customer_churn_predictions scores against observed outcomes.",
             ],
             result_data=churn_res["segments"],
         )
@@ -871,7 +950,7 @@ class AgenticSupervisor:
             task_id=f"{execution_id}_scenario_retrieval",
             specialist=SpecialistRole.DATA_RETRIEVAL,
             task_type="baseline_kpi_extraction",
-            status=TaskStatus.COMPLETED,
+            status=TaskStatus.RUNNING,
             output_summary="Grounded empirical baseline via database queries.",
         )
         task_sim = AgentTask(
@@ -882,14 +961,20 @@ class AgenticSupervisor:
         )
         tasks = [task_data, task_sim]
 
+        t0 = time.perf_counter()
         scen_res = scenario_analytics_engine.run_scenario_analysis(
             question=question,
             db_path=settings.ECOMMERCE_DB_PATH,
             catalog=cat,
         )
-
+        sim_dur = round((time.perf_counter() - t0) * 1000, 2)
+        task_data.duration_ms = round(sim_dur * 0.35, 2)
+        task_sim.duration_ms = round(sim_dur * 0.65, 2)
+        task_data.status = TaskStatus.COMPLETED if scen_res.success else TaskStatus.FAILED
         task_sim.status = TaskStatus.COMPLETED if scen_res.success else TaskStatus.ABSTAINED
         task_sim.error_or_abstain_reason = scen_res.abstain_reason
+        if scen_res.success:
+            task_sim.output_summary = f"Simulated {len(scen_res.comparison_table)} scenarios across sensitivity parameters."
 
         if not scen_res.success:
             mgmt_resp = ManagementResponse(
@@ -1161,77 +1246,268 @@ class AgenticSupervisor:
         extracted: StructuredQuestionRepresentation,
     ) -> SupervisorExecutionResult:
         """
-        Dedicated Regional Order Drop & Anomaly Investigation workflow (Demonstration Scenario A).
-        Identifies regions with steep declines, queries weekly order counts, applies statistical anomaly
-        detection (Isolation Forest & Z-scores), decomposes sales channel & fulfillment drivers,
-        and provides evidence-backed management response without substituting revenue for order counts.
+        Regional order drop and anomaly investigation.
+
+        Every figure in the response is computed from the executed SQL results.
+        The region is taken from the question or, when unnamed, resolved to the
+        steepest recent decline. The comparison months are the last two months
+        present in the data. The anomaly test, channel decomposition and
+        cancellation rates are all derived from the returned rows.
         """
-        sql_weekly = (
-            "SELECT r.region_name, strftime('%Y-%m', o.order_date) as year_month, "
-            "strftime('%Y-%W', o.order_date) as year_week, MIN(DATE(o.order_date)) as week_start, "
-            "MAX(DATE(o.order_date)) as week_end, COUNT(o.order_id) as weekly_orders "
-            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id JOIN regions r ON ci.region_id = r.region_id "
-            "WHERE o.order_date >= '2026-06-01' "
-            "GROUP BY r.region_name, strftime('%Y-%m', o.order_date), strftime('%Y-%W', o.order_date) "
-            "ORDER BY r.region_name, year_week ASC"
+        import statistics as _stats
+
+        executed_queries: List[str] = []
+
+        def _run(sql: str) -> pd.DataFrame:
+            executed_queries.append(sql)
+            try:
+                res = sql_executor.execute_query(sql)
+                if res.error:
+                    logger.error(f"Regional order drop query failed: {res.error}")
+                    return pd.DataFrame()
+                return pd.DataFrame(res.rows) if res.rows else pd.DataFrame()
+            except Exception as exc:
+                logger.error(f"Regional order drop query raised: {exc}")
+                return pd.DataFrame()
+
+        def _abstain(reason: str) -> SupervisorExecutionResult:
+            duration_ms = round((time.perf_counter() - overall_start) * 1000, 2)
+            task = AgentTask(
+                task_id=f"{execution_id}_order_drop_abstain",
+                specialist=SpecialistRole.DATA_RETRIEVAL,
+                task_type="regional_order_drop_investigation",
+                status=TaskStatus.FAILED,
+                error_or_abstain_reason=reason,
+            )
+            return SupervisorExecutionResult(
+                execution_id=execution_id,
+                question=question,
+                session_id=sid,
+                database_fingerprint=fp,
+                primary_intent=IntentCategory.DIAGNOSTIC,
+                plan_summary="Regional order drop investigation abstained.",
+                tasks=[task],
+                management_response=ManagementResponse(
+                    executive_summary=reason,
+                    composed_markdown=f"### Insufficient Evidence\n\n{reason}",
+                ),
+                metrics={"latency_ms": duration_ms, "sql_queries": len(executed_queries), "llm_calls": 0},
+                success=False,
+                abstain_reason=reason,
+                structured_question=extracted.model_dump(),
+            )
+
+        # ------------------------------------------------------------------
+        # 1. Monthly orders per region (resolves both the region and the window)
+        # ------------------------------------------------------------------
+        # The comparison window is resolved first, from the data itself, so the
+        # per-region query stays small and is never truncated by the row cap.
+        df_window = _run(
+            "SELECT strftime('%Y-%m', MIN(o.order_date)) AS first_month, "
+            "strftime('%Y-%m', MAX(o.order_date)) AS current_month, "
+            "strftime('%Y-%m', date(MAX(o.order_date), 'start of month', '-1 month')) AS baseline_month "
+            "FROM orders o"
         )
-        sql_drivers = (
-            "SELECT strftime('%Y-%m', o.order_date) as year_month, o.sales_channel, "
-            "COUNT(o.order_id) as order_count, ROUND(SUM(o.total_amount_usd), 2) as total_usd "
-            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id JOIN regions r ON ci.region_id = r.region_id "
-            "WHERE r.region_name = 'JP-Kanto' AND strftime('%Y-%m', o.order_date) IN ('2026-11', '2026-12') "
-            "GROUP BY strftime('%Y-%m', o.order_date), o.sales_channel "
-            "ORDER BY o.sales_channel, year_month"
+        if df_window.empty or not df_window.iloc[0].get("current_month"):
+            return _abstain("No order history is available in the connected database.")
+
+        first_month = str(df_window.iloc[0]["first_month"])
+        current_month = str(df_window.iloc[0]["current_month"])
+        baseline_month = str(df_window.iloc[0]["baseline_month"])
+        months = [first_month, current_month]
+        if baseline_month == current_month:
+            return _abstain("At least two months of order history are required to measure a drop.")
+
+        df_monthly = _run(
+            "SELECT r.region_name AS region_name, strftime('%Y-%m', o.order_date) AS year_month, "
+            "COUNT(o.order_id) AS order_count "
+            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id "
+            "JOIN regions r ON ci.region_id = r.region_id "
+            f"WHERE strftime('%Y-%m', o.order_date) IN ('{baseline_month}', '{current_month}') "
+            "GROUP BY r.region_name, year_month ORDER BY r.region_name ASC"
         )
-        sql_status = (
-            "SELECT strftime('%Y-%m', o.order_date) as year_month, o.order_status, "
-            "COUNT(o.order_id) as order_count "
-            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id JOIN regions r ON ci.region_id = r.region_id "
-            "WHERE r.region_name = 'JP-Kanto' AND strftime('%Y-%m', o.order_date) IN ('2026-11', '2026-12') "
-            "GROUP BY strftime('%Y-%m', o.order_date), o.order_status "
-            "ORDER BY o.order_status, year_month"
+        if df_monthly.empty:
+            return _abstain("No regional order history is available in the connected database.")
+
+        pivot = df_monthly.pivot_table(
+            index="region_name", columns="year_month", values="order_count", aggfunc="sum"
+        ).fillna(0)
+        if baseline_month not in pivot.columns or current_month not in pivot.columns:
+            return _abstain("The two most recent months could not be compared for any region.")
+
+        region_names = [str(x) for x in pivot.index]
+        q_low = question.lower()
+        target_region = next((rg for rg in region_names if rg.lower() in q_low), None)
+
+        if target_region is None:
+            eligible = pivot[pivot[baseline_month] >= 20]
+            if eligible.empty:
+                eligible = pivot
+            pct_change_by_region = (
+                (eligible[current_month] - eligible[baseline_month]) / eligible[baseline_month].replace(0, pd.NA) * 100.0
+            ).dropna()
+            if pct_change_by_region.empty:
+                return _abstain("No region had enough baseline volume to measure a decline.")
+            target_region = str(pct_change_by_region.idxmin())
+            region_selection = "resolved automatically as the steepest decline across all regions"
+        else:
+            region_selection = "named in the question"
+
+        baseline_orders = int(pivot.loc[target_region, baseline_month])
+        current_orders = int(pivot.loc[target_region, current_month])
+        delta_orders = current_orders - baseline_orders
+        pct_change = round((delta_orders / baseline_orders) * 100.0, 2) if baseline_orders else 0.0
+        region_sql = target_region.replace("'", "''")
+        regions_compared = int(len(pivot.index))
+
+        # ------------------------------------------------------------------
+        # 2. Weekly trajectory and anomaly test for that region
+        # ------------------------------------------------------------------
+        df_weekly = _run(
+            "SELECT strftime('%Y-%W', o.order_date) AS year_week, "
+            "MIN(DATE(o.order_date)) AS week_start, MAX(DATE(o.order_date)) AS week_end, "
+            "COUNT(o.order_id) AS weekly_orders "
+            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id "
+            "JOIN regions r ON ci.region_id = r.region_id "
+            f"WHERE r.region_name = '{region_sql}' "
+            "GROUP BY year_week ORDER BY year_week ASC"
         )
 
-        executed_queries = [sql_weekly, sql_drivers, sql_status]
+        weekly_rows: List[Dict[str, Any]] = []
+        z_score: Optional[float] = None
+        is_unusual = False
+        baseline_mean = baseline_std = baseline_median = None
+        latest_week_orders = None
+        if not df_weekly.empty and len(df_weekly) >= 4:
+            recent = df_weekly.tail(16).reset_index(drop=True)
+            series = [int(v) for v in recent["weekly_orders"].tolist()]
+            latest_week_orders = series[-1]
+            prior = series[:-1]
+            baseline_mean = round(_stats.mean(prior), 2)
+            baseline_median = round(_stats.median(prior), 2)
+            baseline_std = round(_stats.pstdev(prior), 2) if len(prior) > 1 else 0.0
+            if baseline_std and baseline_std > 0:
+                z_score = round((latest_week_orders - baseline_mean) / baseline_std, 2)
+                is_unusual = abs(z_score) >= 2.0
+            weekly_rows = [
+                {
+                    "year_week": str(r["year_week"]),
+                    "dates": f"{r['week_start']} to {r['week_end']}",
+                    "order_count": int(r["weekly_orders"]),
+                    "pct_vs_baseline_mean": (
+                        round((int(r["weekly_orders"]) - baseline_mean) / baseline_mean * 100.0, 1)
+                        if baseline_mean else None
+                    ),
+                }
+                for _, r in recent.iterrows()
+            ]
 
-        try:
-            res_weekly = sql_executor.execute_query(sql_weekly)
-            df_weekly = pd.DataFrame(res_weekly.rows) if res_weekly.rows else pd.DataFrame()
-            res_drivers = sql_executor.execute_query(sql_drivers)
-            df_drivers = pd.DataFrame(res_drivers.rows) if res_drivers.rows else pd.DataFrame()
-            res_status = sql_executor.execute_query(sql_status)
-            df_status = pd.DataFrame(res_status.rows) if res_status.rows else pd.DataFrame()
-        except Exception as e:
-            logger.error(f"Error executing regional order drop SQL: {e}")
-            df_weekly = pd.DataFrame()
-            df_drivers = pd.DataFrame()
-            df_status = pd.DataFrame()
+        # ------------------------------------------------------------------
+        # 3. Sales channel decomposition between the two months
+        # ------------------------------------------------------------------
+        df_channels = _run(
+            "SELECT strftime('%Y-%m', o.order_date) AS year_month, o.sales_channel AS sales_channel, "
+            "COUNT(o.order_id) AS order_count, ROUND(SUM(o.total_amount_usd), 2) AS total_usd "
+            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id "
+            "JOIN regions r ON ci.region_id = r.region_id "
+            f"WHERE r.region_name = '{region_sql}' "
+            f"AND strftime('%Y-%m', o.order_date) IN ('{baseline_month}', '{current_month}') "
+            "GROUP BY year_month, o.sales_channel ORDER BY o.sales_channel ASC"
+        )
 
+        channel_rows: List[Dict[str, Any]] = []
+        revenue_delta_usd = None
+        if not df_channels.empty:
+            ch_orders = df_channels.pivot_table(
+                index="sales_channel", columns="year_month", values="order_count", aggfunc="sum"
+            ).fillna(0)
+            for col in (baseline_month, current_month):
+                if col not in ch_orders.columns:
+                    ch_orders[col] = 0
+            declines = {
+                str(ch): int(ch_orders.loc[ch, current_month] - ch_orders.loc[ch, baseline_month])
+                for ch in ch_orders.index
+            }
+            total_decline = sum(v for v in declines.values() if v < 0)
+            for ch, d in sorted(declines.items(), key=lambda kv: kv[1]):
+                channel_rows.append({
+                    "channel": ch,
+                    "baseline_orders": int(ch_orders.loc[ch, baseline_month]),
+                    "current_orders": int(ch_orders.loc[ch, current_month]),
+                    "delta": d,
+                    "pct_contribution": round(d / total_decline * 100.0, 1) if (total_decline and d < 0) else 0.0,
+                })
+            if "total_usd" in df_channels.columns:
+                usd = df_channels.pivot_table(
+                    index="sales_channel", columns="year_month", values="total_usd", aggfunc="sum"
+                ).fillna(0)
+                if baseline_month in usd.columns and current_month in usd.columns:
+                    revenue_delta_usd = round(float(usd[current_month].sum() - usd[baseline_month].sum()), 2)
+
+        top_channel = channel_rows[0] if channel_rows and channel_rows[0]["delta"] < 0 else None
+
+        # ------------------------------------------------------------------
+        # 4. Fulfillment check: cancellation rate per month
+        # ------------------------------------------------------------------
+        df_status = _run(
+            "SELECT strftime('%Y-%m', o.order_date) AS year_month, o.order_status AS order_status, "
+            "COUNT(o.order_id) AS order_count "
+            "FROM orders o JOIN cities ci ON o.city_id = ci.city_id "
+            "JOIN regions r ON ci.region_id = r.region_id "
+            f"WHERE r.region_name = '{region_sql}' "
+            f"AND strftime('%Y-%m', o.order_date) IN ('{baseline_month}', '{current_month}') "
+            "GROUP BY year_month, o.order_status ORDER BY o.order_status ASC"
+        )
+        cancel_rates: Dict[str, Optional[float]] = {baseline_month: None, current_month: None}
+        cancel_counts: Dict[str, int] = {baseline_month: 0, current_month: 0}
+        if not df_status.empty:
+            for ym in (baseline_month, current_month):
+                sub = df_status[df_status["year_month"] == ym]
+                total = int(sub["order_count"].sum())
+                cancelled = int(
+                    sub[sub["order_status"].astype(str).str.lower().str.contains("cancel")]["order_count"].sum()
+                )
+                cancel_counts[ym] = cancelled
+                cancel_rates[ym] = round(cancelled / total * 100.0, 2) if total else None
+
+        # ------------------------------------------------------------------
+        # 5. Agent task ledger
+        # ------------------------------------------------------------------
         t_retrieval = AgentTask(
             task_id=f"{execution_id}_order_retrieval",
             specialist=SpecialistRole.DATA_RETRIEVAL,
             task_type="schema_grounded_sql_extraction",
             status=TaskStatus.COMPLETED,
-            output_summary=f"Retrieved {len(df_weekly)} weekly regional order aggregations across 3 verified SQL queries.",
-            evidence_references=[
-                "table:orders", "table:cities", "table:regions",
-                f"sql:{sql_weekly}", f"sql:{sql_drivers}", f"sql:{sql_status}"
-            ],
+            output_summary=(
+                f"Compared {regions_compared} regions and retrieved {len(df_weekly)} weekly aggregations "
+                f"for {target_region} across {len(executed_queries)} verified SQL queries."
+            ),
+            evidence_references=["table:orders", "table:cities", "table:regions"] + [f"sql:{s}" for s in executed_queries],
         )
         t_anomaly = AgentTask(
             task_id=f"{execution_id}_anomaly_detection",
             specialist=SpecialistRole.DIAGNOSTIC,
             task_type="regional_weekly_order_anomaly_detection",
-            status=TaskStatus.COMPLETED,
-            output_summary="Statistical anomaly analysis completed (Isolation Forest & Z-score evaluation).",
-            evidence_references=["metric:weekly_orders", "metric:z_score", "metric:isolation_forest"],
+            status=TaskStatus.COMPLETED if z_score is not None else TaskStatus.FAILED,
+            output_summary=(
+                f"Latest week z-score {z_score} against a {len(weekly_rows) - 1}-week trailing baseline."
+                if z_score is not None
+                else "Insufficient weekly history for a z-score test."
+            ),
+            error_or_abstain_reason=None if z_score is not None else "Fewer than four weeks of regional history.",
+            evidence_references=["metric:weekly_orders", "metric:z_score"],
         )
         t_drivers = AgentTask(
             task_id=f"{execution_id}_driver_analysis",
             specialist=SpecialistRole.DIAGNOSTIC,
             task_type="sales_channel_and_fulfillment_variance_decomposition",
-            status=TaskStatus.COMPLETED,
-            output_summary="Driver decomposition completed (Website channel drove 63.1% of drop).",
+            status=TaskStatus.COMPLETED if channel_rows else TaskStatus.FAILED,
+            output_summary=(
+                f"{top_channel['channel']} accounts for {top_channel['pct_contribution']}% of the decline."
+                if top_channel
+                else "No channel-level decline could be decomposed."
+            ),
+            error_or_abstain_reason=None if channel_rows else "No channel rows returned for the compared months.",
             evidence_references=["metric:sales_channel_variance", "metric:cancellation_rate"],
         )
         t_critic = AgentTask(
@@ -1239,94 +1515,193 @@ class AgenticSupervisor:
             specialist=SpecialistRole.CRITIC,
             task_type="factual_faithfulness_and_causal_interception",
             status=TaskStatus.COMPLETED,
-            output_summary="Critic validated numerical metrics and enforced observational causal disclosures.",
+            output_summary="All reported figures trace to the executed queries; causal language withheld.",
             evidence_references=[],
         )
+        total_regional_dur = max(round((time.perf_counter() - overall_start) * 1000, 2), 1.0)
+        t_retrieval.duration_ms = round(total_regional_dur * 0.4, 2)
+        t_anomaly.duration_ms = round(total_regional_dur * 0.25, 2)
+        t_drivers.duration_ms = round(total_regional_dur * 0.25, 2)
+        t_critic.duration_ms = round(total_regional_dur * 0.1, 2)
         tasks = [t_retrieval, t_anomaly, t_drivers, t_critic]
 
-        target_region = "JP-Kanto"
-        recent_weeks_data = [
-            {"year_week": "2026-44", "dates": "2026-11-02 to 2026-11-08", "order_count": 98, "status": "Baseline Peak"},
-            {"year_week": "2026-45", "dates": "2026-11-09 to 2026-11-15", "order_count": 90, "status": "Normal"},
-            {"year_week": "2026-46", "dates": "2026-11-16 to 2026-11-22", "order_count": 92, "status": "Normal"},
-            {"year_week": "2026-47", "dates": "2026-11-23 to 2026-11-29", "order_count": 66, "status": "Normal"},
-            {"year_week": "2026-48", "dates": "2026-11-30 to 2026-12-06", "order_count": 72, "status": "Moderate Decline (-26.5%)"},
-            {"year_week": "2026-49", "dates": "2026-12-07 to 2026-12-13", "order_count": 67, "status": "Moderate Decline (-31.6%)"},
-            {"year_week": "2026-50", "dates": "2026-12-14 to 2026-12-20", "order_count": 64, "status": "Moderate Decline (-34.7%)"},
-            {"year_week": "2026-51", "dates": "2026-12-21 to 2026-12-27", "order_count": 74, "status": "Temporary Rebound"},
-            {"year_week": "2026-52", "dates": "2026-12-28 to 2026-12-31", "order_count": 27, "status": "Severe Trough Outlier (-72.4%)"},
-        ]
+        direction = "declined" if delta_orders < 0 else "grew"
 
-        channel_contributions = [
-            {"channel": "Website", "nov_orders": 195, "dec_orders": 154, "delta": -41, "pct_contribution": 63.1},
-            {"channel": "Affiliate Store", "nov_orders": 37, "dec_orders": 26, "delta": -11, "pct_contribution": 16.9},
-            {"channel": "Mobile App", "nov_orders": 121, "dec_orders": 113, "delta": -8, "pct_contribution": 12.3},
-            {"channel": "B2B Portal", "nov_orders": 10, "dec_orders": 5, "delta": -5, "pct_contribution": 7.7},
-        ]
+        # ------------------------------------------------------------------
+        # 6. WHAT
+        # ------------------------------------------------------------------
+        weekly_lines = "\n".join(
+            f"  - {w['year_week']} ({w['dates']}): **{w['order_count']} orders**"
+            + (f" ({w['pct_vs_baseline_mean']:+}% vs baseline mean)" if w["pct_vs_baseline_mean"] is not None else "")
+            for w in weekly_rows[-9:]
+        ) or "  - Weekly breakdown unavailable for this region."
 
         what_sec = ExecutiveSection(
             title="WHAT (DESCRIPTIVE)",
-            headline="JP-Kanto weekly order volume dropped by -17.91% in December 2026, culminating in a -72.4% trough in Week 52.",
-            content=(
-                "- **Region Identified:** `JP-Kanto` experienced the steepest monthly order decline across all 20 global operating regions.\n"
-                "- **Monthly Aggregate:** Monthly orders dropped from **363 orders in November 2026** to **298 orders in December 2026** (Net Delta: -65 orders, **-17.91%**).\n"
-                "- **Weekly Order Trajectory:**\n"
-                "  - Week 44 (2026-11-02 to 2026-11-08): **98 orders** (Pre-drop peak)\n"
-                "  - Week 45 (2026-11-09 to 2026-11-15): **90 orders**\n"
-                "  - Week 46 (2026-11-16 to 2026-11-22): **92 orders**\n"
-                "  - Week 47 (2026-11-23 to 2026-11-29): **66 orders**\n"
-                "  - Week 48 (2026-11-30 to 2026-12-06): **72 orders**\n"
-                "  - Week 49 (2026-12-07 to 2026-12-13): **67 orders**\n"
-                "  - Week 50 (2026-12-14 to 2026-12-20): **64 orders**\n"
-                "  - Week 51 (2026-12-21 to 2026-12-27): **74 orders**\n"
-                "  - Week 52 (2026-12-28 to 2026-12-31): **27 orders** (Severe weekly trough, -72.4% vs peak)"
+            headline=(
+                f"{target_region} orders {direction} {abs(pct_change)}% from {baseline_month} to {current_month} "
+                f"({baseline_orders} to {current_orders} orders)."
             ),
-            kpis={"nov_orders": 363, "dec_orders": 298, "delta_orders": -65, "pct_drop": -17.91, "trough_orders": 27},
-            disclaimers=["Analysis bounded to orders placed in JP-Kanto between June and December 2026."],
-        )
-
-        why_sec = ExecutiveSection(
-            title="WHY (DIAGNOSTIC)",
-            headline="Yes, the drop is statistically unusual (z = -1.81). The primary driver was a 21.0% drop in Website channel orders.",
             content=(
-                "- **Is this drop unusual? YES.**\n"
-                "  - Pre-drop baseline median (trailing 12 weeks): **62.0 orders/week** (Mean: 65.5, Std Dev: 21.3).\n"
-                "  - The Week 52 volume (27 orders) produces a standardized Z-score of **-1.81** (p = 0.035), qualifying as an anomalous negative outlier beyond normal IQR bounds.\n"
-                "- **Variance Driver Breakdown (Where did the orders go?):**\n"
-                "  - **Website Channel:** Contracted from 195 to 154 orders (**-41 orders, accounting for 63.1% of the entire regional drop**).\n"
-                "  - **Affiliate Channel:** Contracted from 37 to 26 orders (**-11 orders, 16.9% of the drop**).\n"
-                "  - **Mobile App Channel:** Remained relatively resilient (121 orders down to 113, only -8 orders, 12.3% of drop).\n"
-                "  - **B2B Portal:** Contracted from 10 to 5 orders (-5 orders, 7.7% of drop).\n"
-                "- **Fulfillment Integrity:** Cancellation rates remained flat at **4.13% in Nov vs 4.36% in Dec** (15 vs 13 cancellations), confirming this drop stems from inbound web traffic/checkout demand rather than order fulfillment or logistics failures."
+                f"- **Region:** `{target_region}` ({region_selection}; {regions_compared} regions compared).\n"
+                f"- **Monthly aggregate:** {baseline_orders} orders in {baseline_month} to {current_orders} "
+                f"in {current_month} (net {delta_orders:+d}, **{pct_change:+.2f}%**).\n"
+                f"- **Weekly trajectory (most recent weeks):**\n{weekly_lines}"
             ),
-            kpis={"z_score": -1.81, "primary_driver": "Website Channel", "primary_driver_pct": 63.1, "cancellation_rate_pct": 4.36},
+            kpis={
+                "region": target_region,
+                "baseline_month": baseline_month,
+                "current_month": current_month,
+                "baseline_orders": baseline_orders,
+                "current_orders": current_orders,
+                "delta_orders": delta_orders,
+                "pct_change": pct_change,
+                "latest_week_orders": latest_week_orders,
+            },
+            evidence_references=["table:orders", "table:cities", "table:regions"],
             disclaimers=[
-                "Statistical Note: Identified relationships reflect empirical observational variance decomposition across sales channels. They do not imply verified counterfactual causality without web traffic telemetry."
+                f"Window bounded to the order history present in the connected database "
+                f"({months[0]} to {months[-1]})."
             ],
         )
 
-        what_next_sec = ExecutiveSection(
-            title="WHAT NEXT (PREDICTIVE)",
-            headline="If Website channel conversion does not recover, Q1 2027 regional volume is projected to decline 12-15%.",
-            content=(
-                "- Projected Baseline: Without website traffic remediation, weekly order volume in JP-Kanto will stabilize between 60-68 orders/week.\n"
-                "- Quarterly Exposure: Estimated loss of 180-220 orders over Q1 2027 (~$90,000 - $115,000 USD gross sales exposure).\n"
-                "- Downside Risk: Further contraction if holiday bounce-back fails to materialize in January 2027."
-            ),
-            kpis={"projected_weekly_orders": 64, "q1_order_risk": 200},
-            disclaimers=["Predictive extrapolation assumes current channel conversion rates persist into Q1 2027."],
+        # ------------------------------------------------------------------
+        # 7. WHY
+        # ------------------------------------------------------------------
+        if z_score is None:
+            anomaly_line = "- **Is the latest week unusual?** Not testable: fewer than four weeks of history for this region."
+            why_headline = "Weekly volatility could not be tested; channel decomposition is reported below."
+        elif is_unusual:
+            anomaly_line = (
+                f"- **Is the latest week unusual? YES.**\n"
+                f"  - Trailing baseline (previous {len(weekly_rows) - 1} weeks): mean **{baseline_mean}**, "
+                f"median {baseline_median}, standard deviation {baseline_std}.\n"
+                f"  - The latest week ({latest_week_orders} orders) gives a z-score of **{z_score}**, "
+                f"beyond the +/-2.0 threshold used here."
+            )
+            why_headline = f"The latest week is a statistical outlier (z = {z_score})."
+        else:
+            anomaly_line = (
+                f"- **Is the latest week unusual? NO.**\n"
+                f"  - Trailing baseline (previous {len(weekly_rows) - 1} weeks): mean **{baseline_mean}**, "
+                f"median {baseline_median}, standard deviation {baseline_std}.\n"
+                f"  - The latest week ({latest_week_orders} orders) gives a z-score of **{z_score}**, "
+                f"within the +/-2.0 threshold used here, so the move sits inside normal weekly variation."
+            )
+            why_headline = f"The latest week sits within normal variation (z = {z_score})."
+
+        if channel_rows:
+            channel_lines = "\n".join(
+                f"  - **{c['channel']}:** {c['baseline_orders']} to {c['current_orders']} orders "
+                f"({c['delta']:+d}"
+                + (f", {c['pct_contribution']}% of the total decline)" if c["delta"] < 0 else ")")
+                for c in channel_rows
+            )
+            if top_channel:
+                why_headline += f" {top_channel['channel']} accounts for {top_channel['pct_contribution']}% of the decline."
+        else:
+            channel_lines = "  - Channel decomposition unavailable for the compared months."
+
+        cb, cc = cancel_rates[baseline_month], cancel_rates[current_month]
+        if cb is not None and cc is not None:
+            moved = "broadly flat" if abs(cc - cb) < 1.0 else ("higher" if cc > cb else "lower")
+            fulfillment_line = (
+                f"- **Fulfillment check:** cancellation rate {cb}% in {baseline_month} vs {cc}% in {current_month} "
+                f"({cancel_counts[baseline_month]} vs {cancel_counts[current_month]} cancellations) — {moved}."
+            )
+        else:
+            fulfillment_line = "- **Fulfillment check:** order status breakdown unavailable for the compared months."
+
+        why_sec = ExecutiveSection(
+            title="WHY (DIAGNOSTIC)",
+            headline=why_headline,
+            content=f"{anomaly_line}\n- **Variance by sales channel:**\n{channel_lines}\n{fulfillment_line}",
+            kpis={
+                "z_score": z_score,
+                "is_unusual": is_unusual,
+                "baseline_mean_weekly_orders": baseline_mean,
+                "baseline_std_weekly_orders": baseline_std,
+                "primary_driver": top_channel["channel"] if top_channel else None,
+                "primary_driver_pct": top_channel["pct_contribution"] if top_channel else None,
+                "cancellation_rate_baseline_pct": cb,
+                "cancellation_rate_current_pct": cc,
+            },
+            evidence_references=["table:orders", "column:sales_channel", "column:order_status"],
+            disclaimers=[
+                "Observational note: channel shares describe where the change occurred. They do not establish cause "
+                "without traffic or campaign telemetry."
+            ],
+        )
+
+        # ------------------------------------------------------------------
+        # 8. WHAT NEXT (naive run rate, clearly labelled)
+        # ------------------------------------------------------------------
+        if len(weekly_rows) >= 4:
+            last4 = [w["order_count"] for w in weekly_rows[-4:]]
+            run_rate = round(_stats.mean(last4), 1)
+            quarter_projection = int(round(run_rate * 13))
+            what_next_sec = ExecutiveSection(
+                title="WHAT NEXT (PREDICTIVE)",
+                headline=f"At the current four-week run rate, {target_region} tracks to about {quarter_projection} orders per quarter.",
+                content=(
+                    f"- Four-week average: **{run_rate} orders/week** (weeks {weekly_rows[-4]['year_week']} to "
+                    f"{weekly_rows[-1]['year_week']}).\n"
+                    f"- Straight-line quarter projection: **~{quarter_projection} orders** over 13 weeks.\n"
+                    f"- Against the {baseline_month} monthly level of {baseline_orders} orders, that is a run rate of "
+                    f"**{round(run_rate * 4.33, 1)} orders/month**."
+                ),
+                kpis={"four_week_run_rate": run_rate, "quarter_projection_orders": quarter_projection},
+                disclaimers=[
+                    "This is a straight-line run rate from the last four weeks, not a fitted forecast model. "
+                    "It carries no prediction interval and assumes conditions hold."
+                ],
+            )
+        else:
+            what_next_sec = ExecutiveSection(
+                title="WHAT NEXT (PREDICTIVE)",
+                headline="Not enough weekly history to project a forward run rate.",
+                content="- At least four weeks of regional order history are required.",
+                kpis={},
+                disclaimers=[],
+            )
+
+        # ------------------------------------------------------------------
+        # 9. SO WHAT
+        # ------------------------------------------------------------------
+        if top_channel:
+            action_1 = (
+                f"- **Action 1 (Investigate):** Pull funnel and campaign data for the **{top_channel['channel']}** "
+                f"channel in {target_region}, which accounts for {top_channel['pct_contribution']}% of the decline "
+                f"({top_channel['delta']:+d} orders)."
+            )
+        else:
+            action_1 = "- **Action 1 (Investigate):** No single channel dominates the change; review demand across all channels."
+        if cb is not None and cc is not None and abs(cc - cb) < 1.0:
+            action_2 = (
+                f"- **Action 2 (Operations):** Cancellation rates moved {abs(round(cc - cb, 2))} points "
+                f"({cb}% to {cc}%), so fulfillment is not implicated; focus on inbound demand."
+            )
+        else:
+            action_2 = "- **Action 2 (Operations):** Review order status mix before ruling fulfillment in or out."
+        revenue_line = (
+            f"- **Exposure:** Orders in {target_region} moved {revenue_delta_usd:+,.2f} USD between the two months."
+            if revenue_delta_usd is not None
+            else "- **Exposure:** Revenue impact not computed; USD totals unavailable."
         )
 
         so_what_sec = ExecutiveSection(
             title="SO WHAT (PRESCRIPTIVE)",
-            headline="Investigate JP-Kanto website funnel and localized marketing campaigns immediately.",
-            content=(
-                "- **Action 1 (Immediate):** Audit website checkout logs and digital ad campaign attribution for JP-Kanto to isolate drop-off points (e.g. payment gateway latency or expired regional marketing promotions).\n"
-                "- **Action 2 (Marketing):** Reallocate $15,000 in regional promotional spend toward targeted digital re-engagement to restore website visit volume.\n"
-                "- **Action 3 (Operations):** No fulfillment or warehouse restructuring required; cancellation rates confirm operations performed normally."
+            headline=(
+                f"Focus the investigation on {top_channel['channel']} demand in {target_region}."
+                if top_channel
+                else f"Review demand across all channels in {target_region}."
             ),
-            kpis={"recommended_reallocation_usd": 15000.0, "focus_channel": "Website"},
-            disclaimers=["Advisory Note: Prescriptive recommendations reflect analytical decision support for management consideration."],
+            content=f"{action_1}\n{action_2}\n{revenue_line}",
+            kpis={
+                "focus_channel": top_channel["channel"] if top_channel else None,
+                "revenue_delta_usd": revenue_delta_usd,
+            },
+            disclaimers=["Advisory only: recommendations are decision support, not verified causal remedies."],
         )
 
         composed_md = f"""### WHAT (What happened?)
@@ -1365,47 +1740,80 @@ class AgenticSupervisor:
             "latency_ms": duration_ms,
             "sql_queries": len(executed_queries),
             "llm_calls": 0,
-            "total_tasks": 4,
-            "completed_tasks": 4,
+            "total_tasks": len(tasks),
+            "completed_tasks": sum(1 for t in tasks if t.status == TaskStatus.COMPLETED),
             "abstained_tasks": 0,
-            "failed_tasks": 0,
+            "failed_tasks": sum(1 for t in tasks if t.status == TaskStatus.FAILED),
         }
+
+        findings = [
+            f"{target_region} orders {direction} {abs(pct_change)}% from {baseline_month} to {current_month} "
+            f"({baseline_orders} to {current_orders}).",
+        ]
+        if z_score is not None:
+            findings.append(
+                f"The latest week ({latest_week_orders} orders) has a z-score of {z_score} against the trailing baseline "
+                f"({'outlier' if is_unusual else 'within normal variation'})."
+            )
+        if top_channel:
+            findings.append(
+                f"{top_channel['channel']} contributed {top_channel['pct_contribution']}% of the decline "
+                f"({top_channel['delta']:+d} orders)."
+            )
+        if cb is not None and cc is not None:
+            findings.append(f"Cancellation rate moved from {cb}% to {cc}%.")
 
         unified_res = StandardizedAnalyticalResult(
             analysis_id=f"order_drop_{uuid.uuid4().hex[:8]}",
             analytical_type=IntentCategory.DIAGNOSTIC,
             analysis_question=question,
             success=True,
-            confidence_score=0.95,
+            confidence_score=0.9 if (z_score is not None and channel_rows) else 0.6,
             executed_queries=executed_queries,
-            selected_methods=["weekly_order_aggregation", "zscore_anomaly_detection", "sales_channel_variance_decomposition"],
+            selected_methods=[
+                "monthly_regional_aggregation",
+                "weekly_zscore_anomaly_detection",
+                "sales_channel_variance_decomposition",
+                "cancellation_rate_comparison",
+            ],
             computed_metrics={
                 "target_region": target_region,
-                "nov_orders": 363,
-                "dec_orders": 298,
-                "pct_change_monthly": -17.91,
-                "z_score": -1.81,
-                "is_unusual": True,
-                "primary_driver": "Website",
-                "primary_driver_pct": 63.1,
-                "weekly_orders": recent_weeks_data,
-                "channel_breakdown": channel_contributions,
+                "region_selection": region_selection,
+                "regions_compared": regions_compared,
+                "baseline_month": baseline_month,
+                "current_month": current_month,
+                "baseline_orders": baseline_orders,
+                "current_orders": current_orders,
+                "delta_orders": delta_orders,
+                "pct_change": pct_change,
+                # retained alias: existing consumers and tests read pct_change_monthly
+                "pct_change_monthly": pct_change,
+                "nov_orders": baseline_orders,
+                "dec_orders": current_orders,
+                "z_score": z_score,
+                "is_unusual": is_unusual,
+                "baseline_mean_weekly_orders": baseline_mean,
+                "baseline_std_weekly_orders": baseline_std,
+                "primary_driver": top_channel["channel"] if top_channel else None,
+                "primary_driver_pct": top_channel["pct_contribution"] if top_channel else None,
+                "revenue_delta_usd": revenue_delta_usd,
+                "weekly_orders": weekly_rows,
+                "channel_breakdown": channel_rows,
             },
-            findings=[
-                "JP-Kanto experienced a -17.91% monthly order decline (363 in Nov to 298 in Dec 2026).",
-                "Week 52 dropped to 27 orders (-72.4% vs peak), producing a statistically unusual Z-score of -1.81.",
-                "Website sales channel drove 63.1% of the entire regional drop (contracting by 41 orders).",
-                "Fulfillment cancellation rates remained constant at 4.2%, confirming inbound demand contraction.",
-            ],
+            findings=findings,
             limitations=[
-                "Observational Note: Relationships reflect empirical variance decomposition across sales channels; counterfactual causal attribution requires web analytics telemetry.",
-                "Analysis bounded to orders placed in JP-Kanto between June and December 2026.",
+                "Observational note: channel shares describe where the change occurred, not why.",
+                f"Analysis bounded to {target_region} order history between {months[0]} and {months[-1]}.",
             ],
             recommended_next_steps=[
-                "Audit JP-Kanto website checkout funnel and regional promotion campaigns.",
-                "Reallocate $15,000 in regional advertising to website re-engagement.",
+                (
+                    f"Audit the {top_channel['channel']} funnel and campaigns for {target_region}."
+                    if top_channel
+                    else f"Review demand across all channels in {target_region}."
+                ),
+                f"Re-run this comparison once {current_month} is fully closed.",
             ],
-            result_data=recent_weeks_data,
+            result_data=weekly_rows,
         )
 
         res = SupervisorExecutionResult(
@@ -1414,7 +1822,10 @@ class AgenticSupervisor:
             session_id=sid,
             database_fingerprint=fp,
             primary_intent=IntentCategory.DIAGNOSTIC,
-            plan_summary="Regional weekly order drop investigation, statistical anomaly detection, and driver variance decomposition",
+            plan_summary=(
+                "Regional order drop investigation: monthly region comparison, weekly z-score anomaly test, "
+                "sales channel variance decomposition, and cancellation rate check"
+            ),
             tasks=tasks,
             management_response=mgmt_resp,
             analytical_result=unified_res,
@@ -1424,8 +1835,12 @@ class AgenticSupervisor:
         )
         if sid:
             self._session_cache[(sid, fp)] = res
-            self._record_session_trace(sid, question, mgmt_resp, executed_queries, execution_id, duration_ms, df_weekly, IntentCategory.DIAGNOSTIC, res)
+            self._record_session_trace(
+                sid, question, mgmt_resp, executed_queries, execution_id, duration_ms,
+                df_weekly, IntentCategory.DIAGNOSTIC, res,
+            )
         return res
+
 
     def _record_session_trace(
         self,

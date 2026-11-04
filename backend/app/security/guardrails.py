@@ -4,7 +4,7 @@ Enforces read-only database isolation, blocks adversarial bypasses, and redacts 
 """
 
 import re
-from typing import Optional, Set, Tuple
+from typing import Optional, Set, Tuple, Union
 import sqlglot
 from sqlglot import exp
 from sqlglot.errors import ParseError

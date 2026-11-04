@@ -1,5 +1,6 @@
 import {
   MultiAgentWorkflowResponseSchema,
+  MultiAgentWorkflowResultSchema,
   MultiAgentWorkflowResult,
   PreparationJobResponseSchema,
   PreparationJobState,
@@ -204,6 +205,21 @@ export async function fetchSessionDetail(sessionId: string): Promise<{ session: 
   return parsed.data.data;
 }
 
+/**
+ * Parses an SSE `result` payload through the workflow schema.
+ *
+ * The previous implementation cast the JSON straight to the result type, so a
+ * backend field the schema did not declare was invisible and a malformed
+ * payload failed later with no explanation. Validating here means a drift
+ * between backend and contract is reported instead of silently dropped.
+ */
+function parseWorkflowResult(raw: unknown): MultiAgentWorkflowResult | null {
+  const parsed = MultiAgentWorkflowResultSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  console.error("Workflow result failed contract validation:", parsed.error.issues.slice(0, 8));
+  return null;
+}
+
 export async function streamChatQuery(
   queryText: string,
   sessionId: string,
@@ -269,8 +285,12 @@ export async function streamChatQuery(
           }
         } else if (eventType === "result" && dataStr) {
           try {
-            const parsed = JSON.parse(dataStr);
-            onResult(parsed as MultiAgentWorkflowResult);
+            const result = parseWorkflowResult(JSON.parse(dataStr));
+            if (result) {
+              onResult(result);
+            } else {
+              onError("The analysis result did not match the expected contract.");
+            }
           } catch (e) {
             console.error("Failed to parse result event:", e);
             onError("Failed to parse workflow result data.");
@@ -304,17 +324,17 @@ export async function streamChatQuery(
         const dataStr = dataLines.join("\n");
         if (eventType === "result" && dataStr) {
           try {
-            const parsed = JSON.parse(dataStr);
-            onResult(parsed as MultiAgentWorkflowResult);
+            const result = parseWorkflowResult(JSON.parse(dataStr));
+            if (result) onResult(result);
           } catch (e) {
             console.error("Failed to parse flushed result event:", e);
           }
         }
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Stream connection error:", err);
-    onError(err.message || "Failed to connect to stream");
+    onError(err instanceof Error ? err.message : "Failed to connect to stream");
   }
 }
 
@@ -406,8 +426,8 @@ export async function streamAgenticQuery(
   question: string,
   sessionId?: string,
   intentOverride?: string,
-  onTaskProgress?: (task: any) => void,
-  onResult?: (result: any) => void,
+  onTaskProgress?: (task: unknown) => void,
+  onResult?: (result: unknown) => void,
   onError?: (errorMsg: string) => void
 ): Promise<void> {
   const url = `${API_BASE_URL}/api/v1/agentic/stream`;
@@ -471,7 +491,6 @@ export async function fetchSetupStatus(): Promise<SetupStatusResponse> {
   const json = await res.json();
   const parsed = SetupStatusAPIResponseSchema.safeParse(json);
   if (!parsed.success || !parsed.data.data) {
-    console.error("fetchSetupStatus Zod validation issue:", parsed.error, json);
     throw new Error(parsed.data?.error?.message || "Failed to fetch setup readiness status");
   }
   return parsed.data.data;
@@ -598,7 +617,7 @@ export async function connectDatabase(params: {
   username?: string;
   password?: string;
   ssl?: boolean;
-}): Promise<{ database: any; preparation_job: PreparationJobState }> {
+}): Promise<{ database: DatabaseStatusInfo; preparation_job: PreparationJobState }> {
   const url = `${API_BASE_URL}/api/v1/db/connect`;
   const res = await fetch(url, {
     method: "POST",
@@ -612,7 +631,7 @@ export async function connectDatabase(params: {
   return json.data;
 }
 
-export async function activateSavedDatabase(databaseId: string): Promise<{ database: any; preparation_job: PreparationJobState }> {
+export async function activateSavedDatabase(databaseId: string): Promise<{ database: DatabaseStatusInfo; preparation_job: PreparationJobState }> {
   const url = `${API_BASE_URL}/api/v1/db/activate/${encodeURIComponent(databaseId)}`;
   const res = await fetch(url, {
     method: "POST",

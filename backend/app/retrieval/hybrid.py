@@ -43,7 +43,17 @@ class HybridSchemaRetriever:
 
     def __init__(self, catalog: Optional[DatabaseCatalog] = None):
         self._lock = threading.RLock()
-        self.catalog = catalog or schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
+        # The module-level singleton is constructed at import time, before any
+        # database has been connected through the self-service setup flow, so a
+        # missing or unreachable database must not prevent the app from starting.
+        resolved_catalog = catalog
+        if resolved_catalog is None:
+            try:
+                resolved_catalog = schema_service.get_cached_catalog() or schema_service.profile_database(force_refresh=False)
+            except Exception as exc:
+                logger.warning(f"No catalogue available at retriever construction: {exc}")
+                resolved_catalog = None
+        self.catalog = resolved_catalog
         self.corpus: Optional[SchemaCorpus] = None
         self.bm25: Optional[PersistentBM25Retriever] = None
         self.vector_store: Optional[LanceDBVectorStore] = None

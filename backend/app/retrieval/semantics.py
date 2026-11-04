@@ -18,7 +18,7 @@ from pathlib import Path
 import re
 import sqlite3
 import threading
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 import sqlglot
 from backend.app.core.config import settings

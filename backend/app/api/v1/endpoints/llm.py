@@ -120,22 +120,13 @@ async def connect_llm(req: LLMConnectRequest, request: Request) -> APIResponse[L
             timeout=10.0,
         )
         try:
-            # Query models endpoint to verify key authenticity and model availability
-            groq_models = await test_client.models.list()
-            available_ids = {m.id for m in groq_models.data}
-            if req.model and available_ids and req.model not in available_ids:
-                chat_models = [m.id for m in groq_models.data if "whisper" not in m.id and "guard" not in m.id]
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Groq model '{req.model}' is not available on your API key tier. Available models: {', '.join(chat_models)}",
-                )
+            # Query models endpoint to verify key authenticity
+            await test_client.models.list()
         except AuthenticationError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid Groq API key: {str(e)}",
             )
-        except HTTPException:
-            raise
         except Exception as e:
             err_msg = str(e)
             if "invalid_api_key" in err_msg.lower() or "unauthorized" in err_msg.lower() or "401" in err_msg:

@@ -1,61 +1,69 @@
+"use client";
+
 import React from "react";
-import { ShieldAlert, Database } from "lucide-react";
-import { z } from "zod";
-import { AnswerabilityAssessmentSchema } from "@/types/api";
+import { AnswerabilityAssessment } from "@/types/api";
 
-export type AnswerabilityAssessment = z.infer<typeof AnswerabilityAssessmentSchema>;
-
-export interface RefusalBannerProps {
+interface RefusalBannerProps {
   answerability: AnswerabilityAssessment;
+  /** Sends one of the alternatives as a new question. */
+  onSelectAlternative?: (question: string) => void;
 }
 
-export function RefusalBanner({ answerability }: RefusalBannerProps) {
-  if (answerability.is_answerable) return null;
-
-  const alternatives: string[] = answerability.available_alternatives || [];
+/**
+ * The agent declining to answer what the data cannot support.
+ *
+ * Presented as a finding with a way forward, not as an error: abstaining rather
+ * than inventing a number is the behaviour this product is built around, so it
+ * is not coloured red and does not carry an alert icon.
+ */
+export function RefusalBanner({ answerability, onSelectAlternative }: RefusalBannerProps) {
+  const { refusal_reason, available_alternatives, abstention_type } = answerability;
 
   return (
-    <div className="p-5 rounded-xl border border-warning/40 bg-warning/10 shadow-sm space-y-3.5">
-      <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-warning/20 text-warning flex-shrink-0 mt-0.5">
-          <ShieldAlert className="w-5 h-5" />
-        </div>
-        <div className="flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-sm text-warning">
-              Honest Refusal: Question Outside Warehouse Scope
-            </h3>
-            {answerability.abstention_type && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-warning/20 text-warning border border-warning/30 uppercase">
-                {answerability.abstention_type}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-foreground/85 leading-relaxed">
-            {answerability.refusal_reason ||
-              "The requested data or metric falls outside the verified e-commerce warehouse boundary."}
-          </p>
-        </div>
+    <section
+      aria-label="Question not answerable from this data"
+      className="space-y-3 rounded-card border border-[var(--border)] bg-surface p-4"
+    >
+      <div className="space-y-1">
+        <h3 className="text-headline font-semibold text-text">
+          This can&rsquo;t be answered from the connected data
+        </h3>
+        <p className="text-body text-text">
+          {refusal_reason ??
+            "The question could not be grounded in the tables available, so no figure was produced."}
+        </p>
+        {abstention_type ? (
+          <p className="text-label text-muted">Reason recorded by the agent: {abstention_type}</p>
+        ) : null}
       </div>
 
-      {alternatives.length > 0 && (
-        <div className="pt-3 border-t border-warning/20 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground/90">
-            <Database className="w-3.5 h-3.5 text-warning" />
-            <span>Supported Warehouse Domains You Can Query:</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {alternatives.map((alt: string, i: number) => (
-              <span
-                key={i}
-                className="text-[11px] px-2.5 py-1 rounded-lg bg-background/60 border border-warning/30 text-foreground/80 font-medium"
-              >
-                {alt}
-              </span>
+      {available_alternatives.length > 0 ? (
+        <div className="space-y-1.5 border-t border-[var(--rule)] pt-3">
+          <p className="text-label text-muted">You could ask instead:</p>
+          <ul className="space-y-1.5">
+            {available_alternatives.map((alternative) => (
+              <li key={alternative}>
+                {onSelectAlternative ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectAlternative(alternative)}
+                    className={[
+                      "w-full rounded-card border border-[var(--border)] px-3.5 py-2 text-left text-body text-text",
+                      "transition-[background-color,transform] duration-[140ms] ease-out",
+                      "hover:[@media(hover:hover)and(pointer:fine)]:bg-raised",
+                      "active:scale-[0.99] motion-reduce:active:scale-100",
+                    ].join(" ")}
+                  >
+                    {alternative}
+                  </button>
+                ) : (
+                  <p className="text-body text-text">{alternative}</p>
+                )}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
-      )}
-    </div>
+      ) : null}
+    </section>
   );
 }

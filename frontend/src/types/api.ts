@@ -3,7 +3,7 @@ import { z } from "zod";
 export const ErrorDetailSchema = z.object({
   code: z.string(),
   message: z.string(),
-  details: z.record(z.any()).nullable().optional(),
+  details: z.record(z.unknown()).nullable().optional(),
   timestamp: z.string().optional(),
 });
 
@@ -159,6 +159,11 @@ export const AnswerabilityAssessmentSchema = z.object({
   available_alternatives: z.array(z.string()).default([]),
 });
 
+export type AnswerabilityAssessment = z.infer<typeof AnswerabilityAssessmentSchema>;
+export type RouteResult = z.infer<typeof RouteResultSchema>;
+export type StepTrace = z.infer<typeof StepTraceSchema>;
+export type VerificationResult = z.infer<typeof VerificationResultSchema>;
+
 export const ClarificationOptionSchema = z.object({
   option_id: z.string(),
   label: z.string(),
@@ -179,9 +184,9 @@ export const PlanStepSchema = z.object({
   tool_name: z.string(),
   description: z.string(),
   dependencies: z.array(z.string()).default([]),
-  arguments: z.record(z.any()).default({}),
+  arguments: z.record(z.unknown()).default({}),
   status: z.enum(["pending", "running", "succeeded", "failed", "skipped"]),
-  output: z.any().nullable().optional(),
+  output: z.unknown().nullable().optional(),
   error: z.string().nullable().optional(),
   duration_ms: z.number().default(0.0),
 });
@@ -217,8 +222,8 @@ export const ChartSpecificationSchema = z.object({
   color_field: z.string().nullable().optional(),
   units: z.string().nullable().optional(),
   alt_text: z.string().nullable().optional(),
-  plotly_data: z.array(z.record(z.any())).default([]),
-  plotly_layout: z.record(z.any()).default({}),
+  plotly_data: z.array(z.record(z.unknown())).default([]),
+  plotly_layout: z.record(z.unknown()).default({}),
 });
 
 export const StepTraceSchema = z.object({
@@ -226,13 +231,13 @@ export const StepTraceSchema = z.object({
   status: z.enum(["running", "succeeded", "failed", "skipped"]),
   duration_ms: z.number(),
   message: z.string(),
-  metadata: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.unknown()).nullable().optional(),
 });
 
 export const QueryExecutionResultSchema = z.object({
   sql: z.string(),
   columns: z.array(z.string()),
-  rows: z.array(z.record(z.any())),
+  rows: z.array(z.record(z.unknown())),
   row_count: z.number(),
   execution_time_ms: z.number(),
   truncated: z.boolean().default(false),
@@ -265,7 +270,7 @@ export const PeriodComparisonResultSchema = z.object({
   period_b_value: z.number(),
   delta_absolute: z.number(),
   delta_percentage: z.number(),
-  dimension_breakdown: z.array(z.record(z.any())).default([]),
+  dimension_breakdown: z.array(z.record(z.unknown())).default([]),
 });
 
 export const AnomalyPointSchema = z.object({
@@ -335,8 +340,8 @@ export const ScenarioResultSchema = z.object({
   simulated_value: z.number(),
   delta_absolute: z.number(),
   delta_percentage: z.number(),
-  assumptions_applied: z.record(z.any()),
-  sensitivities: z.array(z.record(z.any())).default([]),
+  assumptions_applied: z.record(z.unknown()),
+  sensitivities: z.array(z.record(z.unknown())).default([]),
 });
 
 export const SegmentChurnRiskSchema = z.object({
@@ -386,6 +391,76 @@ export const AnalysisToolResultSchema = z.object({
   optimization: OptimizationResultSchema.nullable().optional(),
 });
 
+export const ExecutiveSectionSchema = z.object({
+  title: z.string(),
+  headline: z.string(),
+  content: z.string(),
+  kpis: z.record(z.unknown()).default({}),
+  evidence_references: z.array(z.string()).default([]),
+  disclaimers: z.array(z.string()).default([]),
+});
+export type ExecutiveSection = z.infer<typeof ExecutiveSectionSchema>;
+
+export const ManagementResponseSchema = z.object({
+  what: ExecutiveSectionSchema.nullable().optional(),
+  why: ExecutiveSectionSchema.nullable().optional(),
+  what_next: ExecutiveSectionSchema.nullable().optional(),
+  so_what: ExecutiveSectionSchema.nullable().optional(),
+  scenario_section: ExecutiveSectionSchema.nullable().optional(),
+  impact_section: ExecutiveSectionSchema.nullable().optional(),
+  executive_summary: z.string().default(""),
+  composed_markdown: z.string().default(""),
+});
+export type ManagementResponse = z.infer<typeof ManagementResponseSchema>;
+
+/**
+ * The shape `linked_values` actually takes on the chat workflow payload. It is
+ * NOT the same shape as the retrieval diagnostic endpoint's LinkedValue, which
+ * is kept separately below.
+ */
+export const WorkflowLinkedValueSchema = z.object({
+  user_mention: z.string(),
+  target_table: z.string(),
+  target_column: z.string(),
+  exact_db_value: z.string(),
+  confidence: z.number(),
+});
+export type WorkflowLinkedValue = z.infer<typeof WorkflowLinkedValueSchema>;
+
+/**
+ * `analytical_result` arrives as a loose dict from the specialist pipelines.
+ * Every field the interface reads is declared; `.passthrough()` keeps anything
+ * else the backend sends rather than silently dropping it.
+ */
+export const AnalyticalResultPayloadSchema = z
+  .object({
+    analysis_id: z.string().optional(),
+    analytical_type: z.string().optional(),
+    analysis_question: z.string().optional(),
+    success: z.boolean().optional(),
+    selected_methods: z.array(z.string()).default([]),
+    source_tables: z.array(z.string()).default([]),
+    source_columns: z.array(z.string()).default([]),
+    executed_queries: z.array(z.string()).default([]),
+    result_data: z.array(z.record(z.unknown())).default([]),
+    computed_metrics: z.record(z.unknown()).default({}),
+    model_information: z.record(z.unknown()).default({}),
+    validation_results: z.record(z.unknown()).default({}),
+    confidence_score: z.number().optional(),
+    uncertainty_notes: z.array(z.string()).default([]),
+    findings: z.array(z.string()).default([]),
+    limitations: z.array(z.string()).default([]),
+    recommended_next_steps: z.array(z.string()).default([]),
+    abstain_reason: z.string().nullable().optional(),
+    created_at: z.string().optional(),
+  })
+  .passthrough();
+export type AnalyticalResultPayload = z.infer<typeof AnalyticalResultPayloadSchema>;
+
+/** Which specialist pipeline answered, when one did. */
+export const SpecialistCapabilitySchema = z.enum(["churn", "scenario", "impact", "order_drop"]);
+export type SpecialistCapability = z.infer<typeof SpecialistCapabilitySchema>;
+
 export const MultiAgentWorkflowResultSchema = z.object({
   run_id: z.string(),
   session_id: z.string().default("default_session"),
@@ -396,6 +471,7 @@ export const MultiAgentWorkflowResultSchema = z.object({
   clarification: ClarificationResponseSchema.nullable().optional(),
   plan: ExecutionPlanSchema.nullable().optional(),
   selected_tables: z.array(z.string()).default([]),
+  linked_values: z.array(WorkflowLinkedValueSchema).default([]),
   sanitized_sql: z.string().nullable().optional(),
   query_result: QueryExecutionResultSchema.nullable().optional(),
   chart_spec: ChartSpecificationSchema.nullable().optional(),
@@ -403,6 +479,9 @@ export const MultiAgentWorkflowResultSchema = z.object({
   verification: VerificationResultSchema.nullable().optional(),
   repair_attempts: z.array(RepairAttemptSchema).default([]),
   composed_answer: z.string(),
+  management_response: ManagementResponseSchema.nullable().optional(),
+  analytical_result: AnalyticalResultPayloadSchema.nullable().optional(),
+  specialist_capability: SpecialistCapabilitySchema.nullable().optional(),
   key_findings: z.array(z.string()).default([]),
   limitations: z.array(z.string()).default([]),
   suggested_followups: z.array(z.string()).default([]),
@@ -597,7 +676,7 @@ export const SessionModelSchema = z.object({
   title: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
-  active_frame: z.any().optional(),
+  active_frame: z.unknown().optional(),
 });
 
 export const SessionListResponseSchema = createAPIResponseSchema(z.array(SessionModelSchema));
@@ -669,17 +748,17 @@ export const StandardizedAnalyticalResultSchema = z.object({
   source_tables: z.array(z.string()).default([]),
   source_columns: z.array(z.string()).default([]),
   executed_queries: z.array(z.string()).default([]),
-  result_data: z.array(z.record(z.any())).default([]),
-  computed_metrics: z.record(z.any()).default({}),
-  model_information: z.record(z.any()).default({}),
-  validation_results: z.record(z.any()).default({}),
+  result_data: z.array(z.record(z.unknown())).default([]),
+  computed_metrics: z.record(z.unknown()).default({}),
+  model_information: z.record(z.unknown()).default({}),
+  validation_results: z.record(z.unknown()).default({}),
   faithfulness: FaithfulnessReportSchema.nullable().optional(),
   confidence_score: z.number().default(1.0),
   uncertainty_notes: z.array(z.string()).default([]),
   findings: z.array(z.string()).default([]),
   limitations: z.array(z.string()).default([]),
   recommended_next_steps: z.array(z.string()).default([]),
-  visualization_config: z.record(z.any()).nullable().optional(),
+  visualization_config: z.record(z.unknown()).nullable().optional(),
   abstain_reason: z.string().nullable().optional(),
   created_at: z.string().optional(),
 });
@@ -709,7 +788,7 @@ export const AnalyticalPlanSchema = z.object({
   relevant_tables: z.array(z.string()).default([]),
   required_columns: z.record(z.array(z.string())).default({}),
   relevant_metrics: z.array(z.string()).default([]),
-  filters: z.array(z.record(z.any())).default([]),
+  filters: z.array(z.record(z.unknown())).default([]),
   time_dimension: z.string().nullable().optional(),
   target_variable: z.string().nullable().optional(),
   candidate_methods: z.array(z.string()).default([]),
@@ -761,27 +840,7 @@ export const AgentTaskSchema = z.object({
 });
 export type AgentTask = z.infer<typeof AgentTaskSchema>;
 
-export const ExecutiveSectionSchema = z.object({
-  title: z.string(),
-  headline: z.string(),
-  content: z.string(),
-  kpis: z.record(z.any()).default({}),
-  evidence_references: z.array(z.string()).default([]),
-  disclaimers: z.array(z.string()).default([]),
-});
-export type ExecutiveSection = z.infer<typeof ExecutiveSectionSchema>;
 
-export const ManagementResponseSchema = z.object({
-  what: ExecutiveSectionSchema.nullable().optional(),
-  why: ExecutiveSectionSchema.nullable().optional(),
-  what_next: ExecutiveSectionSchema.nullable().optional(),
-  so_what: ExecutiveSectionSchema.nullable().optional(),
-  scenario_section: ExecutiveSectionSchema.nullable().optional(),
-  impact_section: ExecutiveSectionSchema.nullable().optional(),
-  executive_summary: z.string().default(""),
-  composed_markdown: z.string().default(""),
-});
-export type ManagementResponse = z.infer<typeof ManagementResponseSchema>;
 
 export const SupervisorExecutionResultSchema = z.object({
   execution_id: z.string(),
@@ -793,10 +852,10 @@ export const SupervisorExecutionResultSchema = z.object({
   tasks: z.array(AgentTaskSchema).default([]),
   management_response: ManagementResponseSchema.default({}),
   analytical_result: StandardizedAnalyticalResultSchema.nullable().optional(),
-  metrics: z.record(z.any()).default({}),
+  metrics: z.record(z.unknown()).default({}),
   success: z.boolean().default(true),
   abstain_reason: z.string().nullable().optional(),
-  structured_question: z.record(z.any()).nullable().optional(),
+  structured_question: z.record(z.unknown()).nullable().optional(),
   clarification_needed: z.boolean().default(false),
   clarification_options: z.array(ClarificationOptionSchema).default([]),
   created_at: z.string().optional(),
@@ -826,15 +885,19 @@ export type LLMModelInfo = z.infer<typeof LLMModelInfoSchema>;
 export const LLMModelListResponseSchema = createAPIResponseSchema(z.array(LLMModelInfoSchema));
 
 export const DatabaseStatusInfoSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().default("ecommerce.db"),
-  engine: z.string().default("sqlite"),
-  status: z.string().default("READY"),
+  name: z.string(),
+  engine: z.string(),
+  /**
+   * Optional: /api/v1/database/status sends it, /api/v1/setup/status does not.
+   * Requiring it made fetchSetupStatus throw on every call, which left the
+   * setup wizard gating the whole app even when chat_ready was true.
+   */
+  status: z.string().optional(),
   fingerprint: z.string().nullable().optional(),
-  read_only: z.boolean().default(true),
+  read_only: z.boolean(),
   table_count: z.number().default(0),
   row_count: z.number().default(0),
-  connected: z.boolean().default(false),
+  connected: z.boolean(),
 });
 export type DatabaseStatusInfo = z.infer<typeof DatabaseStatusInfoSchema>;
 export const DatabaseStatusResponseSchema = createAPIResponseSchema(DatabaseStatusInfoSchema);
@@ -862,7 +925,7 @@ export const SetupStatusResponseSchema = z.object({
     connected: z.boolean(),
   }),
   database: DatabaseStatusInfoSchema.nullable().optional(),
-  preparation: z.any().nullable().optional(),
+  preparation: z.unknown().nullable().optional(),
 });
 export type SetupStatusResponse = z.infer<typeof SetupStatusResponseSchema>;
 export const SetupStatusAPIResponseSchema = createAPIResponseSchema(SetupStatusResponseSchema);

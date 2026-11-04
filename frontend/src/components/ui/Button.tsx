@@ -1,75 +1,75 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-import { RefreshCw } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Loader2 } from "lucide-react";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "destructive" | "subtle";
-  size?: "xs" | "sm" | "md" | "icon";
-  isLoading?: boolean;
+  /**
+   * `primary` is near-black (inverted white on dark) — never the data hue.
+   * One primary per screen.
+   */
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline" | "subtle" | "destructive";
+  size?: "sm" | "md" | "icon" | "xs";
   icon?: React.ReactNode;
+  /** Swaps the icon for a spinner and disables the control. */
+  isLoading?: boolean;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      className,
-      variant = "primary",
-      size = "sm",
-      isLoading = false,
-      icon,
-      disabled,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const variantStyles = {
-      primary:
-        "bg-primary text-white hover:bg-primary/90 shadow-sm border border-primary/40 active:translate-y-px",
-      secondary:
-        "bg-muted text-foreground hover:bg-muted/80 border border-border active:translate-y-px",
-      outline:
-        "bg-transparent text-foreground/90 hover:text-foreground hover:bg-muted/60 border border-border hover:border-primary/40 active:translate-y-px",
-      ghost:
-        "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent active:translate-y-px",
-      destructive:
-        "bg-destructive/15 text-destructive hover:bg-destructive/25 border border-destructive/30 active:translate-y-px",
-      subtle:
-        "bg-background/80 text-foreground/80 hover:text-foreground border border-border hover:border-primary/40 active:translate-y-px",
-    };
+const VARIANTS: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  primary:
+    "bg-[var(--primary)] text-[var(--primary-ink)] shadow-raised hover:-translate-y-px hover:shadow-lift",
+  secondary:
+    "bg-surface text-text border border-[var(--control)] shadow-raised hover:border-[var(--accent-edge)] hover:-translate-y-px hover:shadow-lift",
+  ghost: "bg-transparent text-muted hover:text-accent hover:bg-raised",
+  danger: "bg-transparent text-negative border border-[var(--control)] hover:bg-raised",
+  // aliases kept so existing call sites take the new look without churn
+  outline:
+    "bg-surface text-text border border-[var(--control)] shadow-raised hover:border-[var(--accent-edge)] hover:-translate-y-px hover:shadow-lift",
+  subtle: "bg-transparent text-muted hover:text-accent hover:bg-raised",
+  destructive: "bg-transparent text-negative border border-[var(--control)] hover:bg-raised",
+};
 
-    const sizeStyles = {
-      xs: "text-[11px] px-2 py-1 rounded-md gap-1",
-      sm: "text-xs px-3 py-1.5 rounded-lg gap-1.5",
-      md: "text-sm px-4 py-2 rounded-lg gap-2",
-      icon: "p-1.5 rounded-lg",
-    };
+const SIZES: Record<NonNullable<ButtonProps["size"]>, string> = {
+  sm: "h-9 px-3.5 text-label gap-1.5 rounded-control",
+  md: "h-10 px-4 text-body gap-2 rounded-control",
+  icon: "h-10 w-10 justify-center rounded-control",
+  xs: "h-7 px-2.5 text-label gap-1 rounded-control",
+};
 
-    return (
-      <button
-        ref={ref}
-        disabled={disabled || isLoading}
-        className={twMerge(
-          clsx(
-            "inline-flex items-center justify-center font-medium transition-all duration-150 outline-none select-none disabled:opacity-50 disabled:pointer-events-none cursor-pointer",
-            variantStyles[variant],
-            sizeStyles[size],
-            className
-          )
-        )}
-        {...props}
-      >
-        {isLoading ? (
-          <RefreshCw className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-        ) : icon ? (
-          <span className="flex-shrink-0">{icon}</span>
-        ) : null}
-        {children}
-      </button>
-    );
-  }
-);
-
-Button.displayName = "Button";
-
+/**
+ * Nothing is inert under the cursor: the surface lifts a pixel, its edge warms
+ * to gold and the light under it deepens, all inside 110ms. The press is
+ * `scale(0.97)` — transform only, so feedback never triggers layout. Hover is
+ * gated to real pointers, because touch fires a false hover on tap.
+ */
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant = "secondary", size = "md", icon, isLoading = false, disabled, children, type = "button", ...props },
+  ref
+) {
+  return (
+    <button
+      ref={ref}
+      type={type}
+      disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
+      className={cn(
+        "inline-flex items-center font-medium select-none",
+        "transition-[transform,background-color,border-color,box-shadow,color] duration-[110ms] ease-out",
+        "[@media(hover:none)]:hover:translate-y-0",
+        "active:scale-[0.97]",
+        "disabled:opacity-45 disabled:pointer-events-none",
+        "motion-reduce:active:scale-100",
+        VARIANTS[variant],
+        SIZES[size],
+        className
+      )}
+      {...props}
+    >
+      {isLoading ? (
+        <Loader2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+      ) : icon ? (
+        <span className="shrink-0">{icon}</span>
+      ) : null}
+      {children}
+    </button>
+  );
+});

@@ -62,6 +62,29 @@ class DatabaseConnectionManager:
                 params = decrypt_connection_params(row["connection_params_enc"])
                 engine_type = SupportedEngine(row["engine"])
 
+                # A stored SQLite path comes from whichever machine last connected.
+                # If that file is not on this machine, fall back to the configured
+                # local database instead of starting with no active connection.
+                stored_path = params.get("file_path")
+                if engine_type == SupportedEngine.SQLITE and stored_path:
+                    if not Path(stored_path).expanduser().exists():
+                        baseline = settings.resolved_ecommerce_db_path
+                        if baseline.exists():
+                            logger.warning(
+                                f"Stored database path '{stored_path}' is not present on this machine. "
+                                f"Falling back to the configured database at '{baseline}'."
+                            )
+                            params = dict(params)
+                            params["file_path"] = str(baseline)
+                            row = dict(row)
+                            row["name"] = baseline.name
+                            row["fingerprint"] = None
+                        else:
+                            raise FileNotFoundError(
+                                f"Stored database '{stored_path}' is missing and no local database "
+                                f"was found at '{baseline}'. Connect a database through setup."
+                            )
+
                 config = ActiveDatabaseConfig(
                     id="active_db",
                     name=row["name"],

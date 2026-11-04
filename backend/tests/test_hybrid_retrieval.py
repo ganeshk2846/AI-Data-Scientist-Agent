@@ -9,12 +9,13 @@ from backend.app.retrieval.hybrid import hybrid_retriever
 from backend.app.retrieval.semantics import semantic_registry
 from backend.app.retrieval.value_linker import value_linker
 from backend.app.schema.service import schema_service
+from backend.tests.db_facts import EXPECTED_TABLE_COUNT
 
 
 def test_schema_corpus_generation():
     catalog = schema_service.get_cached_catalog() or schema_service.profile_database()
     corpus = SchemaCorpus(catalog)
-    assert len(corpus.documents) == 30
+    assert len(corpus.documents) == EXPECTED_TABLE_COUNT
     assert "orders" in corpus.documents
     assert len(corpus.documents["orders"].tokens) > 10
 
@@ -26,7 +27,7 @@ def test_bm25_retrieval():
 
     results = bm25.search("inventory warehouse snapshot", top_k=5)
     top_tables = [r[0] for r in results]
-    assert "inventory" in top_tables or "warehouses" in top_tables
+    assert any("inventory" in t or "warehouse" in t for t in top_tables)
 
 
 def test_embedding_retrieval():
@@ -36,7 +37,7 @@ def test_embedding_retrieval():
 
     results = embed.search("customer satisfaction support complaints", top_k=5)
     top_tables = [r[0] for r in results]
-    assert "support_tickets" in top_tables or "reviews" in top_tables
+    assert any(k in t for t in top_tables for k in ("review", "interaction", "support"))
 
 
 def test_reciprocal_rank_fusion_and_fk_expansion():

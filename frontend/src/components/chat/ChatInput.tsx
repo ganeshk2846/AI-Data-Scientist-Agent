@@ -1,158 +1,133 @@
-import React from "react";
-import {
-  History,
-  Lightbulb,
-  MessageSquare,
-  Plus,
-  Send,
-  Sparkles,
-  RefreshCw,
-} from "lucide-react";
-import { Button } from "../ui/Button";
-import { Badge } from "../ui/Badge";
+"use client";
 
-export const SUGGESTED_QUERIES = [
-  { text: "Show orders by status and their total amount", category: "Orders" },
-  { text: "What are our total sales and order counts by year?", category: "Trend" },
-  { text: "What are the top 5 product categories by revenue?", category: "Catalog" },
-  { text: "How many customers belong to each customer segment?", category: "Segments" },
-  { text: "What is the churn risk and revenue at risk across customer segments?", category: "Churn" },
-  { text: "compare revenue", category: "Clarify" },
-  { text: "What is the current bitcoin price?", category: "Refusal" },
-] as const;
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowUp } from "lucide-react";
+import { clsx } from "clsx";
 
-export interface ChatInputProps {
-  queryInput: string;
-  onInputChange: (val: string) => void;
-  onSubmit: (e?: React.FormEvent) => void;
+interface ChatInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
   isSubmitting: boolean;
-  onSelectSuggested: (text: string) => void;
-  sessionId: string;
-  onNewSession: () => void;
-  onOpenHistory: () => void;
+  /** Disables the control and says why. */
+  disabledReason?: string | null;
 }
 
-export function ChatInput({
-  queryInput,
-  onInputChange,
-  onSubmit,
-  isSubmitting,
-  onSelectSuggested,
-  sessionId,
-  onNewSession,
-  onOpenHistory,
-}: ChatInputProps) {
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (queryInput.trim() && !isSubmitting) {
-        onSubmit();
-      }
+/**
+ * The question field.
+ *
+ * Enter sends and Shift+Enter makes a new line, which is the convention for a
+ * thread. The textarea grows with its content to a cap, so a long question is
+ * readable while being typed without the control taking over the screen.
+ *
+ * No animation on send: it is keyboard-initiated and repeated all session.
+ */
+export function ChatInput({ value, onChange, onSubmit, isSubmitting, disabledReason }: ChatInputProps) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // The question box is where the work starts, so it takes focus on load and
+  // Cmd/Ctrl+K brings it back from anywhere.
+  useEffect(() => {
+    // Only on a device with a keyboard: autofocusing on a phone scrolls the
+    // page and throws up the on-screen keyboard before anyone asked for it.
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      // preventScroll: focusing must not scroll the landing view past its hero.
+      ref.current?.focus({ preventScroll: true });
     }
-  };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        ref.current?.focus({ preventScroll: true });
+        ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, [value]);
+
+  const blocked = Boolean(disabledReason);
+  const [modKey, setModKey] = useState("Ctrl ");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)) setModKey("⌘");
+  }, []);
+  const canSend = value.trim().length > 0 && !isSubmitting && !blocked;
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (canSend) onSubmit();
+    }
+  }
 
   return (
-    <div className="p-6 rounded-2xl border border-border/80 bg-card/90 shadow-lg space-y-4">
-      {/* Top Bar with Session Indicators & History Drawer Toggle */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-primary/15 text-primary">
-            <MessageSquare className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-foreground">
-                Conversational BI Assistant
-              </h2>
-              <Badge variant="primary" size="xs">
-                Real-Time SSE DAG
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Ask natural language business questions with schema grounding & AST SQL safety
-            </p>
-          </div>
-        </div>
-
-        {/* Session Controls */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <Badge
-            variant="mono"
-            size="xs"
-            className="text-[11px] px-2.5 py-1 text-muted-foreground bg-muted/60"
-            title="Active Session ID isolated in agent_app.sqlite"
-          >
-            {sessionId}
-          </Badge>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={onOpenHistory}
-            icon={<History className="w-3.5 h-3.5" />}
-            title="View saved session threads"
-          >
-            History
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={onNewSession}
-            icon={<Plus className="w-3.5 h-3.5" />}
-            title="Start new isolated conversation thread"
-          >
-            New
-          </Button>
-        </div>
-      </div>
-
-      {/* Input Form with Send Button */}
-      <form onSubmit={onSubmit} className="relative">
-        <input
-          type="text"
-          placeholder="Ask any warehouse question (e.g. 'Show orders by status and total revenue')..."
-          value={queryInput}
-          onChange={(e) => onInputChange(e.target.value)}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSend) onSubmit();
+      }}
+      className="space-y-1.5"
+    >
+      <div
+        className={clsx(
+          "flex items-end gap-3 rounded-card border bg-surface px-4 py-3.5",
+          "border-[var(--control)] shadow-raised focus-within:border-accent focus-within:shadow-lift",
+          "transition-[border-color,box-shadow] duration-[110ms] ease-out"
+        )}
+      >
+        <label htmlFor="question" className="sr-only">
+          Ask a question about the connected data
+        </label>
+        <textarea
+          id="question"
+          ref={ref}
+          rows={1}
+          value={value}
+          disabled={blocked}
+          onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isSubmitting}
-          className="w-full pl-4 pr-32 py-3.5 text-sm bg-background/80 border border-border/80 rounded-xl text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 disabled:opacity-50 transition-all shadow-inner"
+          placeholder="Ask a question about the connected data"
+          aria-describedby={blocked ? "question-blocked" : undefined}
+          className={clsx(
+            "scroll-quiet min-h-[26px] flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-text",
+            "placeholder:text-faint focus:outline-none disabled:cursor-not-allowed"
+          )}
         />
-        <Button
+        <button
           type="submit"
-          variant="primary"
-          size="sm"
-          disabled={!queryInput.trim() || isSubmitting}
-          isLoading={isSubmitting}
-          icon={!isSubmitting ? <Send className="w-3.5 h-3.5" /> : undefined}
-          className="absolute right-2 top-2 px-4 py-2"
+          disabled={!canSend}
+          aria-label="Send question"
+          className={clsx(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-control",
+            "bg-[var(--primary)] text-[var(--primary-ink)] shadow-raised",
+            "transition-[opacity,transform,box-shadow] duration-[110ms] ease-out",
+            "enabled:hover:[@media(hover:hover)and(pointer:fine)]:shadow-lift",
+            "disabled:opacity-30 enabled:active:scale-[0.97] motion-reduce:enabled:active:scale-100"
+          )}
         >
-          {isSubmitting ? "Running DAG..." : "Ask Agent"}
-        </Button>
-      </form>
-
-      {/* Starter Suggested Queries Rack */}
-      <div className="flex items-center gap-1.5 text-xs flex-wrap pt-1">
-        <span className="text-muted-foreground flex items-center gap-1 font-medium pr-1">
-          <Lightbulb className="w-3.5 h-3.5 text-warning" />
-          <span>Quick Inquiries:</span>
-        </span>
-        {SUGGESTED_QUERIES.map((sq, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onSelectSuggested(sq.text)}
-            disabled={isSubmitting}
-            className="px-2.5 py-1 rounded-lg bg-background/60 border border-border/70 hover:border-primary/60 hover:bg-muted/40 text-foreground/80 hover:text-foreground text-[11px] transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1 shadow-sm"
-          >
-            <span className="text-[10px] text-muted-foreground font-mono">[{sq.category}]</span>
-            <span>{sq.text}</span>
-          </button>
-        ))}
+          <ArrowUp aria-hidden="true" className="h-4 w-4" />
+        </button>
       </div>
-    </div>
+
+      {blocked ? (
+        <p id="question-blocked" className="text-label text-muted">
+          {disabledReason}
+        </p>
+      ) : (
+        <p className="text-label text-faint">
+          Enter to send · Shift + Enter for a new line ·{" "}
+          <kbd className="num rounded-chip border border-[var(--border)] bg-raised px-1 py-0.5 text-micro text-muted">
+            {modKey}K
+          </kbd>{" "}
+          to jump back here
+        </p>
+      )}
+    </form>
   );
 }
-

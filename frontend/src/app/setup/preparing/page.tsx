@@ -4,7 +4,6 @@ import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PreparationProgress } from "@/components/setup/PreparationProgress";
 import { Header } from "@/components/Header";
-import { RefreshCw } from "lucide-react";
 
 function PreparingContent() {
   const router = useRouter();
@@ -21,15 +20,12 @@ function PreparingContent() {
 
 export default function PreparingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-ground">
       <Header />
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
+      <main className="mx-auto flex w-full max-w-[1200px] flex-1 items-start justify-center px-4 py-10 sm:px-6">
         <Suspense
           fallback={
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-              <span>Loading preparation workspace...</span>
-            </div>
+            <p className="text-body text-muted">Loading the preparation view…</p>
           }
         >
           <PreparingContent />

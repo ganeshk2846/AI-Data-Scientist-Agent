@@ -99,7 +99,7 @@ def test_bounded_repair_loop_execution():
 
 
 def test_end_to_end_orchestrator():
-    res = asyncio.run(multi_agent_orchestrator.run("What was our monthly revenue in 2024?"))
+    res = asyncio.run(multi_agent_orchestrator.run("What was our monthly revenue in 2023?"))
     assert res.run_id is not None
     assert res.answerability.is_answerable is True
     assert res.plan is not None
@@ -107,6 +107,8 @@ def test_end_to_end_orchestrator():
     assert res.sanitized_sql is not None
     assert res.query_result is not None
     assert res.query_result.row_count > 0
+    assert res.verification is not None
+    assert res.verification.empty_result is False
     assert res.chart_spec is not None
     assert res.chart_spec.chart_type in [ChartType.LINE, ChartType.BAR]
     assert len(res.composed_answer) > 20

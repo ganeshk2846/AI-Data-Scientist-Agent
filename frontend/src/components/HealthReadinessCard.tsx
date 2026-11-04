@@ -1,21 +1,14 @@
 "use client";
 
 import React from "react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Database,
-  KeyRound,
-  RefreshCw,
-  Server,
-  ShieldCheck,
-  Terminal,
-} from "lucide-react";
 import { ReadinessStatus } from "@/types/api";
 import { Button } from "./ui/Button";
-import { Badge } from "./ui/Badge";
+import { Notice } from "./ui/Notice";
+import { StatGroup, StatItem } from "./ui/Stat";
+import { formatFigure } from "@/lib/format";
+import { ScreenHeader } from "./ui/ScreenHeader";
 
-export interface HealthReadinessCardProps {
+interface HealthReadinessCardProps {
   data?: ReadinessStatus;
   isLoading: boolean;
   isError: boolean;
@@ -23,6 +16,37 @@ export interface HealthReadinessCardProps {
   onRefresh: () => void;
 }
 
+function Row({ label, value, note }: { label: string; value: React.ReactNode; note?: string }) {
+  return (
+    <div className="row-responds flex items-baseline justify-between gap-4 px-4 py-3">
+      <dt className="min-w-0 text-body text-muted">
+        {label}
+        {note ? <span className="mt-0.5 block text-label text-faint">{note}</span> : null}
+      </dt>
+      <dd className="shrink-0 text-right text-body text-text">{value}</dd>
+    </div>
+  );
+}
+
+function State({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-positive" : "bg-negative"}`}
+      />
+      {ok ? yes : no}
+    </span>
+  );
+}
+
+/**
+ * The System screen: is everything connected, and is the database genuinely
+ * read-only.
+ *
+ * The loading state is the final layout with each value replaced by a flat bar
+ * at its real size, so nothing shifts when the data lands.
+ */
 export function HealthReadinessCard({
   data,
   isLoading,
@@ -32,184 +56,129 @@ export function HealthReadinessCard({
 }: HealthReadinessCardProps) {
   if (isLoading) {
     return (
-      <div className="p-8 rounded-2xl border border-border/80 bg-card/90 shadow-md flex flex-col items-center justify-center space-y-3">
-        <RefreshCw className="w-8 h-8 text-primary animate-spin" />
-        <div className="text-center">
-          <h3 className="font-semibold text-sm text-foreground">Probing Backend Services...</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Verifying SQLite read-only immutability and schema integrity
-          </p>
+      <div className="space-y-10">
+        <ScreenHeader title="System" description="Checking the database, the model and the app store." />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="plane-raised px-5 py-5">
+              <span className="skeleton block h-[11px] w-24" />
+              <span className="skeleton mt-3 block h-[38px] w-32" />
+            </div>
+          ))}
         </div>
+        <span className="sr-only">Loading system status</span>
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="p-6 rounded-2xl border border-destructive/40 bg-destructive/10 text-destructive shadow-lg space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="p-2.5 rounded-xl bg-destructive/20 text-destructive flex-shrink-0">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <div className="flex-1 space-y-1">
-            <h3 className="font-bold text-base">Backend Connection Offline</h3>
-            <p className="text-xs text-foreground/80 leading-relaxed">
-              {error?.message || "Could not connect to FastAPI backend at http://localhost:8001"}
-            </p>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl bg-background/80 border border-border space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <Terminal className="w-4 h-4 text-primary" />
-            <span>Start Backend Service:</span>
-          </div>
-          <pre className="p-2.5 rounded-lg bg-card text-xs font-mono text-primary border border-border/60 overflow-x-auto">
-            <code>python -m uvicorn backend.app.main:app --port 8001 --reload</code>
-          </pre>
-        </div>
-
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onRefresh}
-          icon={<RefreshCw className="w-3.5 h-3.5" />}
+      <div className="space-y-10">
+        <ScreenHeader title="System" />
+        <Notice
+          tone="negative"
+          title="The backend could not be reached"
+          action={
+            <Button size="sm" variant="secondary" onClick={onRefresh}>
+              Try again
+            </Button>
+          }
         >
-          Retry Connection
-        </Button>
+          {error?.message ??
+            "No response from the API. Start it with: python -m uvicorn backend.app.main:app --port 8001"}
+        </Notice>
       </div>
     );
   }
 
-  const { database, llm, app_store_ready, ready } = data;
+  const { database, llm } = data;
+
+  const tiles: StatItem[] = [
+    {
+      metricKey: "table_count",
+      label: "Tables",
+      figure: typeof database.table_count === "number" ? formatFigure(database.table_count, "table_count") : null,
+      absentReason: "not-evaluated",
+    },
+    {
+      metricKey: "total_rows",
+      label: "Rows",
+      figure: typeof database.total_rows === "number" ? formatFigure(database.total_rows, "total_rows") : null,
+      absentReason: "not-evaluated",
+    },
+    {
+      metricKey: "size_bytes",
+      label: "Database size",
+      figure:
+        typeof database.size_bytes === "number"
+          ? {
+              display: `${(database.size_bytes / 1_000_000).toFixed(1)} MB`,
+              exact: `${database.size_bytes.toLocaleString("en-US")} bytes`,
+              abbreviated: true,
+              unit: null,
+            }
+          : null,
+      absentReason: "not-evaluated",
+    },
+  ];
 
   return (
-    <div className="p-6 rounded-2xl border border-border/80 bg-card/90 shadow-md space-y-5">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-border/80 gap-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-base font-semibold text-foreground">System Readiness & Architecture</h2>
-            <Badge variant={ready ? "success" : "warning"} size="sm">
-              {ready ? "Production Ready" : "Attention Required"}
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Runtime verification of read-only dataset, LLM provider, and agent persistence store
-          </p>
-        </div>
+    <div className="space-y-10">
+      <ScreenHeader
+        title="System"
+        description={
+          data.ready
+            ? "Connected and ready to answer questions. The warehouse is open read-only, and that is verified rather than assumed."
+            : "Not ready — one of the checks below has not passed."
+        }
+        actions={
+          <Button size="sm" variant="secondary" onClick={onRefresh}>
+            Refresh
+          </Button>
+        }
+      />
 
-        <Button
-          variant="outline"
-          size="xs"
-          onClick={onRefresh}
-          icon={<RefreshCw className="w-3.5 h-3.5" />}
-          title="Refresh Readiness Probe"
-        >
-          Refresh Probe
-        </Button>
-      </div>
+      <StatGroup items={tiles} />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Database Card */}
-        <div className="p-4 rounded-xl border border-border bg-background/50 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-primary font-semibold text-sm">
-              <Database className="w-4 h-4" />
-              <span>Business Warehouse</span>
-            </div>
-            {database.connected && database.read_only_verified ? (
-              <Badge variant="success" size="xs" className="gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                <span>Read-Only</span>
-              </Badge>
-            ) : (
-              <Badge variant="destructive" size="xs">
-                Error
-              </Badge>
-            )}
-          </div>
+      <section className="space-y-3">
+        <h2 className="text-headline font-semibold text-text">Database</h2>
+        <dl className="plane-raised divide-y divide-[var(--rule)] overflow-hidden">
+          <Row label="Connection" value={<State ok={database.connected} yes="Connected" no="Not connected" />} />
+          <Row
+            label="Read-only"
+            note="The agent can never write to the warehouse"
+            value={<State ok={database.read_only_verified} yes="Verified" no="Not verified" />}
+          />
+          <Row label="Path" value={<span className="font-mono text-label">{database.path}</span>} />
+          {database.error ? <Row label="Error" value={<span className="text-negative">{database.error}</span>} /> : null}
+        </dl>
+      </section>
 
-          <div className="space-y-1.5 text-xs text-muted-foreground font-mono">
-            <div className="flex justify-between">
-              <span>Database File:</span>
-              <span className="font-semibold text-foreground truncate max-w-[150px]" title={database.path}>
-                {database.path.split(/[/\\]/).pop()}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Cataloged Tables:</span>
-              <span className="font-semibold text-foreground">{database.table_count ?? "N/A"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Verified Records:</span>
-              <span className="font-semibold text-foreground">
-                {database.total_rows?.toLocaleString() ?? "N/A"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Database Size:</span>
-              <span className="text-foreground">
-                {database.size_bytes ? `${(database.size_bytes / (1024 * 1024)).toFixed(1)} MB` : "N/A"}
-              </span>
-            </div>
-          </div>
-        </div>
+      <section className="space-y-3">
+        <h2 className="text-headline font-semibold text-text">Model</h2>
+        <dl className="plane-raised divide-y divide-[var(--rule)] overflow-hidden">
+          <Row label="Provider" value={llm.provider} />
+          <Row label="Model" value={<span className="font-mono text-label">{llm.model}</span>} />
+          <Row label="Configured" value={<State ok={llm.configured} yes="Yes" no="No" />} />
+          <Row label="Status" value={llm.message} />
+        </dl>
+      </section>
 
-        {/* LLM Provider Card */}
-        <div className="p-4 rounded-xl border border-border bg-background/50 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-primary font-semibold text-sm">
-              <KeyRound className="w-4 h-4" />
-              <span>LLM Synthesis</span>
-            </div>
-            <Badge variant={llm.configured ? "success" : "warning"} size="xs">
-              {llm.configured ? "Ready" : "Offline / Mock"}
-            </Badge>
-          </div>
-
-          <div className="space-y-1.5 text-xs text-muted-foreground font-mono">
-            <div className="flex justify-between">
-              <span>Provider:</span>
-              <span className="font-semibold text-foreground capitalize">{llm.provider}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Active Model:</span>
-              <span className="font-semibold text-foreground truncate max-w-[160px]">{llm.model}</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground font-sans pt-1 border-t border-border/50 leading-relaxed">
-              {llm.message}
-            </p>
-          </div>
-        </div>
-
-        {/* Agent Store Card */}
-        <div className="p-4 rounded-xl border border-border bg-background/50 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-primary font-semibold text-sm">
-              <Server className="w-4 h-4" />
-              <span>Agent Checkpoints</span>
-            </div>
-            <Badge variant={app_store_ready ? "success" : "warning"} size="xs" className="gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Isolated</span>
-            </Badge>
-          </div>
-
-          <div className="space-y-1.5 text-xs text-muted-foreground font-mono">
-            <div className="flex justify-between">
-              <span>Target Store:</span>
-              <span className="font-semibold text-foreground">agent_app.sqlite</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Directory State:</span>
-              <span className="text-success font-medium">Ready</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground font-sans pt-1 border-t border-border/50 leading-relaxed">
-              LangGraph local SQLite memory frames, turns, and run telemetry remain strictly isolated from business data.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section className="space-y-3">
+        <h2 className="text-headline font-semibold text-text">Application store</h2>
+        <dl className="plane-raised divide-y divide-[var(--rule)] overflow-hidden">
+          <Row
+            label="Sessions and traces"
+            note="Threads, active frames and telemetry"
+            value={<State ok={data.app_store_ready} yes="Ready" no="Unavailable" />}
+          />
+          <Row label="Version" value={<span className="font-mono text-label">{data.version}</span>} />
+          <Row
+            label="Checked"
+            value={<span className="num text-label">{new Date(data.timestamp).toLocaleString()}</span>}
+          />
+        </dl>
+      </section>
     </div>
   );
 }

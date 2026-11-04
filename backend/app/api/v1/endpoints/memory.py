@@ -2,7 +2,7 @@
 REST API endpoints for shared conversational memory, sessions, and preferences.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 from backend.app.core.models import APIResponse

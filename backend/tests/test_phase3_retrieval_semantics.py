@@ -24,6 +24,7 @@ from backend.app.retrieval.embeddings import FastEmbedProvider, fastembed_provid
 from backend.app.retrieval.hybrid import HybridSchemaRetriever, hybrid_retriever
 from backend.app.retrieval.persistent_bm25 import PersistentBM25Retriever
 from backend.app.retrieval.semantics import (
+    CANONICAL_METRIC_REQUIREMENTS,
     CANONICAL_METRICS,
     DynamicSemanticEngine,
     dynamic_semantic_engine,
@@ -178,11 +179,22 @@ def test_hybrid_retriever_fk_graph_expansion(active_catalog):
 def test_semantic_canonical_baseline_seeding(active_catalog):
     """Verifies canonical baseline metrics are seeded as USER_APPROVED."""
     fp = getattr(active_catalog, "fingerprint", None) or "default"
-    dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp)
+    dynamic_semantic_engine.seed_baseline_canonical_metrics(fingerprint=fp, catalog=active_catalog)
 
     auth_metrics = dynamic_semantic_engine.get_authoritative_metrics(fingerprint=fp)
-    assert len(auth_metrics) >= 6
     metric_keys = [m.metric_key for m in auth_metrics]
+
+    # Every canonical metric whose required tables exist in this database must be
+    # seeded; metrics needing absent tables must not be invented.
+    available = set(active_catalog.tables)
+    supported = {
+        key for key, req in CANONICAL_METRIC_REQUIREMENTS.items()
+        if set(req["required_tables"]) <= available
+    }
+    assert supported, "no canonical metric is supported by the connected database"
+    assert supported <= set(metric_keys)
+    unsupported = set(CANONICAL_METRIC_REQUIREMENTS) - supported
+    assert not (unsupported & set(metric_keys))
     assert "gross_revenue" in metric_keys
     assert "net_revenue" in metric_keys
     assert "average_order_value" in metric_keys

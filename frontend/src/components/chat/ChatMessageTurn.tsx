@@ -1,10 +1,11 @@
+"use client";
+
 import React from "react";
-import { User, AlertCircle } from "lucide-react";
 import { MultiAgentWorkflowResult } from "@/types/api";
-import { StreamingStepper } from "./StreamingStepper";
-import { ClarificationPrompt } from "./ClarificationPrompt";
-import { RefusalBanner } from "./RefusalBanner";
-import { ArtifactCard } from "./ArtifactCard";
+import { StreamingStepper, StepView } from "./StreamingStepper";
+import { AnswerView } from "./AnswerView";
+import { Notice } from "@/components/ui/Notice";
+import { Button } from "@/components/ui/Button";
 
 export interface ChatTurn {
   turnId: string;
@@ -13,93 +14,61 @@ export interface ChatTurn {
   result?: MultiAgentWorkflowResult;
   error?: string;
   isStreaming?: boolean;
-  activeStepKey?: string;
-  activeStepMessage?: string;
-  completedSteps?: string[];
-  activeTab?: "narrative" | "chart" | "analysis" | "sql" | "data" | "plan" | "trace";
+  /** Steps observed live over SSE, in arrival order. */
+  liveSteps?: StepView[];
+  /** When the step currently running began, for the live counter. */
+  runningSince?: number | null;
 }
 
-export interface ChatMessageTurnProps {
+interface ChatMessageTurnProps {
   turn: ChatTurn;
-  onTabChange: (tab: ChatTurn["activeTab"]) => void;
-  onSelectClarification: (inferredQuery: string) => void;
-  onSelectFollowUp: (qText: string) => void;
+  onAsk: (question: string) => void;
+  onRetry: (question: string) => void;
 }
 
-export function ChatMessageTurn({
-  turn,
-  onTabChange,
-  onSelectClarification,
-  onSelectFollowUp,
-}: ChatMessageTurnProps) {
+/**
+ * One exchange: the question asked, then the answer being built or the answer
+ * itself.
+ *
+ * The question is a quiet right-aligned line rather than a filled bubble — a
+ * coloured bubble on every turn would spend most of the screen's colour budget
+ * on chrome that carries no information.
+ */
+export function ChatMessageTurn({ turn, onAsk, onRetry }: ChatMessageTurnProps) {
   const { result, isStreaming, error } = turn;
 
   return (
-    <div className="space-y-4">
-      {/* 1. User Message Bubble */}
-      <div className="flex justify-end">
-        <div className="max-w-2xl p-4 rounded-2xl rounded-tr-sm bg-primary text-white shadow-md space-y-1.5">
-          <div className="flex items-center gap-2 text-xs opacity-90 pb-1 border-b border-white/20">
-            <User className="w-3.5 h-3.5" />
-            <span className="font-semibold">You</span>
-            <span className="text-[10px] ml-auto font-mono opacity-80">{turn.timestamp}</span>
-          </div>
-          <p className="text-sm font-medium pt-0.5 leading-relaxed">{turn.userQuery}</p>
-          {result?.standalone_query && result.standalone_query !== turn.userQuery && (
-            <p className="text-[11px] opacity-85 italic pt-1 border-t border-white/10">
-              ContextResolver Standalone Rewrite: "{result.standalone_query}"
-            </p>
-          )}
-        </div>
+    <article className="space-y-7" aria-label={`Question: ${turn.userQuery}`}>
+      <div className="flex flex-col items-end gap-1.5 border-b border-[var(--rule)] pb-6">
+        <h2 className="max-w-[46rem] text-balance text-right font-display text-[clamp(1.5rem,2.4vw,2.125rem)] leading-[1.1] text-text">
+          {turn.userQuery}
+        </h2>
+        <p className="num text-label text-faint">{turn.timestamp}</p>
       </div>
 
-      {/* 2. Agent Streaming Live DAG Stepper */}
-      {isStreaming && (
+      {isStreaming ? (
         <StreamingStepper
-          activeStepKey={turn.activeStepKey}
-          activeStepMessage={turn.activeStepMessage}
-          completedSteps={turn.completedSteps}
+          steps={turn.liveSteps ?? []}
+          runningSince={turn.runningSince ?? null}
+          live
         />
-      )}
+      ) : null}
 
-      {/* 3. Execution Error Message */}
-      {error && (
-        <div className="p-5 rounded-2xl border border-destructive/40 bg-destructive/10 text-destructive flex items-start gap-3 shadow-sm">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h3 className="font-semibold text-sm">Execution Interrupted</h3>
-            <p className="text-xs text-foreground/80 leading-relaxed">{error}</p>
-          </div>
-        </div>
-      )}
+      {error ? (
+        <Notice
+          tone="negative"
+          title="The analysis did not finish"
+          action={
+            <Button size="sm" variant="secondary" onClick={() => onRetry(turn.userQuery)}>
+              Try again
+            </Button>
+          }
+        >
+          {error}
+        </Notice>
+      ) : null}
 
-      {/* 4. Agent Completed Results & Specialized Views */}
-      {result && !isStreaming && (
-        <div className="space-y-4">
-          {/* Clarification Alert if triggered */}
-          {result.clarification?.needs_clarification && (
-            <ClarificationPrompt
-              clarification={result.clarification}
-              onSelectOption={onSelectClarification}
-            />
-          )}
-
-          {/* Answerability Refusal Alert if triggered */}
-          {!result.answerability.is_answerable && (
-            <RefusalBanner answerability={result.answerability} />
-          )}
-
-          {/* Full Artifact Card with Sub-tabs and Follow-ups */}
-          <ArtifactCard
-            result={result}
-            turnId={turn.turnId}
-            activeTab={turn.activeTab || "narrative"}
-            onTabChange={onTabChange}
-            onSelectFollowUp={onSelectFollowUp}
-          />
-        </div>
-      )}
-    </div>
+      {result && !isStreaming ? <AnswerView result={result} onAsk={onAsk} /> : null}
+    </article>
   );
 }
-

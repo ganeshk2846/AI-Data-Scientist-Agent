@@ -216,29 +216,64 @@ class ChurnAnalyticsEngine:
                 ml_results = self._evaluate_temporal_ml_baseline(conn, cutoff_date=cutoff_date)
 
             # 5. Build Discrepancy & Limitation Narrative
+            inactive_status_summary = ", ".join(
+                f"{item['count']:,} {k}"
+                for k, item in sorted(status_breakdown.items(), key=lambda kv: -kv[1]["count"])
+                if item["is_active"] == 0 or k in ["Churned", "Dormant"]
+            ) or "no inactive statuses recorded"
+
+            if prediction_stats:
+                pred_parts = ", ".join(
+                    f"{v['count']:,} as '{k}' risk (avg probability {v['avg_prob']})"
+                    for k, v in sorted(prediction_stats.items(), key=lambda kv: -kv[1]["count"])
+                )
+                pred_summary = (
+                    f"In `customer_churn_predictions`, customers are pre-classified: {pred_parts}. "
+                    "These stored scores are not validated against observed outcomes here; the temporal ML "
+                    "baseline below is the evaluated measure."
+                )
+            else:
+                pred_summary = "No `customer_churn_predictions` table is present in the connected database."
+
             discrepancy_narrative = {
                 "inactive_customers_in_customers": inactive_customers_count,
                 "breakdown_in_customers": {k: v["count"] for k, v in status_breakdown.items()},
                 "history_table_rows": history_stats.get("total_historical_records", 0),
                 "distinct_customers_in_history": history_stats.get("distinct_customers_tracked", 0),
                 "explanation": (
-                    f"In `customers`, exactly {inactive_customers_count:,} accounts are inactive (1,625 Churned, 1,940 Dormant). "
-                    f"The higher row count in `customer_segments_history` ({history_stats.get('total_historical_records', 0):,} records) "
-                    "represents historical segment transitions (SCD Type 2) across 12,500 distinct customers over time, "
-                    "rather than current inactive customer accounts."
+                    f"In `customers`, {inactive_customers_count:,} accounts are inactive ({inactive_status_summary}). "
+                    f"The row count in `{history_stats.get('table_name', 'customer_segments_history')}` "
+                    f"({history_stats.get('total_historical_records', 0):,} records) represents historical segment "
+                    f"transitions (SCD Type 2) across {history_stats.get('distinct_customers_tracked', 0):,} distinct "
+                    "customers over time, rather than current inactive customer accounts."
                 ),
-                "prediction_table_analysis": (
-                    "In `customer_churn_predictions`, 16,848 customers were pre-classified as 'High' risk and 3,147 as 'Low' risk. "
-                    "However, empirical evaluation reveals actual churn rates in 2026 are nearly identical (~17.8% in High vs 17.3% in Low), "
-                    "proving the stored predictions are uncalibrated synthetic artifacts with negligible true discrimination."
-                ),
+                "prediction_table_analysis": pred_summary,
             }
+
+            top_exposure_text = "; ".join(
+                f"'{s['segment_name']}' ${s['revenue_at_risk']:,.2f} ({s['customer_count']:,} customers)"
+                for s in segment_risks[:3]
+            ) or "no segments resolved"
+
+            _auc_values = [
+                m.get("roc_auc")
+                for m in (ml_results.get("models", {}) or {}).values()
+                if isinstance(m, dict) and isinstance(m.get("roc_auc"), (int, float))
+            ]
+            if _auc_values:
+                _best_auc = max(_auc_values)
+                ml_observation = (
+                    f"Temporal ML baselines evaluated without feature leakage reach a best ROC-AUC of {_best_auc}, "
+                    f"against 0.5 for random chance."
+                )
+            else:
+                ml_observation = "No temporal ML baseline was evaluated for this database."
 
             observations = [
                 f"Analyzed {total_customers:,} total customers across {len(segment_risks)} segments.",
-                f"Identified ${total_revenue_at_risk:,.2f} total revenue exposure across 'At Risk' ($345.89M) and 'Inactive' ($281.77M) segments.",
-                "Temporal ML baselines evaluated strictly without feature leakage show ROC-AUC ~ 0.51, confirming underlying synthetic data decoupling.",
-                "System refrains from claiming false ML predictive precision on decoupled data, prioritizing verified historical revenue exposure.",
+                f"Identified ${total_revenue_at_risk:,.2f} total revenue exposure; largest segments: {top_exposure_text}.",
+                ml_observation,
+                "Individual churn probabilities are withheld where measured separation is at chance level.",
             ]
 
             return {
@@ -253,10 +288,15 @@ class ChurnAnalyticsEngine:
                 "observations": observations,
                 "abstain_from_predictive_claims": True,
                 "abstain_reason": (
-                    "Empirical validation confirms historical customer order generation was decoupled from status labels: "
-                    "over 90% of customers marked 'Churned' or 'Dormant' placed orders in the subsequent period, and "
-                    "honest temporal ML models achieve ROC-AUC ~ 0.51 (indistinguishable from chance). "
-                    "Defensible actionability is based on verified segment spend exposure rather than synthetic individual probabilities."
+                    "Individual churn probabilities are withheld. "
+                    + (
+                        f"The best temporal ML baseline reaches ROC-AUC {max(_auc_values)} against 0.5 for random chance, "
+                        "so the behavioural features are decoupled from the status labels and carry no usable "
+                        "separation on this data. "
+                        if _auc_values else
+                        "No temporal ML baseline could be evaluated on this data. "
+                    )
+                    + "Actionability is based on verified segment spend exposure rather than modelled individual probabilities."
                 ),
             }
 

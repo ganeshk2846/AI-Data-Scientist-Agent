@@ -2,6 +2,8 @@
 Tests for health, ready, and system status endpoints.
 """
 
+from backend.tests.db_facts import EXPECTED_TABLE_COUNT, EXPECTED_TOTAL_ROWS
+
 def test_health_endpoint(client):
     res = client.get("/health")
     assert res.status_code == 200
@@ -31,8 +33,8 @@ def test_ready_endpoint(client):
     assert data["ready"] is True
     assert data["database"]["connected"] is True
     assert data["database"]["read_only_verified"] is True
-    assert data["database"]["table_count"] == 30
-    assert data["database"]["total_rows"] == 334503
+    assert data["database"]["table_count"] == EXPECTED_TABLE_COUNT
+    assert data["database"]["total_rows"] == EXPECTED_TOTAL_ROWS
 
 
 def test_system_status_endpoint(client):
