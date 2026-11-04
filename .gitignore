@@ -34,7 +34,7 @@ token.json
 
 # Explicitly track template config
 !.env.example
-
+PRD_AIFORBI_2.txt
 # --- 2. Python Virtual Environments, Bytecode & Packaging ---
 __pycache__/
 **/__pycache__/
