@@ -7,7 +7,7 @@
 # - Frontend Next.js build artifacts, node_modules and bundler caches
 # - Databases, SQLite instances, warehouses, journals and locks
 # - Runtime generated vector stores, LanceDB tables, and BM25 indices
-# - Dynamic user uploads and temporary scratch scripts
+# - Temporary scratch scripts and editor backups
 # - ML model weights, FastEmbed/HuggingFace caches and pickles
 # - Operational logs, traces, process IDs and locks
 # - Operating system metadata, IDE settings and AI agent state
@@ -138,11 +138,7 @@ backend/data/active_catalog.json
 data/active_catalog.json
 data/schema_catalog_cache.json
 
-# --- 7. Dynamic User Uploads, Media & Scratch Scripts ---
-uploads/
-**/uploads/
-data/uploads/
-backend/data/uploads/
+# --- 7. Temporary Scratch Scripts & Working Artifacts ---
 scratch/
 **/scratch/
 tmp/
