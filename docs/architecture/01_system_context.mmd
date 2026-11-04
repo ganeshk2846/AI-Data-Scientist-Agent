@@ -31,15 +31,9 @@ flowchart TB
     end
 
     %% High-level relationships
-    BusinessUser -->|"Asks Natural Language Questions"| FrontendApp
-    DataAnalyst -->|"Explores Schemas & Evaluates Traces"| FrontendApp
-    FrontendApp -->|"Presents Management Briefs & Charts"| BusinessUser
-    
-    BackendPlatform -->|"Schema-Grounded Prompt Context"| GroqService
-    GroqService -->|"Generated SQL & Analytical Syntheses"| BackendPlatform
-
-    BackendPlatform -->|"Read-Only Parameterized Queries"| ENTERPRISE_WAREHOUSES
-    ENTERPRISE_WAREHOUSES -->|"Raw Relational Datasets"| BackendPlatform
+    BusinessUser & DataAnalyst <-->|"Natural Language Inquiries & Management Briefings"| FrontendApp
+    BackendPlatform <-->|"Schema Context & Analytical Syntheses"| GroqService
+    BackendPlatform <-->|"Read-Only Parameterized Queries & Data Rows"| SqliteWarehouse & PostgresWarehouse & MySqlWarehouse
 
     %% Theme Styling
     classDef actorClass fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1;
@@ -52,3 +46,5 @@ flowchart TB
     class GroqService extClass;
     class SqliteWarehouse,PostgresWarehouse,MySqlWarehouse dbClass;
 
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

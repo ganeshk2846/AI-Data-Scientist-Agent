@@ -32,14 +32,14 @@ flowchart TB
             direction TB
             DriverRanking["Statistical Driver Ranking & Contribution"]
             VarianceDecomposition["Variance Decomposition & Price-Volume Mix"]
-            AnomalyDetection["Statistical Anomaly Screening (MAD / Z-Score / Isolation Forest)"]
+            AnomalyDetection["Statistical Anomaly Screening (MAD / Z-Score)"]
             CorrelationAnalysis["Multi-Variable Correlation Matrix"]
         end
 
         subgraph CAT_4["4. Impact Analytics Engine ('So What?')"]
             direction TB
             DeltaMetrics["Absolute and Percentage Impact Quantifiers"]
-            SignificanceTesting["Statistical Significance Testing (Student's t-Test, p &lt; 0.05)"]
+            SignificanceTesting["Statistical Significance Testing (Student's t-Test)"]
             ConfidenceIntervals["95% Confidence Interval Calculation"]
             MonetaryRisk["Monetary Revenue Risk & Annualized Dollar Exposure"]
         end
@@ -49,14 +49,14 @@ flowchart TB
             HoltWinters["Exponential Smoothing & Holt-Winters Models"]
             ArimaModeling["ARIMA / SARIMAX Time-Series Forecasting"]
             LightGbmRegression["LightGBM Machine Learning Regressor"]
-            BacktestingSuite["Sliding-Window Walk-Forward Backtesting (MAE, RMSE, MAPE)"]
+            BacktestingSuite["Sliding-Window Walk-Forward Backtesting (MAPE)"]
             PredictionBounds["80% & 95% Prediction Confidence Bounds"]
             ChurnScoring["Customer Churn Risk & RFM Recency-Frequency Scoring"]
         end
 
         subgraph CAT_6["6. Scenario Analytics Engine ('What-If?')"]
             direction TB
-            ParameterPerturbation["Parameter Perturbation (Price, Demand, Cost Multipliers)"]
+            ParameterPerturbation["Parameter Perturbation (Price, Demand, Multipliers)"]
             ElasticityMatrix["Price & Demand Elasticity Modeling"]
             SensitivityAnalysis["Sensitivity Curves & Breakeven Thresholds"]
             ComparativeMatrix["Baseline vs Simulated Scenario Comparisons"]
@@ -65,9 +65,9 @@ flowchart TB
         subgraph CAT_7["7. Prescriptive Optimization Engine"]
             direction TB
             MathematicalOptimization["SciPy Constrained Optimization (SLSQP Solver)"]
-            ObjectiveFunctions["Objective Formulation (Revenue Maximization, Churn Minimization)"]
-            ConstraintModeling["Operational, Capacity & Budget Constraint Enforcement"]
-            PolicyRecommendations["Actionable Policy Recommendations & Trade-Off Analysis"]
+            ObjectiveFunctions["Objective Formulation (Revenue Maximization)"]
+            ConstraintModeling["Operational, Capacity & Budget Constraints"]
+            PolicyRecommendations["Actionable Policy Recommendations & Trade-Offs"]
         end
     end
 
@@ -85,14 +85,14 @@ flowchart TB
     end
 
     %% Analytical Dependencies & Data Handoffs
-    ExtractedData & AnalyticalPlan --> CAT_1 & CAT_2 & CAT_3 & CAT_4 & CAT_5 & CAT_6 & CAT_7
+    ExtractedData & AnalyticalPlan --> SqlAggregation & SchemaIntrospection
 
-    CAT_2 -->|"Baseline Historical Metrics"| CAT_3 & CAT_5
-    CAT_3 -->|"Driver Attribution & Anomaly Weights"| CAT_4 & CAT_7
-    CAT_5 -->|"Forecast Trajectories & Baselines"| CAT_6 & CAT_7
-    CAT_6 -->|"Elasticity Multipliers"| CAT_7
+    SqlAggregation --> DriverRanking & HoltWinters
+    DriverRanking --> DeltaMetrics & MathematicalOptimization
+    HoltWinters --> ParameterPerturbation & MathematicalOptimization
+    ParameterPerturbation --> MathematicalOptimization
 
-    CAT_1 & CAT_2 & CAT_3 & CAT_4 & CAT_5 & CAT_6 & CAT_7 --> NumericalFactMatcher
+    DeltaMetrics & ParameterPerturbation & MathematicalOptimization --> NumericalFactMatcher
     NumericalFactMatcher --> CausalLogicGuard --> EvidenceAuditor
     EvidenceAuditor -->|"Approved Evidence"| ExecutiveBrief & InteractiveCharts
 
@@ -119,3 +119,5 @@ flowchart TB
     class NumericalFactMatcher,CausalLogicGuard,EvidenceAuditor criticClass;
     class ExecutiveBrief,InteractiveCharts outClass;
 
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

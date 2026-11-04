@@ -58,28 +58,22 @@ flowchart TB
         end
 
         subgraph SYSTEM_TAB["System Status & Diagnostics View"]
-            SystemPage["System Diagnostics Controller"]
-            SystemScreen["System Diagnostic Status Screen"]
-            HealthCard["Component Health & Readiness Card"]
+            SystemPage["System Status Controller"]
+            SystemScreen["System Diagnostic Health Dashboard"]
+            HealthCard["LLM & Database Readiness Checkpoints"]
         end
     end
 
-    subgraph SETUP_AND_SETTINGS["4. Self-Service Onboarding & Connection Setup"]
+    subgraph ONBOARDING_FLOW["4. Self-Service Onboarding & Setup Views"]
         direction TB
-        
-        subgraph ONBOARDING_FLOW["Onboarding Setup Views"]
-            LlmConnectPage["Groq Cloud LLM Configuration Screen"]
-            DbConnectPage["Warehouse Connection & Upload Screen"]
-            PrepPage["Asynchronous Schema Preparation Progress Screen"]
-            SettingsPage["Connection Management Settings Screen"]
-        end
-
-        subgraph SETUP_CONTROLS["Setup Components & Controls"]
-            ConnManager["Connection Manager Controller"]
-            GroqForm["Groq API Key Entry & Model Selector"]
-            DbForm["Warehouse URI Form & File Upload Control"]
-            PrepProgress["7-Stage Schema Preparation Tracker"]
-        end
+        LlmConnectPage["LLM Provider Setup Screen"]
+        DbConnectPage["Database Connection Screen"]
+        PrepPage["Schema Preparation Progress Screen"]
+        SettingsPage["Connection Management View"]
+        ConnManager["Connection Switcher & Credentials Manager"]
+        GroqForm["Groq Cloud API Key & Model Form"]
+        DbForm["Warehouse URI Form & File Upload Control"]
+        PrepProgress["7-Stage Schema Preparation Tracker"]
     end
 
     subgraph CLIENT_DATA_LAYER["5. Client API & State Management Layer"]
@@ -101,7 +95,7 @@ flowchart TB
         ReadinessService["System Health & Setup Readiness Services"]
     end
 
-    %% Navigation & Hierarchy Linkages
+    %% Navigation & Hierarchy Linkages (Downward Hierarchy)
     RootLayout --> AppContext --> RouteGuard
     RouteGuard -->|"If Setup Incomplete"| LlmConnectPage & DbConnectPage & PrepPage
     RouteGuard -->|"If System Ready"| AppShell
@@ -112,19 +106,9 @@ flowchart TB
 
     %% Workspace Sub-components
     OverviewView --> HeroSection --> HeroPlot
-    ChatInterface --> ChatInputComp
-    ChatInterface --> ChatMessageList
-    ChatInterface --> StreamingStepper
-    ChatInterface --> AnswerView
-    ChatInterface --> EvidencePanel
-    ChatInterface --> SessionsDrawer
-    ChatInterface --> PresentationDeck
-    ChatInterface --> ClarifyModal
-    ChatInterface --> RefusalAlert
+    ChatInterface --> ChatInputComp & ChatMessageList & StreamingStepper & AnswerView & EvidencePanel & SessionsDrawer & PresentationDeck & ClarifyModal & RefusalAlert
 
-    EvidencePanel --> PlotlyRenderer
-    EvidencePanel --> DataTable
-    EvidencePanel --> SqlBlock
+    EvidencePanel --> PlotlyRenderer & DataTable & SqlBlock
 
     ActivityPage --> ObsDashboard --> MetricCards & TraceTable
     CatalogPage --> SchemaSection --> TableCards
@@ -134,25 +118,14 @@ flowchart TB
     LlmConnectPage --> GroqForm
     DbConnectPage --> DbForm
     PrepPage --> PrepProgress
-    SettingsPage --> ConnManager
-    ConnManager --> GroqForm & DbForm & PrepProgress
+    SettingsPage --> ConnManager --> GroqForm & DbForm & PrepProgress
 
-    %% API Connections
-    ChatInterface <-->|"Query Turns & SSE Stream"| ApiClient
-    AnswerView <-->|"Structured Data"| ApiClient
-    ObsDashboard <-->|"Telemetry Metrics"| ApiClient
-    SchemaSection <-->|"Schema Introspection"| ApiClient
-    SystemScreen <-->|"System Status"| ApiClient
-    ConnManager <-->|"Test Credentials"| ApiClient
+    %% Client Services & Backend Dispatch
+    ChatInterface --> SessionHook
+    AnswerView & EvidencePanel --> FormatUtils & NarrativeUtils
+    ChatInterface & AnswerView & ObsDashboard & SchemaSection & SystemScreen & ConnManager --> ApiClient
 
-    ApiClient <-->|"Streaming Chat Turns"| ChatService
-    ApiClient <-->|"Streaming Decision Support"| AgenticService
-    ApiClient <-->|"Schema Profiling & Preparation"| SchemaService
-    ApiClient <-->|"Operational Metrics & Traces"| TelemetryService
-    ApiClient <-->|"Readiness & Liveness Probes"| ReadinessService
-
-    SessionHook <--> ChatInterface
-    FormatUtils & NarrativeUtils <--> AnswerView & EvidencePanel
+    ApiClient --> ChatService & AgenticService & SchemaService & TelemetryService & ReadinessService
 
     %% Theme Styling Classes
     classDef rootClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
@@ -170,3 +143,6 @@ flowchart TB
     class LlmConnectPage,DbConnectPage,PrepPage,SettingsPage,ConnManager,GroqForm,DbForm,PrepProgress setupClass;
     class ApiClient,SessionHook,ThemeHook,FormatUtils,NarrativeUtils,TypeContracts libClass;
     class ChatService,AgenticService,SchemaService,TelemetryService,ReadinessService beClass;
+
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

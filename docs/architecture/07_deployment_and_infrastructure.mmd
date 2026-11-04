@@ -69,7 +69,7 @@ flowchart TB
     RetrievalEngines <-->|"Catalog Introspection Snapshots"| CacheVolume
 
     CORE_MODULES <-->|"HTTPS / TLS 1.3 OpenAI-Compatible API"| GroqLpuCluster
-    SecurityGuards -->|"Enforces Read-Only Parameters"| BUSINESS_DATA_WAREHOUSES
+    SecurityGuards -->|"Enforces Read-Only Parameters"| LocalSqlite & RemotePostgres & RemoteMySql
     CORE_MODULES <-->|"Local File I/O (Read-Only Pragma)"| LocalSqlite
     CORE_MODULES <-->|"TCP/IP Connection Pool (Read-Only Session)"| RemotePostgres
     CORE_MODULES <-->|"TCP/IP Connection Pool (Read-Only Session)"| RemoteMySql
@@ -87,3 +87,5 @@ flowchart TB
     class GroqLpuCluster cloudClass;
     class LocalSqlite,RemotePostgres,RemoteMySql dataClass;
 
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

@@ -71,7 +71,7 @@ flowchart TB
         FinalAnswer["Validated Analytical Response & Visualizations"]
     end
 
-    %% Flow Connections
+    %% Flow Connections (Clean Directional Handoffs)
     UserQuery --> QueryTokenizer
     RelationalMetadata --> CorpusGenerator --> SchemaCorpus
     QueryTokenizer & SchemaCorpus --> EmbeddingModel & Bm25Engine
@@ -92,13 +92,11 @@ flowchart TB
     GeneratedSql --> AstParser --> ReadOnlyPolicy --> InjectionGuard
 
     InjectionGuard -->|"Valid AST Passed"| SafeExecutor
-    InjectionGuard -->|"AST Invalidation"| RepairLoop
-    RepairLoop -->|"Corrective Feedback"| GroqService
+    InjectionGuard -->|"AST Invalidation"| RepairLoop --> GroqService
 
-    SafeExecutor --> EnterpriseWarehouse
-    EnterpriseWarehouse -->|"Raw Query Rows"| SafeExecutor
-    SafeExecutor -->|"Runtime Query Error"| RepairLoop
-    SafeExecutor -->|"Success"| DataFrameExtractor --> PythonAnalytics --> EvidenceAudit --> FinalAnswer
+    SafeExecutor <-->|"Safe Parameterized Queries & Data Rows"| EnterpriseWarehouse
+    SafeExecutor -->|"Extracted Table Records"| DataFrameExtractor
+    DataFrameExtractor --> PythonAnalytics --> EvidenceAudit --> FinalAnswer
 
     %% Styling Classes
     classDef queryClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
@@ -118,3 +116,6 @@ flowchart TB
     class ValueLinker,SemanticEngine,GroundedPromptContext semClass;
     class GroqService,GeneratedSql,AstParser,ReadOnlyPolicy,InjectionGuard,RepairLoop sqlClass;
     class SafeExecutor,EnterpriseWarehouse,DataFrameExtractor,PythonAnalytics,EvidenceAudit,FinalAnswer execClass;
+
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

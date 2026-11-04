@@ -83,34 +83,25 @@ flowchart TB
         InteractiveVisualizations["Interactive Visualizations<br/>Dynamic charts, tabular views, and scenario curves"]
     end
 
-    %% Execution & Data Handoff Flow
+    %% Clean Forward-Flowing Execution & Data Handoffs (Zero Cycles)
     UserQuestion & SessionContext --> EntityExtraction --> IntentClassification --> ClassificationOutput
     ClassificationOutput --> DagPlanner --> ExecutionPlan --> Supervisor
 
-    Supervisor -->|"1. Dispatch Query Plan"| DataRetrieval
+    Supervisor -->|"1. Dispatch Execution Plan"| DataRetrieval
     DataRetrieval --> DescriptiveEng
-    DescriptiveEng -->|"Extracted Datasets & KPIs"| DataRetrieval
-    DataRetrieval -->|"Clean Dataset Handoff"| Supervisor
+    DescriptiveEng -->|"Extracted Datasets & Baseline KPIs"| Diagnostic
 
-    Supervisor -->|"2. Forward Upstream Data"| Diagnostic
     Diagnostic --> DiagnosticEng & ImpactEng
-    DiagnosticEng & ImpactEng -->|"Root Causes & Impact Scores"| Diagnostic
-    Diagnostic -->|"Diagnostic Findings Handoff"| Supervisor
+    DiagnosticEng & ImpactEng -->|"Root Causes & Driver Attribution"| Predictive
 
-    Supervisor -->|"3. Forward Trend Data"| Predictive
     Predictive --> PredictiveEng & ChurnEng
-    PredictiveEng & ChurnEng -->|"Forecasts & Churn Profiles"| Predictive
-    Predictive -->|"Predictive Trajectory Handoff"| Supervisor
+    PredictiveEng & ChurnEng -->|"Forecast Trajectories & Churn Profiles"| Prescriptive
 
-    Supervisor -->|"4. Forward Baselines & Targets"| Prescriptive
     Prescriptive --> ScenarioEng & PrescriptiveEng
-    ScenarioEng & PrescriptiveEng -->|"Optimized Policies & Simulation Multipliers"| Prescriptive
-    Prescriptive -->|"Prescriptive Recommendations Handoff"| Supervisor
+    ScenarioEng & PrescriptiveEng -->|"Simulation Curves & Optimal Policies"| Critic
 
-    Supervisor -->|"5. Draft Findings & Data"| Critic
     Critic --> FactMatcher --> CausalGuard --> AuditReport
-    AuditReport -->|"Audit Decision"| Critic
-    Critic -->|"Verified Evidence"| ExecutiveSynthesis
+    AuditReport -->|"Verified Findings"| ExecutiveSynthesis
 
     ExecutiveSynthesis --> SectionWhat & SectionWhy & SectionNext & SectionImpact
     ExecutiveSynthesis --> InteractiveVisualizations
@@ -134,3 +125,5 @@ flowchart TB
     class FactMatcher,CausalGuard,AuditReport auditClass;
     class ExecutiveSynthesis,SectionWhat,SectionWhy,SectionNext,SectionImpact,InteractiveVisualizations outClass;
 
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;

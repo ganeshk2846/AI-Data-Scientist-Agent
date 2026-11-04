@@ -80,7 +80,7 @@ flowchart TB
     LlmConfig --> TestLlm
     DatabaseConfig & SettingsSwitch --> TestDb
     TestLlm & TestDb --> ConnectionManager
-    ConnectionManager --> ENGINE_ADAPTERS --> ConnectedWarehouse
+    ConnectionManager --> SqliteMode & PostgresMode & MySqlMode --> ConnectedWarehouse
 
     ConnectedWarehouse --> FingerprintEngine
     CryptographicSalt --> FingerprintEngine --> UniqueFingerprint
@@ -111,3 +111,6 @@ flowchart TB
     class MetadataCatalog,VectorStore,LexicalStore storeClass;
     class SwitchEvent,CacheClear,ArtifactCheck,ImmediateLoad,BackgroundJob switchClass;
     class ReadinessGate,WorkspaceUnlocked readyClass;
+
+    %% High-Contrast Bold Connector Lines (100% Crisp & Visible on GitHub Dark and Light Modes)
+    linkStyle default stroke:#0284c7,stroke-width:2.5px;
