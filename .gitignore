@@ -1,9 +1,19 @@
 # =========================================================================
 # GITIGNORE - AI for BI Data Scientist Agent
-# Keeps GitHub repository clean from caches, databases, logs, builds & secrets
+# Comprehensive protection keeping the repository clean of:
+# - Secrets, keys, tokens and environment variables
+# - Python bytecode, virtual environments, caches and eggs
+# - Testing, coverage, junit reports and mock artifacts
+# - Frontend Next.js build artifacts, node_modules and bundler caches
+# - Databases, SQLite instances, warehouses, journals and locks
+# - Runtime generated vector stores, LanceDB tables, and BM25 indices
+# - Dynamic user uploads and temporary scratch scripts
+# - ML model weights, FastEmbed/HuggingFace caches and pickles
+# - Operational logs, traces, process IDs and locks
+# - Operating system metadata, IDE settings and AI agent state
 # =========================================================================
 
-# --- Secrets, Credentials & Local Config ---
+# --- 1. Secrets, Credentials, Tokens & Local Environment ---
 .env
 .env.local
 .env.*.local
@@ -16,15 +26,39 @@ secrets.*
 *.cert
 *.crt
 credentials.json
-# Ensure template config is always tracked
+*.token
+token.json
+.security_salt
+**/.security_salt
+*.salt
+
+# Explicitly track template config
 !.env.example
 
-# --- Python, Testing & Caching ---
+# --- 2. Python Virtual Environments, Bytecode & Packaging ---
 __pycache__/
 **/__pycache__/
 *.py[cod]
 *$py.class
 *.pyo
+*.pyd
+*.so
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+*.egg-info/
+**/build/
+**/dist/
+*.egg
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- 3. Testing, Quality Assurance & Coverage ---
 .pytest_cache/
 **/.pytest_cache/
 .coverage
@@ -36,15 +70,13 @@ htmlcov/
 .ruff_cache/
 .tox/
 .hypothesis/
-venv/
-.venv/
-env/
-ENV/
-*.egg-info/
-*.egg
-.eggs/
+playwright-report/
+test-results/
+blob-report/
+junit.xml
+test-report.json
 
-# --- Frontend & Node.js ---
+# --- 4. Frontend, Next.js, Node.js & Bundlers ---
 node_modules/
 **/node_modules/
 .next/
@@ -53,16 +85,19 @@ out/
 build/
 dist/
 .turbo/
+**/.turbo/
 .npm/
 *.tsbuildinfo
 .eslintcache
+.parcel-cache/
+.webpack/
+storybook-static/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# --- Databases, Storage & State ---
-# Exclude raw warehouses, local sqlite instances and lock/journal files
+# --- 5. Databases, Storage, Warehouses & Lock Files ---
 *.db
 *.db-*
 *.db-wal
@@ -73,55 +108,100 @@ pnpm-debug.log*
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+*.sql.gz
+*.sql.tar.gz
+*.sql.bak
+*.dump
+*.rdb
+*.accdb
+*.mdb
 ecommerce.sqlite
 ecommerce.db
 agent_app.sqlite
 
-# --- Runtime Caches & Vector Stores ---
-# Application generated schema catalogs, BM25 indices and LanceDB embeddings
+# --- 6. Runtime Caches, Vector Stores & Index Partitions ---
 /data/
 data/
-backend/data/active_catalog.json
+backend/data/
+**/data/
 *.lance/
+**/*.lance/
+lancedb/
+**/lancedb/
+bm25/
+**/bm25/
 *.parquet
 *.arrow
 *.duckdb
+*.duckdb.*
+backend/data/active_catalog.json
+data/active_catalog.json
+data/schema_catalog_cache.json
 
-# Keep golden evaluation test fixtures
-!backend/data/gold_evaluation_set.json
+# --- 7. Dynamic User Uploads, Media & Scratch Scripts ---
+uploads/
+**/uploads/
+data/uploads/
+backend/data/uploads/
+scratch/
+**/scratch/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
 
-# --- ML Model Weights & Cache ---
+# --- 8. Machine Learning Model Weights, Embeddings & Serialized Data ---
 fastembed_cache/
+**/.fastembed/
+**/.fastembed_cache/
 huggingface_cache/
+**/.huggingface/
 models/
 *.onnx
 *.safetensors
 *.bin
 *.pt
 *.pth
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
 
-# --- Logs & Temp Directories ---
+# --- 9. Logs, Telemetry & Process IDs ---
 *.log
+**/*.log
 logs/
+**/logs/
 .cache/
 *.cache
-tmp/
-temp/
-scratch/
-*.tmp
-*.bak
+*.pid
+*.pid.lock
+*.seed
 
-# --- OS & Editors ---
+# --- 10. Operating System, Editors, IDEs & AI Agent Artifacts ---
 .DS_Store
 .DS_Store?
 ._*
-Thumbs.db
+[Tt]humbs.db
 ehthumbs.db
-Desktop.ini
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
 .vscode/
+**/.vscode/
 .idea/
+**/.idea/
+*.code-workspace
 *.sublime-project
 *.sublime-workspace
-*.swp
-*.swo
-*~
+.cursor/
+**/.cursor/
+.cursorrules.bak
+.antigravity/
+**/.antigravity/
+.gemini/
+**/.gemini/
