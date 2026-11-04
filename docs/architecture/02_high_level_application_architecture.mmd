@@ -1,0 +1,150 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 2: HIGH-LEVEL APPLICATION ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph LAYER_1["1. User Interface Layer"]
+        direction TB
+        AppShell["Application Shell & Unified Navigation"]
+        ChatInterface["Conversational BI Workspace"]
+        ExecutiveOverview["Executive Strategic Overview"]
+        CatalogBrowser["Relational Schema Explorer"]
+        TelemetryDashboard["Operational Telemetry & Observability"]
+        SystemDiagnostics["System Health & Diagnostic Center"]
+        ConnectionManager["Self-Service Connection Manager"]
+    end
+
+    subgraph LAYER_2["2. Application and API Layer"]
+        direction TB
+        ApiGateway["FastAPI Application Gateway"]
+        SecurityGate["Security & Guardrail Enforcement"]
+        RestRouter["RESTful Service Endpoints"]
+        SseStreaming["Server-Sent Events Streaming Engine"]
+    end
+
+    subgraph LAYER_3["3. Agentic Orchestration Layer"]
+        direction TB
+        Supervisor["Agentic Supervisor Coordinator"]
+        IntentClassifier["Intent & Complexity Classifier"]
+        EntityExtractor["Structured Entity Extractor"]
+        TaskPlanner["Analytical Plan DAG Generator"]
+        WorkflowOrchestrator["Conversational BI Pipeline Orchestrator"]
+        
+        subgraph SPECIALIST_GROUP["Specialist Analytical Agents"]
+            DataRetrievalAgent["Data Retrieval Specialist"]
+            DiagnosticAgent["Diagnostic Specialist"]
+            PredictiveAgent["Predictive Specialist"]
+            PrescriptiveAgent["Prescriptive Specialist"]
+            CriticAgent["Evidence & Faithfulness Critic"]
+        end
+
+        ConversationalMemory["Session Memory & Context Resolver"]
+    end
+
+    subgraph LAYER_4["4. Intelligence and Analytics Layer"]
+        direction TB
+        DataDiscovery["Data Discovery Engine"]
+        DescriptiveAnalytics["Descriptive Analytics Engine"]
+        DiagnosticAnalytics["Diagnostic & Root Cause Engine"]
+        ImpactAnalytics["Impact Analytics Engine ('So What?')"]
+        PredictiveAnalytics["Predictive Forecasting & Churn Engine"]
+        ScenarioAnalytics["Scenario Analytics Engine ('What-If?')"]
+        PrescriptiveAnalytics["Prescriptive Optimization Engine"]
+        FaithfulnessCritic["Numerical Fact Verification Critic"]
+    end
+
+    subgraph LAYER_5["5. Retrieval and Knowledge Layer"]
+        direction TB
+        HybridRetriever["Hybrid Schema Retriever"]
+        DenseSearch["Dense Vector Semantic Search"]
+        LexicalSearch["Lexical Frequency Search"]
+        RankFusion["Reciprocal Rank Fusion"]
+        GraphExpander["Foreign-Key Graph Expander"]
+        ValueLinker["Fuzzy Entity Value Linker"]
+        SemanticLayer["Dynamic Business Semantic Engine"]
+    end
+
+    subgraph LAYER_6["6. Data Connectivity and Processing Layer"]
+        direction TB
+        ConnectionManagerCore["Database Connection Manager"]
+        SqlAstValidator["SQL AST Security Gate (sqlglot)"]
+        SqlRepairLoop["Bounded SQL Repair Loop"]
+        SqlExecutor["Safe SQL Query Executor"]
+        
+        subgraph MULTI_ADAPTERS["Read-Only Database Adapters"]
+            SqliteAdapter["SQLite Read-Only Adapter"]
+            PostgresAdapter["PostgreSQL Read-Only Adapter"]
+            MysqlAdapter["MySQL Read-Only Adapter"]
+        end
+    end
+
+    subgraph LAYER_7["7. Storage and Observability Layer"]
+        direction TB
+        ObservabilityTracer["High-Resolution Performance Tracer"]
+        
+        subgraph OPERATIONAL_STORES["Local Data Stores & Indices"]
+            AppDatabase[("Operational State & Traces Store")]
+            VectorStorage[("Dense Vector Storage (LanceDB)")]
+            LexicalIndex[("Lexical Index Storage (BM25)")]
+            CatalogCache[("Metadata Catalog Cache")]
+        end
+    end
+
+    subgraph LAYER_8["8. External Services Layer"]
+        direction TB
+        GroqCloud["Groq Cloud Inference Platform<br/>Exclusive LLM Provider (LPU Architecture)"]
+        EnterpriseWarehouses[("Connected Business Warehouses<br/>SQLite / PostgreSQL / MySQL")]
+    end
+
+    %% Cross-Layer Flows
+    LAYER_1 -->|"User Prompts & Telemetry Requests"| ApiGateway
+    ApiGateway --> SecurityGate --> RestRouter & SseStreaming
+    RestRouter & SseStreaming --> Supervisor & WorkflowOrchestrator
+    
+    Supervisor --> IntentClassifier & EntityExtractor --> TaskPlanner
+    TaskPlanner --> SPECIALIST_GROUP
+    SPECIALIST_GROUP --> LAYER_4
+    
+    WorkflowOrchestrator & DataRetrievalAgent --> HybridRetriever
+    HybridRetriever --> DenseSearch & LexicalSearch --> RankFusion --> GraphExpander --> ValueLinker --> SemanticLayer
+
+    SemanticLayer & DataRetrievalAgent --> SqlAstValidator
+    SqlAstValidator -->|"Valid AST"| SqlExecutor
+    SqlAstValidator -->|"Syntax Error"| SqlRepairLoop
+    SqlRepairLoop -->|"Corrective Loop"| GroqCloud
+    
+    SqlExecutor --> ConnectionManagerCore --> MULTI_ADAPTERS --> EnterpriseWarehouses
+    EnterpriseWarehouses -->|"Relational Data"| SqlExecutor --> LAYER_4
+
+    LAYER_4 --> FaithfulnessCritic --> CriticAgent --> Supervisor
+    Supervisor --> SseStreaming --> Layer_1_Return["Streaming Management Response & Plotly Visualizations"] --> LAYER_1
+
+    DenseSearch <--> VectorStorage
+    LexicalSearch <--> LexicalIndex
+    HybridRetriever <--> CatalogCache
+    Supervisor & WorkflowOrchestrator <--> ConversationalMemory <--> AppDatabase
+    ApiGateway & Supervisor -.->|"Latency Spans & Run Traces"| ObservabilityTracer --> AppDatabase
+    ObservabilityTracer -.-> TelemetryDashboard
+
+    DataRetrievalAgent & Supervisor <--> GroqCloud
+
+    %% Theme Styling Classes
+    classDef l1Class fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#01579b;
+    classDef l2Class fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef l3Class fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+    classDef l4Class fill:#fff3e0,stroke:#f57c00,stroke-width:1.5px,color:#e65100;
+    classDef l5Class fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef l6Class fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef l7Class fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px,color:#1b5e20;
+    classDef l8Class fill:#fce4ec,stroke:#c2185b,stroke-width:1.5px,color:#880e4f;
+
+    class AppShell,ChatInterface,ExecutiveOverview,CatalogBrowser,TelemetryDashboard,SystemDiagnostics,ConnectionManager l1Class;
+    class ApiGateway,SecurityGate,RestRouter,SseStreaming l2Class;
+    class Supervisor,IntentClassifier,EntityExtractor,TaskPlanner,WorkflowOrchestrator,DataRetrievalAgent,DiagnosticAgent,PredictiveAgent,PrescriptiveAgent,CriticAgent,ConversationalMemory l3Class;
+    class DataDiscovery,DescriptiveAnalytics,DiagnosticAnalytics,ImpactAnalytics,PredictiveAnalytics,ScenarioAnalytics,PrescriptiveAnalytics,FaithfulnessCritic l4Class;
+    class HybridRetriever,DenseSearch,LexicalSearch,RankFusion,GraphExpander,ValueLinker,SemanticLayer l5Class;
+    class ConnectionManagerCore,SqlAstValidator,SqlRepairLoop,SqlExecutor,SqliteAdapter,PostgresAdapter,MysqlAdapter l6Class;
+    class ObservabilityTracer,AppDatabase,VectorStorage,LexicalIndex,CatalogCache l7Class;
+    class GroqCloud,EnterpriseWarehouses l8Class;
+

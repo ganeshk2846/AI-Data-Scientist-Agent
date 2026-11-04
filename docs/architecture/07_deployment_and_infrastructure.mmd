@@ -1,0 +1,89 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 7: DEPLOYMENT AND INFRASTRUCTURE ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph CLIENT_TIER["1. Client Device / Presentation Tier"]
+        direction TB
+        BrowserInstance["Modern Web Browser<br/>Chrome, Edge, Firefox, Safari"]
+        SpaApplication["Single-Page Application Client<br/>Next.js 14 / React 18 / Tailwind CSS<br/>Client-Side State, Dynamic Plotly.js Visualizations"]
+        BrowserInstance --> SpaApplication
+    end
+
+    subgraph APPLICATION_TIER["2. Application Services Tier (Host / Container)"]
+        direction TB
+
+        subgraph FRONTEND_SERVER["Node.js Application Runtime"]
+            NextJsServer["Next.js Application Server<br/>Port 3001<br/>Static Asset Delivery, SSR & Client Proxying"]
+        end
+
+        subgraph BACKEND_SERVER["Python ASGI Application Runtime"]
+            UvicornServer["Uvicorn High-Performance ASGI Server<br/>Port 8001"]
+            FastApiGateway["FastAPI Application Framework<br/>Python 3.10+ Multi-Threaded Asyncio Engine"]
+            
+            subgraph CORE_MODULES["Core Engine Modules"]
+                Orchestrators["Multi-Agent Orchestrators<br/>Supervisor & Workflow Coordinators"]
+                AnalyticalEngines["Deterministic Python Engines<br/>Pandas, SciPy, statsmodels, LightGBM"]
+                RetrievalEngines["Hybrid RAG Retrievers<br/>FastEmbed ONNX & BM25Okapi"]
+                SecurityGuards["Security & AST Validation Gates<br/>sqlglot & Input Sanitization"]
+            end
+            
+            UvicornServer --> FastApiGateway --> CORE_MODULES
+        end
+    end
+
+    subgraph STORAGE_TIER["3. Local Persistent Storage Tier (Volumes / Disk)"]
+        direction TB
+        
+        subgraph LOCAL_VOLUMES["Filesystem Storage Volumes"]
+            OperationalDb[("Operational SQLite Store<br/>User Sessions, Conversation Memory,<br/>Execution Traces, Stage Spans")]
+            VectorVolume[("LanceDB Vector Storage<br/>Schema Table Embeddings Partitioned by Fingerprint")]
+            Bm25Volume[("Persistent BM25 Storage<br/>Inverted Index Files Partitioned by Fingerprint")]
+            CacheVolume[("Metadata Catalog Cache<br/>Schema Structure & Profiling Snapshots")]
+        end
+    end
+
+    subgraph EXTERNAL_TIER["4. External Services & Enterprise Data Tier"]
+        direction TB
+
+        subgraph CLOUD_LLM_SERVICE["Groq Cloud Platform (Exclusive Provider)"]
+            GroqLpuCluster["Groq LPU Inference Engine<br/>Ultra-High Throughput Hardware Acceleration<br/>Models: llama-3.3-70b-versatile, openai/gpt-oss-120b"]
+        end
+
+        subgraph BUSINESS_DATA_WAREHOUSES["Connected Business Data Warehouses (Read-Only)"]
+            LocalSqlite[("SQLite Relational Warehouses<br/>Local File Storage / Uploaded Datasets")]
+            RemotePostgres[("Enterprise PostgreSQL Clusters<br/>Network TCP/IP Connection")]
+            RemoteMySql[("Enterprise MySQL Databases<br/>Network TCP/IP Connection")]
+        end
+    end
+
+    %% Network & Inter-Tier Communication
+    SpaApplication <-->|"HTTP / SSE Stream (Port 3001)"| NextJsServer
+    SpaApplication <-->|"Direct REST & SSE Calls (Port 8001)"| UvicornServer
+    NextJsServer -.->|"Reverse Proxy / API Rewrites"| UvicornServer
+
+    FastApiGateway <-->|"Read/Write Operational Traces & Sessions"| OperationalDb
+    RetrievalEngines <-->|"Vector Queries & Indexing"| VectorVolume
+    RetrievalEngines <-->|"Lexical Lookups & Caching"| Bm25Volume
+    RetrievalEngines <-->|"Catalog Introspection Snapshots"| CacheVolume
+
+    CORE_MODULES <-->|"HTTPS / TLS 1.3 OpenAI-Compatible API"| GroqLpuCluster
+    SecurityGuards -->|"Enforces Read-Only Parameters"| BUSINESS_DATA_WAREHOUSES
+    CORE_MODULES <-->|"Local File I/O (Read-Only Pragma)"| LocalSqlite
+    CORE_MODULES <-->|"TCP/IP Connection Pool (Read-Only Session)"| RemotePostgres
+    CORE_MODULES <-->|"TCP/IP Connection Pool (Read-Only Session)"| RemoteMySql
+
+    %% Styling Classes
+    classDef clientClass fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#0d47a1;
+    classDef appClass fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef storeClass fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef cloudClass fill:#fce4ec,stroke:#c2185b,stroke-width:1.5px,color:#880e4f;
+    classDef dataClass fill:#e8f5e9,stroke:#388e3c,stroke-width:1.5px,color:#1b5e20;
+
+    class BrowserInstance,SpaApplication clientClass;
+    class NextJsServer,UvicornServer,FastApiGateway,Orchestrators,AnalyticalEngines,RetrievalEngines,SecurityGuards appClass;
+    class OperationalDb,VectorVolume,Bm25Volume,CacheVolume storeClass;
+    class GroqLpuCluster cloudClass;
+    class LocalSqlite,RemotePostgres,RemoteMySql dataClass;
+

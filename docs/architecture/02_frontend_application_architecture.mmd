@@ -1,0 +1,172 @@
+flowchart TB
+%% =====================================================================
+%% ARCHITECTURE 02: FRONTEND APPLICATION ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph CLIENT_ROOT["1. Web Application Foundation (Next.js / React)"]
+        direction TB
+        RootLayout["Root Application Layout & Typography"]
+        GlobalTheme["Global Dark / Light Enterprise Theme"]
+        AppContext["Application Context & State Providers"]
+        RouteGuard["Setup Readiness Route Guard"]
+    end
+
+    subgraph APP_SHELL_GROUP["2. Application Shell & Global Navigation"]
+        direction TB
+        AppShell["Application Shell & Tab Navigation"]
+        Header["System Header & Status Indicators"]
+        WelcomeIntro["Introductory Onboarding Sequence"]
+    end
+
+    subgraph PRIMARY_APP_VIEWS["3. Core Functional Views"]
+        direction TB
+        
+        subgraph OVERVIEW_TAB["Executive Overview View"]
+            OverviewView["Executive Overview Dashboard"]
+            HeroSection["Interactive Analytical Hero Visualizer"]
+            HeroPlot["Dynamic Time-Series Trajectory Visualizer"]
+        end
+
+        subgraph CHAT_TAB["Conversational BI Workspace"]
+            ChatInterface["Conversational BI Workspace Controller"]
+            ChatInputComp["Natural Language Query Composer & Prompt Starters"]
+            ChatMessageList["Conversation Message History & Turns"]
+            StreamingStepper["Real-Time Execution Progress Stepper"]
+            AnswerView["Executive Management Response Brief"]
+            EvidencePanel["Interactive Multi-Tab Evidence Panel"]
+            PlotlyRenderer["Responsive Plotly.js Visualizer"]
+            DataTable["Tabular Data Viewer with Export"]
+            SqlBlock["Syntax-Highlighted SQL Viewer"]
+            PresentationDeck["Full-Screen Executive Presentation Deck"]
+            SessionsDrawer["Conversation Sessions Drawer & Switcher"]
+            ClarifyModal["Multi-Choice Clarification Prompt"]
+            RefusalAlert["Safe Abstention & Policy Refusal Banner"]
+        end
+
+        subgraph ACTIVITY_TAB["Observability & Analytics History View"]
+            ActivityPage["Observability & History Controller"]
+            ObsDashboard["Operational Telemetry Dashboard"]
+            MetricCards["Latency Percentiles (p50 / p95 / p99) & Success Cards"]
+            TraceTable["Historical Run Traces & Execution Spans"]
+        end
+
+        subgraph CATALOG_TAB["Schema & Catalog Explorer View"]
+            CatalogPage["Catalog Explorer Controller"]
+            SchemaSection["Schema Readiness Explorer"]
+            TableCards["Table Cardinality & Column Data Profiles"]
+        end
+
+        subgraph SYSTEM_TAB["System Status & Diagnostics View"]
+            SystemPage["System Diagnostics Controller"]
+            SystemScreen["System Diagnostic Status Screen"]
+            HealthCard["Component Health & Readiness Card"]
+        end
+    end
+
+    subgraph SETUP_AND_SETTINGS["4. Self-Service Onboarding & Connection Setup"]
+        direction TB
+        
+        subgraph ONBOARDING_FLOW["Onboarding Setup Views"]
+            LlmConnectPage["Groq Cloud LLM Configuration Screen"]
+            DbConnectPage["Warehouse Connection & Upload Screen"]
+            PrepPage["Asynchronous Schema Preparation Progress Screen"]
+            SettingsPage["Connection Management Settings Screen"]
+        end
+
+        subgraph SETUP_CONTROLS["Setup Components & Controls"]
+            ConnManager["Connection Manager Controller"]
+            GroqForm["Groq API Key Entry & Model Selector"]
+            DbForm["Warehouse URI Form & File Upload Control"]
+            PrepProgress["7-Stage Schema Preparation Tracker"]
+        end
+    end
+
+    subgraph CLIENT_DATA_LAYER["5. Client API & State Management Layer"]
+        direction TB
+        ApiClient["Typed REST & Streaming Client"]
+        SessionHook["Conversational Session State Manager"]
+        ThemeHook["Theme Toggle & Mode Controller"]
+        FormatUtils["Currency, Percentage & Number Formatters"]
+        NarrativeUtils["Executive Narrative Parser"]
+        TypeContracts["TypeScript API Data Contracts"]
+    end
+
+    subgraph BACKEND_GATEWAY["6. Backend API Gateway"]
+        direction TB
+        ChatService["Conversational BI & SSE Streaming Services"]
+        AgenticService["Agentic Supervisor & Multi-Agent Services"]
+        SchemaService["Schema Catalog & Preparation Job Services"]
+        TelemetryService["Observability & Run Trace Services"]
+        ReadinessService["System Health & Setup Readiness Services"]
+    end
+
+    %% Navigation & Hierarchy Linkages
+    RootLayout --> AppContext --> RouteGuard
+    RouteGuard -->|"If Setup Incomplete"| LlmConnectPage & DbConnectPage & PrepPage
+    RouteGuard -->|"If System Ready"| AppShell
+
+    AppShell --> Header
+    AppShell --> OverviewView & ChatInterface & ActivityPage & CatalogPage & SystemPage
+    Header -.->|"Settings Shortcut"| SettingsPage
+
+    %% Workspace Sub-components
+    OverviewView --> HeroSection --> HeroPlot
+    ChatInterface --> ChatInputComp
+    ChatInterface --> ChatMessageList
+    ChatInterface --> StreamingStepper
+    ChatInterface --> AnswerView
+    ChatInterface --> EvidencePanel
+    ChatInterface --> SessionsDrawer
+    ChatInterface --> PresentationDeck
+    ChatInterface --> ClarifyModal
+    ChatInterface --> RefusalAlert
+
+    EvidencePanel --> PlotlyRenderer
+    EvidencePanel --> DataTable
+    EvidencePanel --> SqlBlock
+
+    ActivityPage --> ObsDashboard --> MetricCards & TraceTable
+    CatalogPage --> SchemaSection --> TableCards
+    SystemPage --> SystemScreen --> HealthCard
+
+    %% Setup Components
+    LlmConnectPage --> GroqForm
+    DbConnectPage --> DbForm
+    PrepPage --> PrepProgress
+    SettingsPage --> ConnManager
+    ConnManager --> GroqForm & DbForm & PrepProgress
+
+    %% API Connections
+    ChatInterface <-->|"Query Turns & SSE Stream"| ApiClient
+    AnswerView <-->|"Structured Data"| ApiClient
+    ObsDashboard <-->|"Telemetry Metrics"| ApiClient
+    SchemaSection <-->|"Schema Introspection"| ApiClient
+    SystemScreen <-->|"System Status"| ApiClient
+    ConnManager <-->|"Test Credentials"| ApiClient
+
+    ApiClient <-->|"Streaming Chat Turns"| ChatService
+    ApiClient <-->|"Streaming Decision Support"| AgenticService
+    ApiClient <-->|"Schema Profiling & Preparation"| SchemaService
+    ApiClient <-->|"Operational Metrics & Traces"| TelemetryService
+    ApiClient <-->|"Readiness & Liveness Probes"| ReadinessService
+
+    SessionHook <--> ChatInterface
+    FormatUtils & NarrativeUtils <--> AnswerView & EvidencePanel
+
+    %% Theme Styling Classes
+    classDef rootClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
+    classDef shellClass fill:#ede7f6,stroke:#4527a0,stroke-width:1.5px,color:#311b92;
+    classDef viewClass fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#01579b;
+    classDef chatClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+    classDef setupClass fill:#fff8e1,stroke:#f57f17,stroke-width:1.5px,color:#e65100;
+    classDef libClass fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef beClass fill:#eceff1,stroke:#455a64,stroke-width:1.5px,color:#263238;
+
+    class RootLayout,GlobalTheme,AppContext,RouteGuard rootClass;
+    class AppShell,Header,WelcomeIntro shellClass;
+    class OverviewView,HeroSection,HeroPlot,ActivityPage,ObsDashboard,MetricCards,TraceTable,CatalogPage,SchemaSection,TableCards,SystemPage,SystemScreen,HealthCard viewClass;
+    class ChatInterface,ChatInputComp,ChatMessageList,StreamingStepper,AnswerView,EvidencePanel,PlotlyRenderer,DataTable,SqlBlock,PresentationDeck,SessionsDrawer,ClarifyModal,RefusalAlert chatClass;
+    class LlmConnectPage,DbConnectPage,PrepPage,SettingsPage,ConnManager,GroqForm,DbForm,PrepProgress setupClass;
+    class ApiClient,SessionHook,ThemeHook,FormatUtils,NarrativeUtils,TypeContracts libClass;
+    class ChatService,AgenticService,SchemaService,TelemetryService,ReadinessService beClass;

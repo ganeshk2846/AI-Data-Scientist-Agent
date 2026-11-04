@@ -1,0 +1,120 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 4: HYBRID RAG & SCHEMA-GROUNDED SQL PIPELINE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph QUERY_INGESTION["1. Natural Language Query Ingestion"]
+        UserQuery["Natural Language Business Query"]
+        QueryTokenizer["Linguistic Tokenizer & Stopword Filter"]
+    end
+
+    subgraph SCHEMA_KNOWLEDGE["2. Schema Knowledge Discovery & Corpus Generation"]
+        direction TB
+        RelationalMetadata["Relational Metadata Catalog<br/>Tables, Columns, Data Types, Constraints & Key Stats"]
+        CorpusGenerator["Schema Document Corpus Builder<br/>Compiles DDL specifications, descriptions & sample values"]
+        SchemaCorpus[("Schema Knowledge Corpus")]
+    end
+
+    subgraph DUAL_RETRIEVAL["3. Dual-Channel Candidate Retrieval (Top 20 Each)"]
+        direction TB
+
+        subgraph DENSE_SEARCH["Channel A: Dense Vector Semantic Search"]
+            EmbeddingModel["FastEmbed Text Embedding Generator<br/>Dense vector representation of table concepts"]
+            VectorStore[("LanceDB Vector Storage<br/>Pre-indexed schema embedding vectors")]
+            DenseRanker["Top 20 Dense Candidates<br/>Ranked by cosine semantic similarity"]
+        end
+
+        subgraph LEXICAL_SEARCH["Channel B: Lexical Frequency Search"]
+            Bm25Engine["Persistent BM25 Lexical Engine<br/>Exact token frequency & inverted index search"]
+            Bm25Index[("BM25 Index Storage<br/>Serialized lexical schema index")]
+            LexicalRanker["Top 20 Lexical Candidates<br/>Ranked by BM25 relevance score"]
+        end
+    end
+
+    subgraph RANK_FUSION["4. Rank Fusion & Relational Graph Expansion"]
+        direction TB
+        RrfFusion["Reciprocal Rank Fusion (RRF)<br/>Combines dense and lexical rankings into unified score"]
+        TopInitial["Top-5 Initial Candidate Tables"]
+        FkGraphExpander["Foreign-Key Graph Expander<br/>Traverses relational join paths to include essential join tables"]
+        GroundedTableSet["Optimal Schema Table Set<br/>Target tables constrained to query context (Up to 7 tables)"]
+    end
+
+    subgraph SEMANTIC_GROUNDING["5. Semantic Layer & Entity Value Linking"]
+        direction TB
+        ValueLinker["Fuzzy Entity Value Linker<br/>Resolves ambiguous query terms to database distinct literals"]
+        SemanticEngine["Dynamic Business Semantic Layer<br/>Maps metric synonyms, KPIs, and dialect date expressions"]
+        GroundedPromptContext["Schema-Grounded Prompt Context<br/>Precise DDLs, verified join keys, literal filters & metric rules"]
+    end
+
+    subgraph SQL_GENERATION["6. Dialect-Aware SQL Generation & Security Gate"]
+        direction TB
+        GroqService["Groq Cloud Inference Platform<br/>Ultra-low-latency SQL query generation"]
+        GeneratedSql["Generated SQL Statement"]
+        
+        subgraph AST_GATE["SQL AST Security Gate (sqlglot)"]
+            AstParser["SQL AST Parser & Validator"]
+            ReadOnlyPolicy["Enforce Read-Only SELECT Policy<br/>Rejects INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE"]
+            InjectionGuard["Anti-Injection & Builtin Routine Guard<br/>Blocks multi-statements, administrative calls & comments"]
+        end
+
+        RepairLoop["Bounded SQL Repair Loop<br/>Feeds exact database syntax errors back for correction (Max 2)"]
+    end
+
+    subgraph EXECUTION_TIER["7. Safe Database Execution & Analytical Processing"]
+        direction TB
+        SafeExecutor["Safe Database Executor<br/>Read-only transaction parameters, 15s timeout, 5k row cap"]
+        EnterpriseWarehouse[("Target Business Warehouse<br/>SQLite / PostgreSQL / MySQL")]
+        DataFrameExtractor["Pandas DataFrame Extraction & Type Normalization"]
+        PythonAnalytics["Deterministic Python Analytics & Calculation"]
+        EvidenceAudit["Critic Evidence Validation & Grounding"]
+        FinalAnswer["Validated Analytical Response & Visualizations"]
+    end
+
+    %% Flow Connections
+    UserQuery --> QueryTokenizer
+    RelationalMetadata --> CorpusGenerator --> SchemaCorpus
+    QueryTokenizer & SchemaCorpus --> EmbeddingModel & Bm25Engine
+
+    EmbeddingModel --> VectorStore --> DenseRanker
+    Bm25Engine --> Bm25Index --> LexicalRanker
+
+    DenseRanker & LexicalRanker --> RrfFusion --> TopInitial
+    TopInitial --> FkGraphExpander
+    RelationalMetadata -.->|"Foreign Key Relationships"| FkGraphExpander
+    FkGraphExpander --> GroundedTableSet
+
+    GroundedTableSet --> ValueLinker & SemanticEngine
+    EnterpriseWarehouse -.->|"Column Distinct Values"| ValueLinker
+    ValueLinker & SemanticEngine --> GroundedPromptContext
+
+    GroundedPromptContext & UserQuery --> GroqService --> GeneratedSql
+    GeneratedSql --> AstParser --> ReadOnlyPolicy --> InjectionGuard
+
+    InjectionGuard -->|"Valid AST Passed"| SafeExecutor
+    InjectionGuard -->|"AST Invalidation"| RepairLoop
+    RepairLoop -->|"Corrective Feedback"| GroqService
+
+    SafeExecutor --> EnterpriseWarehouse
+    EnterpriseWarehouse -->|"Raw Query Rows"| SafeExecutor
+    SafeExecutor -->|"Runtime Query Error"| RepairLoop
+    SafeExecutor -->|"Success"| DataFrameExtractor --> PythonAnalytics --> EvidenceAudit --> FinalAnswer
+
+    %% Styling Classes
+    classDef queryClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
+    classDef metaClass fill:#e8eaf6,stroke:#3f51b5,stroke-width:1.5px,color:#1a237e;
+    classDef denseClass fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef lexClass fill:#e0f7fa,stroke:#00838f,stroke-width:1.5px,color:#006064;
+    classDef rrfClass fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef semClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+    classDef sqlClass fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef execClass fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#1b5e20;
+
+    class UserQuery,QueryTokenizer queryClass;
+    class RelationalMetadata,CorpusGenerator,SchemaCorpus metaClass;
+    class EmbeddingModel,VectorStore,DenseRanker denseClass;
+    class Bm25Engine,Bm25Index,LexicalRanker lexClass;
+    class RrfFusion,TopInitial,FkGraphExpander,GroundedTableSet rrfClass;
+    class ValueLinker,SemanticEngine,GroundedPromptContext semClass;
+    class GroqService,GeneratedSql,AstParser,ReadOnlyPolicy,InjectionGuard,RepairLoop sqlClass;
+    class SafeExecutor,EnterpriseWarehouse,DataFrameExtractor,PythonAnalytics,EvidenceAudit,FinalAnswer execClass;

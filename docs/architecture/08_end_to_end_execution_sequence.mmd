@@ -1,0 +1,129 @@
+sequenceDiagram
+%% =====================================================================
+%% ARCHITECTURE 08: END-TO-END BUSINESS QUESTION EXECUTION SEQUENCE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    autonumber
+    actor User as Business User
+    participant Frontend as Conversational BI Interface
+    participant Gateway as API Gateway & Security
+    participant Tracer as Performance & Tracing Service
+    participant Memory as Conversational Memory Service
+    participant Extractor as Entity & Intent Engine
+    participant Retriever as Hybrid Schema Retriever
+    participant Supervisor as Agentic Supervisor Coordinator
+    participant Specialists as Specialist Analytical Agents
+    participant GroqLLM as Groq Cloud Inference Platform
+    participant Warehouse as Read-Only Database Adapter
+    participant Critic as Faithfulness Critic Specialist
+
+    %% 1. Ingestion
+    User->>Frontend: Enter natural language business question
+    Frontend->>Gateway: Initiate streaming query request
+    activate Gateway
+    Gateway->>Tracer: Start monotonic execution trace
+    Gateway-->>Frontend: Emit progress event: Understanding Question
+
+    %% 2. Context Recall & Entity Extraction
+    Gateway->>Memory: Retrieve session context and recent entity preferences
+    Memory-->>Gateway: Return resolved conversational context
+    Gateway->>Extractor: Extract structured entities and classify business intent
+    activate Extractor
+    Extractor-->>Gateway: Structured Question Profile (Metrics, Dimensions, Intent, Complexity)
+    deactivate Extractor
+
+    %% 3. Answerability & Clarification Gate
+    alt Question is Highly Ambiguous or Underspecified
+        Gateway-->>Frontend: Emit clarification event with structured options
+        Frontend-->>User: Display interactive clarification prompt
+        Note over Gateway,User: Execution pauses until user selects clarification option
+    else Security Violation or Prompt Injection Detected
+        Gateway->>Tracer: Record security rejection event
+        Gateway-->>Frontend: Emit security abstention notice
+        Frontend-->>User: Display Security & Policy Refusal Banner
+    else Question is Valid and Answerable
+        
+        %% 4. Hybrid Schema Retrieval
+        Gateway->>Retriever: Retrieve grounded schema context
+        activate Retriever
+        Retriever->>Retriever: Dense vector search (FastEmbed + LanceDB)
+        Retriever->>Retriever: Lexical frequency search (BM25Okapi)
+        Retriever->>Retriever: Reciprocal Rank Fusion & Foreign-Key Graph Expansion
+        Retriever-->>Supervisor: Grounded schema subset (Target tables, DDLs, value links)
+        deactivate Retriever
+
+        %% 5. Analytical Planning
+        Supervisor->>Supervisor: Generate ordered Analytical Plan DAG
+        Gateway-->>Frontend: Emit progress event: Executing Specialized Analytics
+
+        %% 6. Data Retrieval Specialist Execution
+        Supervisor->>Specialists: Dispatch Task to Data Retrieval Specialist
+        activate Specialists
+        Specialists->>GroqLLM: Request dialect-specific read-only SQL generation
+        GroqLLM-->>Specialists: Return generated SQL query candidate
+
+        %% SQL AST Validation & Bounded Repair
+        Specialists->>Specialists: Validate SQL via AST Parser (sqlglot)
+        alt Syntax Error or AST Invalidation Detected
+            loop Bounded SQL Repair Loop (Maximum 2 Retries)
+                Specialists->>GroqLLM: Send repair prompt with exact error feedback
+                GroqLLM-->>Specialists: Return corrected SQL query
+            end
+        end
+
+        Specialists->>Warehouse: Execute read-only SQL query (Enforces timeout & row caps)
+        Warehouse-->>Specialists: Return raw relational result set
+        Specialists->>Specialists: Extract and normalize into clean Pandas DataFrame
+        Specialists-->>Supervisor: Deliver verified dataset and baseline KPIs
+        deactivate Specialists
+
+        %% 7. Conditional Specialized Analytical Engines
+        opt Question requires Diagnostic Analysis
+            Supervisor->>Specialists: Invoke Diagnostic Specialist
+            Specialists->>Specialists: Run variance decomposition, driver ranking, and anomaly screening
+            Specialists-->>Supervisor: Deliver diagnostic drivers and impact attribution
+        end
+
+        opt Question requires Predictive Forecasting
+            alt Sufficient Historical Temporal Depth Exists
+                Supervisor->>Specialists: Invoke Predictive Specialist
+                Specialists->>Specialists: Fit time-series models (ETS / ARIMA / LightGBM) with prediction bounds
+                Specialists-->>Supervisor: Deliver forecast trajectory and confidence intervals
+            else Insufficient Historical Depth
+                Supervisor->>Supervisor: Record safe abstention due to insufficient historical data
+            end
+        end
+
+        opt Question requires Scenario Simulation or Optimization
+            Supervisor->>Specialists: Invoke Prescriptive Specialist
+            Specialists->>Specialists: Execute parameter perturbation or SciPy constrained optimization
+            Specialists-->>Supervisor: Deliver optimal resource allocation and what-if multipliers
+        end
+
+        %% 8. Synthesis & Critic Validation
+        Supervisor->>GroqLLM: Request executive management synthesis
+        GroqLLM-->>Supervisor: Return draft management narrative
+        
+        Supervisor->>Critic: Invoke Critic Specialist (Audit narrative against computed data)
+        activate Critic
+        Critic->>Critic: Extract numerical claims and verify exact match with DataFrames
+        alt Critic detects unverified claim or numerical discrepancy
+            Critic->>Critic: Flag discrepancy or redact unsupported assertion
+            Critic-->>Supervisor: Deliver verified narrative with audit disclosure
+        else All claims mathematically faithful
+            Critic-->>Supervisor: Deliver verified narrative (Audit Status: VERIFIED)
+        end
+        deactivate Critic
+
+        %% 9. Final Payload & Delivery
+        Supervisor-->>Gateway: Deliver standardized executive response and visualization specs
+        Gateway->>Memory: Persist turn summary and discovered facts to session store
+        Gateway->>Tracer: Record stage spans and finalize end-to-end latency metrics
+        Gateway-->>Frontend: Stream final management brief and Plotly chart configurations
+        Gateway-->>Frontend: Emit stream completion sentinel
+        deactivate Gateway
+
+        %% 10. Frontend Presentation
+        Frontend-->>User: Render Executive Management Brief (WHAT / WHY / WHAT NEXT / SO WHAT) & Charts
+    end

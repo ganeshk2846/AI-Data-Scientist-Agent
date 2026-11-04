@@ -1,0 +1,121 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 5: ANALYTICAL INTELLIGENCE ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph INPUT_CONTRACTS["1. Standardized Input Contracts"]
+        ExtractedData["Clean Extracted Dataset (Pandas DataFrame)"]
+        AnalyticalPlan["Analytical Plan & Mathematical Method Specification"]
+    end
+
+    subgraph ENGINE_TIER["2. The Seven PRD Business Analytical Engines"]
+        direction TB
+
+        subgraph CAT_1["1. Data Discovery Engine"]
+            direction TB
+            SchemaIntrospection["Schema Introspection & Catalog Discovery"]
+            TableProfiling["Column Profiling, Distinct Values & Cardinalities"]
+            RelationshipDiscovery["Relational Key & Foreign Key Traversal"]
+            SemanticEntitySearch["Semantic Entity Relevance Ranking"]
+        end
+
+        subgraph CAT_2["2. Descriptive Analytics Engine"]
+            direction TB
+            SqlAggregation["Multi-Dimensional SQL Aggregations"]
+            PandasVectorization["Pandas Vectorized Statistical Summaries"]
+            PeriodOverPeriod["Period-over-Period Delta Analysis"]
+            TrendDecomposition["Trend, Seasonality & Cyclical Decomposition"]
+        end
+
+        subgraph CAT_3["3. Diagnostic Analytics Engine"]
+            direction TB
+            DriverRanking["Statistical Driver Ranking & Contribution"]
+            VarianceDecomposition["Variance Decomposition & Price-Volume Mix"]
+            AnomalyDetection["Statistical Anomaly Screening (MAD / Z-Score / Isolation Forest)"]
+            CorrelationAnalysis["Multi-Variable Correlation Matrix"]
+        end
+
+        subgraph CAT_4["4. Impact Analytics Engine ('So What?')"]
+            direction TB
+            DeltaMetrics["Absolute and Percentage Impact Quantifiers"]
+            SignificanceTesting["Statistical Significance Testing (Student's t-Test, p &lt; 0.05)"]
+            ConfidenceIntervals["95% Confidence Interval Calculation"]
+            MonetaryRisk["Monetary Revenue Risk & Annualized Dollar Exposure"]
+        end
+
+        subgraph CAT_5["5. Predictive Analytics Engine"]
+            direction TB
+            HoltWinters["Exponential Smoothing & Holt-Winters Models"]
+            ArimaModeling["ARIMA / SARIMAX Time-Series Forecasting"]
+            LightGbmRegression["LightGBM Machine Learning Regressor"]
+            BacktestingSuite["Sliding-Window Walk-Forward Backtesting (MAE, RMSE, MAPE)"]
+            PredictionBounds["80% & 95% Prediction Confidence Bounds"]
+            ChurnScoring["Customer Churn Risk & RFM Recency-Frequency Scoring"]
+        end
+
+        subgraph CAT_6["6. Scenario Analytics Engine ('What-If?')"]
+            direction TB
+            ParameterPerturbation["Parameter Perturbation (Price, Demand, Cost Multipliers)"]
+            ElasticityMatrix["Price & Demand Elasticity Modeling"]
+            SensitivityAnalysis["Sensitivity Curves & Breakeven Thresholds"]
+            ComparativeMatrix["Baseline vs Simulated Scenario Comparisons"]
+        end
+
+        subgraph CAT_7["7. Prescriptive Optimization Engine"]
+            direction TB
+            MathematicalOptimization["SciPy Constrained Optimization (SLSQP Solver)"]
+            ObjectiveFunctions["Objective Formulation (Revenue Maximization, Churn Minimization)"]
+            ConstraintModeling["Operational, Capacity & Budget Constraint Enforcement"]
+            PolicyRecommendations["Actionable Policy Recommendations & Trade-Off Analysis"]
+        end
+    end
+
+    subgraph CRITIC_TIER["3. Cross-Cutting Evidence Validation & Hallucination Gate"]
+        direction TB
+        NumericalFactMatcher["Numerical Fact Matcher<br/>Extracts narrative claims and verifies exact match against computed results"]
+        CausalLogicGuard["Causal Assertion Guard<br/>Detects and flags unsupported causal assertions"]
+        EvidenceAuditor["Evidence Audit Decision<br/>VERIFIED / DISCREPANCY FLAGGED / ABSTAINED"]
+    end
+
+    subgraph PRESENTATION_TIER["4. Standardized Analytical Deliverables"]
+        direction TB
+        ExecutiveBrief["Structured Executive Management Brief<br/>WHAT Happened | WHY It Happened | WHAT NEXT to Expect | SO WHAT Business Impact"]
+        InteractiveCharts["Interactive Plotly Visualizations<br/>Time-series trajectories, driver waterfalls, distribution bars, and scenario curves"]
+    end
+
+    %% Analytical Dependencies & Data Handoffs
+    ExtractedData & AnalyticalPlan --> CAT_1 & CAT_2 & CAT_3 & CAT_4 & CAT_5 & CAT_6 & CAT_7
+
+    CAT_2 -->|"Baseline Historical Metrics"| CAT_3 & CAT_5
+    CAT_3 -->|"Driver Attribution & Anomaly Weights"| CAT_4 & CAT_7
+    CAT_5 -->|"Forecast Trajectories & Baselines"| CAT_6 & CAT_7
+    CAT_6 -->|"Elasticity Multipliers"| CAT_7
+
+    CAT_1 & CAT_2 & CAT_3 & CAT_4 & CAT_5 & CAT_6 & CAT_7 --> NumericalFactMatcher
+    NumericalFactMatcher --> CausalLogicGuard --> EvidenceAuditor
+    EvidenceAuditor -->|"Approved Evidence"| ExecutiveBrief & InteractiveCharts
+
+    %% Styling Classes
+    classDef inputClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
+    classDef discClass fill:#e0f7fa,stroke:#00838f,stroke-width:1.5px,color:#006064;
+    classDef descClass fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#1b5e20;
+    classDef diagClass fill:#fff8e1,stroke:#f57f17,stroke-width:1.5px,color:#e65100;
+    classDef impactClass fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef predClass fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef scenClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+    classDef prescClass fill:#fce4ec,stroke:#c2185b,stroke-width:1.5px,color:#880e4f;
+    classDef criticClass fill:#e0f2f1,stroke:#00796b,stroke-width:2px,color:#004d40;
+    classDef outClass fill:#f5f5f5,stroke:#424242,stroke-width:1.5px,color:#212121;
+
+    class ExtractedData,AnalyticalPlan inputClass;
+    class SchemaIntrospection,TableProfiling,RelationshipDiscovery,SemanticEntitySearch discClass;
+    class SqlAggregation,PandasVectorization,PeriodOverPeriod,TrendDecomposition descClass;
+    class DriverRanking,VarianceDecomposition,AnomalyDetection,CorrelationAnalysis diagClass;
+    class DeltaMetrics,SignificanceTesting,ConfidenceIntervals,MonetaryRisk impactClass;
+    class HoltWinters,ArimaModeling,LightGbmRegression,BacktestingSuite,PredictionBounds,ChurnScoring predClass;
+    class ParameterPerturbation,ElasticityMatrix,SensitivityAnalysis,ComparativeMatrix scenClass;
+    class MathematicalOptimization,ObjectiveFunctions,ConstraintModeling,PolicyRecommendations prescClass;
+    class NumericalFactMatcher,CausalLogicGuard,EvidenceAuditor criticClass;
+    class ExecutiveBrief,InteractiveCharts outClass;
+

@@ -1,0 +1,120 @@
+flowchart TB
+%% =====================================================================
+%% ARCHITECTURE 09: SECURITY, OBSERVABILITY & PERFORMANCE ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph SECURITY_PILLAR["SECURITY ARCHITECTURE PILLAR"]
+        direction TB
+
+        subgraph CREDENTIAL_PROTECTION["1. Credential & Environment Protection"]
+            EnvironmentConfig["Protected Environment Configuration<br/>System credentials isolated from version control"]
+            LoggingFilter["Structured Logging Redaction Filter<br/>Automated pattern-based masking of API keys & credentials"]
+            ZeroTrustClient["Zero-Trust Client Boundary<br/>Zero credential exposure to client web application"]
+        end
+
+        subgraph DATABASE_SECURITY["2. Database Read-Only Isolation"]
+            ConnectionSecurity["Database Security Manager"]
+            SqliteReadOnly["SQLite Read-Only Enforcement<br/>Locking via query-only pragmas"]
+            PostgresReadOnly["PostgreSQL Session Isolation<br/>Read-only transaction parameters"]
+            MySqlReadOnly["MySQL Session Isolation<br/>Read-only transaction parameters"]
+        end
+
+        subgraph SQL_GUARDRAILS["3. SQL AST Security Gate"]
+            AstValidator["SQL AST Security Gate (sqlglot)"]
+            MutationBlock["Block All DDL & DML Mutations<br/>Rejects INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE"]
+            InjectionBlock["Block System Builtins & SQL Injection<br/>Rejects multi-statements, administrative calls & comments"]
+            ExecutionGuard["Execution Safety Guard<br/>Strict 15-second query timeout and 5,000 row cap"]
+        end
+
+        subgraph DOMAIN_ISOLATION["4. Multi-Tenant & Domain Isolation"]
+            FingerprintHash["Cryptographic Database Fingerprinting<br/>SHA-256 schema hash partitions all cache artifacts"]
+            SessionIsolation["Session Isolation Partitioning<br/>Memory isolated by session ID and warehouse fingerprint"]
+            PromptSanitization["Prompt Injection Guard<br/>Pattern heuristics block instruction override attempts"]
+        end
+    end
+
+    subgraph OBSERVABILITY_PILLAR["OBSERVABILITY & PERFORMANCE PILLAR"]
+        direction TB
+
+        subgraph TRACING_CORE["1. Operational Tracer Engine"]
+            PerformanceTracer["Operational Performance Tracer<br/>High-resolution monotonic execution timing"]
+            TraceContext["Unique Trace Correlation Context<br/>UUID4 run ID, session reference & request ID"]
+        end
+
+        subgraph OPERATIONAL_STORE["2. Dedicated Observability Store"]
+            direction TB
+            RunTracesStore[("Execution Run Traces Store<br/>Top-level run metrics, tokens, intent, errors & orchestrator type")]
+            StageSpansStore[("Stage-Level Spans Store<br/>Granular execution checkpoints, durations & status metadata")]
+        end
+
+        subgraph STAGE_CHECKPOINTS["3. Stage-Level Latency Checkpoints"]
+            direction TB
+            Stage1["1. Request Reception & Security Check"]
+            Stage2["2. Structured Entity Extraction & Intent Classification"]
+            Stage3["3. Hybrid Schema Retrieval & Rank Fusion"]
+            Stage4["4. Groq Prompt Context Packing"]
+            Stage5["5. Groq Cloud LPU Inference Execution"]
+            Stage6["6. Dialect SQL Generation"]
+            Stage7["7. sqlglot AST Security Gate Validation"]
+            Stage8["8. Read-Only Database Query Execution"]
+            Stage9["9. Deterministic Python Analytics Execution"]
+            Stage10["10. Specialist Orchestration Coordination"]
+            Stage11["11. Critic Evidence Verification & Audit"]
+            Stage12["12. Executive Management Synthesis"]
+            Stage13["13. Response Delivery & Stream Finalization"]
+        end
+
+        subgraph STREAMING_TELEMETRY["4. Streaming Latency Metrics"]
+            TtfeMetric["Time to First Event (TTFE)<br/>Monitors initial user acknowledgment latency"]
+            TtfoMetric["Time to First Output (TTFO)<br/>Monitors time to first meaningful analytical token"]
+            TotalStreamMetric["Total Streaming Duration<br/>Monitored until terminal stream completion sentinel"]
+        end
+
+        subgraph TELEMETRY_ANALYTICS["5. Telemetry API & Non-Parametric Analytics"]
+            TelemetryService["Operational Telemetry Service"]
+            PercentileEngine["Statistical Percentile Engine<br/>Exact non-parametric p50, p95, p99 metrics & success rates"]
+            TelemetryUI["Operational Telemetry Dashboard<br/>Interactive visualization of system latencies and error logs"]
+        end
+    end
+
+    %% Security Linkages
+    EnvironmentConfig --> LoggingFilter --> ZeroTrustClient
+    ConnectionSecurity --> SqliteReadOnly & PostgresReadOnly & MySqlReadOnly
+    AstValidator --> MutationBlock & InjectionBlock --> ExecutionGuard
+    FingerprintHash & SessionIsolation & PromptSanitization --> ConnectionSecurity
+
+    %% Observability Linkages
+    PerformanceTracer --> TraceContext
+    TraceContext --> STAGE_CHECKPOINTS
+    STAGE_CHECKPOINTS --> StageSpansStore
+    TraceContext --> RunTracesStore
+    STREAMING_TELEMETRY --> RunTracesStore
+
+    RunTracesStore & StageSpansStore --> PercentileEngine --> TelemetryService --> TelemetryUI
+
+    %% Cross-Pillar Linkage
+    ExecutionGuard -.->|"Timeout Incidents"| PerformanceTracer
+    MutationBlock -.->|"Security Blocks"| PerformanceTracer
+    PromptSanitization -.->|"Injection Blocks"| PerformanceTracer
+
+    %% Theme Classes
+    classDef secEnv fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef secDb fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#1b5e20;
+    classDef secSql fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef secIso fill:#fce4ec,stroke:#c2185b,stroke-width:1.5px,color:#880e4f;
+    classDef obsCore fill:#e1f5fe,stroke:#0288d1,stroke-width:1.5px,color:#01579b;
+    classDef obsStore fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef obsStage fill:#fff8e1,stroke:#f57f17,stroke-width:1.5px,color:#e65100;
+    classDef obsStream fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1.5px,color:#4a148c;
+    classDef obsApi fill:#f5f5f5,stroke:#424242,stroke-width:1.5px,color:#212121;
+
+    class EnvironmentConfig,LoggingFilter,ZeroTrustClient secEnv;
+    class ConnectionSecurity,SqliteReadOnly,PostgresReadOnly,MySqlReadOnly secDb;
+    class AstValidator,MutationBlock,InjectionBlock,ExecutionGuard secSql;
+    class FingerprintHash,SessionIsolation,PromptSanitization secIso;
+    class PerformanceTracer,TraceContext obsCore;
+    class RunTracesStore,StageSpansStore obsStore;
+    class Stage1,Stage2,Stage3,Stage4,Stage5,Stage6,Stage7,Stage8,Stage9,Stage10,Stage11,Stage12,Stage13 obsStage;
+    class TtfeMetric,TtfoMetric,TotalStreamMetric obsStream;
+    class TelemetryService,PercentileEngine,TelemetryUI obsApi;

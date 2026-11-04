@@ -1,0 +1,54 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 1: SYSTEM CONTEXT ARCHITECTURE
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph ACTORS["Enterprise Stakeholders"]
+        BusinessUser["Business Executive & Decision Maker"]
+        DataAnalyst["BI & Analytics Professional"]
+    end
+
+    subgraph AI_BI_SYSTEM["AI for BI Enterprise Platform"]
+        direction TB
+        FrontendApp["Conversational BI Application<br/>Interactive Dashboards & Streaming Interface"]
+        BackendPlatform["Data Scientist Agent Engine<br/>Orchestration, Analytics & Security Gateway"]
+        LocalStores[("Application & Vector Storage<br/>Operational Traces, Sessions & Schema Caches")]
+        
+        FrontendApp <-->|"Secure REST & Real-Time SSE"| BackendPlatform
+        BackendPlatform <-->|"Local Caching & State"| LocalStores
+    end
+
+    subgraph EXTERNAL_SERVICES["External Services & Enterprise Data"]
+        direction TB
+        GroqService["Groq Cloud Inference Platform<br/>Ultra-Fast LPUs (Llama 3.3 / GPT-OSS)"]
+        
+        subgraph ENTERPRISE_WAREHOUSES["Connected Enterprise Data Warehouses (Read-Only)"]
+            SqliteWarehouse["SQLite Database Files"]
+            PostgresWarehouse["PostgreSQL Enterprise Instances"]
+            MySqlWarehouse["MySQL Business Databases"]
+        end
+    end
+
+    %% High-level relationships
+    BusinessUser -->|"Asks Natural Language Questions"| FrontendApp
+    DataAnalyst -->|"Explores Schemas & Evaluates Traces"| FrontendApp
+    FrontendApp -->|"Presents Management Briefs & Charts"| BusinessUser
+    
+    BackendPlatform -->|"Schema-Grounded Prompt Context"| GroqService
+    GroqService -->|"Generated SQL & Analytical Syntheses"| BackendPlatform
+
+    BackendPlatform -->|"Read-Only Parameterized Queries"| ENTERPRISE_WAREHOUSES
+    ENTERPRISE_WAREHOUSES -->|"Raw Relational Datasets"| BackendPlatform
+
+    %% Theme Styling
+    classDef actorClass fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1;
+    classDef appClass fill:#ede7f6,stroke:#4527a0,stroke-width:2px,color:#311b92;
+    classDef extClass fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f;
+    classDef dbClass fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+
+    class BusinessUser,DataAnalyst actorClass;
+    class FrontendApp,BackendPlatform,LocalStores appClass;
+    class GroqService extClass;
+    class SqliteWarehouse,PostgresWarehouse,MySqlWarehouse dbClass;
+

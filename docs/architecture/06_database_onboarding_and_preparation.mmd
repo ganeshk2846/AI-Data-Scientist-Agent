@@ -1,0 +1,113 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 6: DATABASE ONBOARDING & PREPARATION WORKFLOW
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph CONNECTION_TIER["1. Connection Onboarding & Input Channels"]
+        direction TB
+        
+        subgraph INPUT_SOURCES["User Onboarding Interfaces"]
+            LlmConfig["Groq Cloud LLM Configuration<br/>API key validation & model selection"]
+            DatabaseConfig["Warehouse Connection Form<br/>Connection string or local database file upload"]
+            SettingsSwitch["Connection Settings Control<br/>Runtime switching between active databases"]
+        end
+
+        subgraph GATEWAY_VERIFICATION["Connection Verification Gateway"]
+            TestLlm["LLM Connectivity & Quota Verification"]
+            TestDb["Database Ping & Read-Only Handshake"]
+        end
+    end
+
+    subgraph SECURITY_ENFORCEMENT["2. Multi-Engine Read-Only Enforcement"]
+        direction TB
+        ConnectionManager["Database Connection Manager"]
+
+        subgraph ENGINE_ADAPTERS["Read-Only Engine Adapters"]
+            SqliteMode["SQLite Read-Only Enforcement<br/>PRAGMA query-only locking"]
+            PostgresMode["PostgreSQL Transaction Isolation<br/>Read-only session characteristics"]
+            MySqlMode["MySQL Transaction Isolation<br/>Read-only session characteristics"]
+        end
+
+        ConnectedWarehouse[("Connected Target Warehouse")]
+    end
+
+    subgraph FINGERPRINT_TIER["3. Cryptographic Fingerprint Generation"]
+        direction TB
+        CryptographicSalt["Cryptographic Salt Generator"]
+        FingerprintEngine["Database Fingerprint Generator<br/>Computes SHA-256 hash of tables, column counts & schema structure"]
+        UniqueFingerprint["Unique Database Fingerprint ID"]
+    end
+
+    subgraph ASYNC_PREPARATION["4. Asynchronous 7-Stage Schema Preparation Job"]
+        direction TB
+        JobCoordinator["Asynchronous Preparation Job Coordinator"]
+
+        subgraph SEVEN_STAGES["The 7 Sequential Lifecycle Stages"]
+            Stage1["Stage 1: Connection Verification<br/>Verifies dialect and validates read-only security mode"]
+            Stage2["Stage 2: Schema Discovery<br/>Introspects tables, views, primary keys, and foreign keys"]
+            Stage3["Stage 3: Table Profiling<br/>Calculates row counts, null ratios, distinct counts & value ranges"]
+            Stage4["Stage 4: Semantic Metadata Construction<br/>Builds textual schema corpus and dynamic metric definitions"]
+            Stage5["Stage 5: Dense Vector Indexing<br/>Encodes FastEmbed embeddings and builds LanceDB vector tables"]
+            Stage6["Stage 6: Lexical BM25 Indexing<br/>Tokenizes schema documents and persists BM25 inverted index"]
+            Stage7["Stage 7: Final Preparation Verification<br/>Executes test retrieval query to confirm indexing integrity"]
+        end
+    end
+
+    subgraph PARTITIONED_STORAGE["5. Fingerprint-Partitioned Local Storage"]
+        direction TB
+        MetadataCatalog[("Metadata Catalog Cache")]
+        VectorStore[("LanceDB Dense Vector Storage")]
+        LexicalStore[("Persistent BM25 Lexical Storage")]
+    end
+
+    subgraph HOT_SWITCHING["6. Database Switching & Cache Invalidation"]
+        direction TB
+        SwitchEvent["Database Switching Triggered"]
+        CacheClear["Invalidate In-Memory Catalogs & Retrievers"]
+        ArtifactCheck{"Pre-Existing Verified Artifacts on Disk?"}
+        ImmediateLoad["Immediate Chat Readiness (&lt;50ms Warm Start)"]
+        BackgroundJob["Execute 7-Stage Preparation in Background"]
+    end
+
+    subgraph READINESS_TIER["7. System Readiness & Chat Activation"]
+        direction TB
+        ReadinessGate["System Readiness Gate<br/>Confirms LLM Ready + Database Ready + Schema Ready"]
+        WorkspaceUnlocked["Conversational BI Workspace Unlocked for User"]
+    end
+
+    %% Pipeline Connections
+    LlmConfig --> TestLlm
+    DatabaseConfig & SettingsSwitch --> TestDb
+    TestLlm & TestDb --> ConnectionManager
+    ConnectionManager --> ENGINE_ADAPTERS --> ConnectedWarehouse
+
+    ConnectedWarehouse --> FingerprintEngine
+    CryptographicSalt --> FingerprintEngine --> UniqueFingerprint
+
+    UniqueFingerprint --> SwitchEvent --> CacheClear --> ArtifactCheck
+    ArtifactCheck -->|"Yes (Pre-indexed Database)"| ImmediateLoad --> ReadinessGate
+    ArtifactCheck -->|"No (New / Modified Database)"| BackgroundJob --> JobCoordinator
+
+    JobCoordinator --> Stage1 --> Stage2 --> Stage3 --> Stage4 --> Stage5 --> Stage6 --> Stage7
+    Stage2 & Stage3 --> MetadataCatalog
+    Stage5 --> VectorStore
+    Stage6 --> LexicalStore
+    Stage7 --> ReadinessGate --> WorkspaceUnlocked
+
+    %% Styling Classes
+    classDef trigClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
+    classDef secClass fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef fpClass fill:#fce4ec,stroke:#c2185b,stroke-width:1.5px,color:#880e4f;
+    classDef jobClass fill:#fff8e1,stroke:#f57f17,stroke-width:1.5px,color:#e65100;
+    classDef storeClass fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef switchClass fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef readyClass fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20;
+
+    class LlmConfig,DatabaseConfig,SettingsSwitch,TestLlm,TestDb trigClass;
+    class ConnectionManager,SqliteMode,PostgresMode,MySqlMode,ConnectedWarehouse secClass;
+    class CryptographicSalt,FingerprintEngine,UniqueFingerprint fpClass;
+    class JobCoordinator,Stage1,Stage2,Stage3,Stage4,Stage5,Stage6,Stage7 jobClass;
+    class MetadataCatalog,VectorStore,LexicalStore storeClass;
+    class SwitchEvent,CacheClear,ArtifactCheck,ImmediateLoad,BackgroundJob switchClass;
+    class ReadinessGate,WorkspaceUnlocked readyClass;

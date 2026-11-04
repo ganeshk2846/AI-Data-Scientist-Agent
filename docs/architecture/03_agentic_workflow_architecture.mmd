@@ -1,0 +1,136 @@
+flowchart TB
+%% =====================================================================
+%% LEVEL 3: AGENTIC WORKFLOW & MULTI-AGENT ORCHESTRATION
+%% AI for BI — Conversational Data Scientist Agent
+%% =====================================================================
+
+    subgraph INGESTION["1. Question Ingestion & Session Isolation"]
+        UserQuestion["Business Question Prompt"]
+        SessionContext["Isolated Conversational Session Context"]
+    end
+
+    subgraph UNDERSTANDING["2. Structured Understanding & Classification"]
+        direction TB
+        EntityExtraction["Structured Entity Extractor<br/>Identifies metrics, dimensions, temporal bounds, and filters"]
+        IntentClassification["Intent & Complexity Classifier<br/>Categorizes intent and scores complexity tier"]
+        ClassificationOutput["Structured Intent Profile<br/>Primary Intent & Complexity Tier"]
+    end
+
+    subgraph PLANNING["3. Autonomous Analytical Planning"]
+        direction TB
+        DagPlanner["Analytical Plan DAG Generator<br/>Constructs ordered task execution graph with dependencies"]
+        ExecutionPlan["Standardized Analytical Plan<br/>Task DAG & Required Mathematical Methods"]
+    end
+
+    subgraph SUPERVISOR_CORE["4. Agentic Supervisor Task Coordination"]
+        direction TB
+        Supervisor["Agentic Supervisor Coordinator<br/>- Dispatches tasks to specialist agents<br/>- Manages upstream-to-downstream data handoffs<br/>- Enforces 2-round clarification cap<br/>- Handles exceptions and graceful fallbacks"]
+    end
+
+    subgraph SPECIALIST_TIER["5. The Five Specialist Analytical Agents"]
+        direction TB
+
+        subgraph SPECIALIST_1["Specialist 1: Data Retrieval Specialist"]
+            DataRetrieval["Data Retrieval Specialist<br/>Hybrid schema retrieval, SQL generation, read-only execution"]
+        end
+
+        subgraph SPECIALIST_2["Specialist 2: Diagnostic Specialist"]
+            Diagnostic["Diagnostic Specialist<br/>Driver ranking, variance decomposition, impact evaluation"]
+        end
+
+        subgraph SPECIALIST_3["Specialist 3: Predictive Specialist"]
+            Predictive["Predictive Specialist<br/>Time-series forecasting, backtesting, churn risk scoring"]
+        end
+
+        subgraph SPECIALIST_4["Specialist 4: Prescriptive Specialist"]
+            Prescriptive["Prescriptive Specialist<br/>What-if scenario simulation, constrained optimization"]
+        end
+
+        subgraph SPECIALIST_5["Specialist 5: Critic Specialist"]
+            Critic["Critic Specialist<br/>Numerical claim verification, causal logic audit"]
+        end
+    end
+
+    subgraph ENGINE_TIER["6. Deterministic Calculation Engines"]
+        direction TB
+        DescriptiveEng["Descriptive Analytics Engine"]
+        DiagnosticEng["Diagnostic & Outlier Engine"]
+        ImpactEng["Impact Analytics Engine ('So What?')"]
+        PredictiveEng["Predictive Forecasting Engine"]
+        ChurnEng["Customer Churn & Risk Engine"]
+        ScenarioEng["Scenario Simulation Engine ('What-If?')"]
+        PrescriptiveEng["Prescriptive Optimization Engine"]
+    end
+
+    subgraph VERIFICATION_TIER["7. Evidence Verification & Hallucination Gate"]
+        direction TB
+        FactMatcher["Numerical Fact Matcher<br/>Verifies narrative numbers against computed datasets"]
+        CausalGuard["Causal Assertion Guard<br/>Blocks unsupported claims of causality"]
+        AuditReport["Audit Verification Status<br/>Verified / Discrepancy Flagged / Abstained"]
+    end
+
+    subgraph SYNTHESIS_TIER["8. Executive Management Briefing"]
+        direction TB
+        ExecutiveSynthesis["Executive Answer Composer<br/>Synthesizes verified findings into standard structure"]
+        
+        subgraph BRIEF_SECTIONS["Standard Management Report Sections"]
+            SectionWhat["WHAT Happened<br/>Historical facts, performance metrics & KPIs"]
+            SectionWhy["WHY It Happened<br/>Root-cause drivers, variance attribution & anomalies"]
+            SectionNext["WHAT NEXT to Expect<br/>Forward-looking trajectories & prediction intervals"]
+            SectionImpact["SO WHAT Business Impact<br/>Monetary revenue risk, scenario trade-offs & policy advice"]
+        end
+
+        InteractiveVisualizations["Interactive Visualizations<br/>Dynamic charts, tabular views, and scenario curves"]
+    end
+
+    %% Execution & Data Handoff Flow
+    UserQuestion & SessionContext --> EntityExtraction --> IntentClassification --> ClassificationOutput
+    ClassificationOutput --> DagPlanner --> ExecutionPlan --> Supervisor
+
+    Supervisor -->|"1. Dispatch Query Plan"| DataRetrieval
+    DataRetrieval --> DescriptiveEng
+    DescriptiveEng -->|"Extracted Datasets & KPIs"| DataRetrieval
+    DataRetrieval -->|"Clean Dataset Handoff"| Supervisor
+
+    Supervisor -->|"2. Forward Upstream Data"| Diagnostic
+    Diagnostic --> DiagnosticEng & ImpactEng
+    DiagnosticEng & ImpactEng -->|"Root Causes & Impact Scores"| Diagnostic
+    Diagnostic -->|"Diagnostic Findings Handoff"| Supervisor
+
+    Supervisor -->|"3. Forward Trend Data"| Predictive
+    Predictive --> PredictiveEng & ChurnEng
+    PredictiveEng & ChurnEng -->|"Forecasts & Churn Profiles"| Predictive
+    Predictive -->|"Predictive Trajectory Handoff"| Supervisor
+
+    Supervisor -->|"4. Forward Baselines & Targets"| Prescriptive
+    Prescriptive --> ScenarioEng & PrescriptiveEng
+    ScenarioEng & PrescriptiveEng -->|"Optimized Policies & Simulation Multipliers"| Prescriptive
+    Prescriptive -->|"Prescriptive Recommendations Handoff"| Supervisor
+
+    Supervisor -->|"5. Draft Findings & Data"| Critic
+    Critic --> FactMatcher --> CausalGuard --> AuditReport
+    AuditReport -->|"Audit Decision"| Critic
+    Critic -->|"Verified Evidence"| ExecutiveSynthesis
+
+    ExecutiveSynthesis --> SectionWhat & SectionWhy & SectionNext & SectionImpact
+    ExecutiveSynthesis --> InteractiveVisualizations
+
+    %% Styling Classes
+    classDef ingestClass fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#0d47a1;
+    classDef underClass fill:#ede7f6,stroke:#512da8,stroke-width:1.5px,color:#311b92;
+    classDef planClass fill:#e8eaf6,stroke:#3949ab,stroke-width:1.5px,color:#1a237e;
+    classDef supClass fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c;
+    classDef specClass fill:#fff3e0,stroke:#e65100,stroke-width:1.5px,color:#bf360c;
+    classDef engClass fill:#e0f2f1,stroke:#00796b,stroke-width:1.5px,color:#004d40;
+    classDef auditClass fill:#fbe9e7,stroke:#d84315,stroke-width:1.5px,color:#bf360c;
+    classDef outClass fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,color:#1b5e20;
+
+    class UserQuestion,SessionContext ingestClass;
+    class EntityExtraction,IntentClassification,ClassificationOutput underClass;
+    class DagPlanner,ExecutionPlan planClass;
+    class Supervisor supClass;
+    class DataRetrieval,Diagnostic,Predictive,Prescriptive,Critic specClass;
+    class DescriptiveEng,DiagnosticEng,ImpactEng,PredictiveEng,ChurnEng,ScenarioEng,PrescriptiveEng engClass;
+    class FactMatcher,CausalGuard,AuditReport auditClass;
+    class ExecutiveSynthesis,SectionWhat,SectionWhy,SectionNext,SectionImpact,InteractiveVisualizations outClass;
+
